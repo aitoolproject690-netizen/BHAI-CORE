@@ -38,7 +38,8 @@ async function ensureLoaded() {
       auditLog: parsed.auditLog ?? [],
       approvals: parsed.approvals,
     services: parsed.services || {},
-    deployments: parsed.deployments || {}
+    deployments: parsed.deployments || {},
+      domains: parsed.domains || {}
     };
   } catch {
     state = emptyState();

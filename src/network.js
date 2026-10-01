@@ -1,0 +1,97 @@
+import crypto from "node:crypto";
+import http from "node:http";
+import https from "node:https";
+import { getStore, updateStore } from "./store.js";
+
+const ROUTE_STATUSES = new Set(["active", "disabled"]);
+
+function validPort(port) {
+  const n = Number(port);
+  return Number.isInteger(n) && n >= 1 && n <= 65535;
+}
+
+function normalizeHost(hostname) {
+  return String(hostname || "").trim().toLowerCase().replace(/:\d+$/, "");
+}
+
+function validHostname(host) {
+  return /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(host);
+}
+
+function publicRoute(r) {
+  return { id:r.id, ownerId:r.ownerId, hostname:r.hostname, serviceId:r.serviceId, targetHost:r.targetHost, targetPort:r.targetPort, status:r.status, createdAt:r.createdAt, updatedAt:r.updatedAt };
+}
+
+export async function createRoute({ ownerId, hostname, serviceId, targetHost="127.0.0.1", targetPort } = {}) {
+  const host = normalizeHost(hostname);
+  if (!ownerId || !host || !serviceId || !validPort(targetPort))
+    throw Object.assign(new Error("ownerId, hostname, serviceId and valid targetPort required"), { code:"ROUTE_FIELDS_REQUIRED", status:400 });
+  if (!validHostname(host))
+    throw Object.assign(new Error("Invalid route hostname"), { code:"ROUTE_HOST_INVALID", status:400 });
+  const existing = await findRouteByHostname(host);
+  if (existing && existing.ownerId !== ownerId)
+    throw Object.assign(new Error("Hostname is already owned"), { code:"ROUTE_HOST_CONFLICT", status:409 });
+  if (existing)
+    throw Object.assign(new Error("Hostname already routed"), { code:"ROUTE_EXISTS", status:409 });
+  const id = "rte_" + crypto.randomUUID();
+  const now = new Date().toISOString();
+  const route = { id, ownerId, hostname:host, serviceId, targetHost:String(targetHost || "127.0.0.1"), targetPort:Number(targetPort), status:"active", createdAt:now, updatedAt:now };
+  await updateStore(store => { store.routes ??= {}; store.routes[id] = route; return store; });
+  return publicRoute(route);
+}
+
+export async function getRoute(id, ownerId) {
+  const store = await getStore();
+  const r = store.routes?.[id];
+  return r && r.ownerId === ownerId ? publicRoute(r) : null;
+}
+
+export async function listRoutes(ownerId) {
+  const store = await getStore();
+  return Object.values(store.routes || {}).filter(r => r.ownerId === ownerId).map(publicRoute);
+}
+
+export async function findRouteByHostname(hostname) {
+  const host = normalizeHost(hostname);
+  const store = await getStore();
+  const r = Object.values(store.routes || {}).find(x => x.hostname === host && x.status === "active");
+  return r ? publicRoute(r) : null;
+}
+
+export async function setRouteStatus(id, ownerId, status) {
+  if (!ROUTE_STATUSES.has(status))
+    throw Object.assign(new Error("Invalid route status"), { code:"ROUTE_STATUS_INVALID", status:400 });
+  let found = false;
+  await updateStore(store => {
+    const r = store.routes?.[id];
+    if (!r || r.ownerId !== ownerId) return store;
+    r.status = status;
+    r.updatedAt = new Date().toISOString();
+    found = true;
+    return store;
+  });
+  return found ? getRoute(id, ownerId) : null;
+}
+
+export function networkInfo() {
+  return { persistent:true, ownerScoped:true, routing:"hostname_to_service", statuses:[...ROUTE_STATUSES], proxy:"http/https" };
+}
+
+export function proxyRequest(req, res, route) {
+  return new Promise(resolve => {
+    const transport = process.env.BHAI_NETWORK_TLS === "true" ? https : http;
+    const headers = { ...req.headers, host: route.targetHost + ":" + route.targetPort, "x-bhai-route-id": route.id };
+    const upstream = transport.request({ hostname:route.targetHost, port:route.targetPort, method:req.method, path:req.url, headers, timeout:Number(process.env.BHAI_NETWORK_PROXY_TIMEOUT_MS || 15000) }, response => {
+      res.writeHead(response.statusCode || 502, response.headers);
+      response.pipe(res);
+      response.on("end", resolve);
+    });
+    upstream.on("timeout", () => upstream.destroy(new Error("Upstream timeout")));
+    upstream.on("error", () => {
+      if (!res.headersSent) { res.writeHead(502, {"content-type":"application/json","cache-control":"no-store"}); res.end(JSON.stringify({ok:false,error:"Upstream service unavailable"})); }
+      else res.destroy();
+      resolve();
+    });
+    req.pipe(upstream);
+  });
+}

@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { getStore, updateStore } from "./store.js";
-import { embedText, embeddingInfo } from "./embeddings.js";
+import { createEmbeddingProvider, embeddingInfo } from "./embeddings.js";
 import { rankVectors, stripVectors } from "./vectorStore.js";
 
 const DEFAULT_CHUNK_SIZE = Number(process.env.BHAI_CHUNK_SIZE || 1200);
@@ -26,12 +26,16 @@ export function chunkText(text, options = {}) {
   return chunks;
 }
 
+const embeddingProvider = createEmbeddingProvider();
+
 export async function indexFile(file) {
   if (!file?.id || !file.ownerId) throw new Error("file with id and ownerId is required");
-  const chunks = chunkText(file.text).map((chunk, index) => ({
+  const pieces = chunkText(file.text);
+  const vectors = await embeddingProvider.embedMany(pieces.map(chunk => chunk.content));
+  const chunks = pieces.map((chunk, index) => ({
     id: makeId(), fileId: file.id, ownerId: file.ownerId, index,
     start: chunk.start, end: chunk.end, content: chunk.content,
-    tokens: tokenize(chunk.content), vector: embedText(chunk.content)
+    tokens: tokenize(chunk.content), vector: vectors[index]
   }));
   await updateStore(store => {
     store.ragChunks ??= {};
@@ -76,7 +80,7 @@ export async function searchRag(ownerId, query, limit = 5, options = {}) {
   if (!ownerId || !terms.length) return [];
   const store = await getStore();
   const chunks = Object.values(store.ragChunks || {}).filter(chunk => chunk.ownerId === ownerId);
-  const queryVector = embedText(query);
+  const queryVector = await embeddingProvider.embed(query);
   const vectorRanked = rankVectors(chunks, queryVector, { limit: Math.max(20, Number(limit) || 5) });
   const vectorScores = new Map(vectorRanked.map(item => [item.id, item.score]));
   const mode = String(options.mode || "hybrid").toLowerCase();

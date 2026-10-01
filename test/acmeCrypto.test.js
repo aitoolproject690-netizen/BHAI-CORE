@@ -1,0 +1,3 @@
+import test from "node:test";import assert from "node:assert/strict";import {generateAccountKey,encryptPrivateKey,decryptPrivateKey,createJws} from "../src/acmeCrypto.js";
+test("ACME account keys use ES256 and JWS signs",()=>{const k=generateAccountKey();const j=createJws({protectedHeader:{alg:"ES256",nonce:"n",url:"u"},payload:{a:1},privateKey:k.privateKey});assert.ok(j.signature);assert.equal(k.jwk.crv,"P-256");});
+test("private key encrypt/decrypt round trip",()=>{process.env.BHAI_ACME_MASTER_KEY="test-master-key";const k=generateAccountKey();const e=encryptPrivateKey(k.privateKey);const d=decryptPrivateKey(e);assert.equal(d.export({format:"pem",type:"pkcs8"}),k.privateKey.export({format:"pem",type:"pkcs8"}));});

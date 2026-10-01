@@ -55,6 +55,22 @@ export async function setDomainStatus(id, ownerId, status) {
   return found ? getDomain(id, ownerId) : null;
 }
 
+export async function rebindDomainServices(fromServiceId, toServiceId) {
+  if (!toServiceId) return 0;
+  let changed = 0;
+  await updateStore(store => {
+    for (const domain of Object.values(store.domains || {})) {
+      if (domain.serviceId === fromServiceId) {
+        domain.serviceId = toServiceId;
+        domain.updatedAt = new Date().toISOString();
+        changed++;
+      }
+    }
+    return store;
+  });
+  return changed;
+}
+
 export function domainInfo() {
   return { persistent:true, ownerScoped:true, statuses:[...STATUSES], tlsModes:[...TLS_MODES] };
 }

@@ -29,6 +29,7 @@ import { recordAudit, listAudit, auditInfo } from "./src/audit.js";
 import { createApproval, getApproval, decideApproval, approvalInfo } from "./src/approval.js";
 import { cloudBuildInfo } from "./src/cloudBuild.js";
 import { getBuildDetails, buildLogInfo } from "./src/buildLogs.js";
+import { createService, getService, stopService, checkService, listServices, serviceInfo } from "./src/service.js";
 
 const cfg = config();
 
@@ -308,6 +309,44 @@ const server = http.createServer(async (req, res) => {
 
     if (url.pathname === "/v1/cloud/build/info" && req.method === "GET")
       return send(res, 200, { ok: true, cloudBuild: cloudBuildInfo() }, rid);
+
+    if (url.pathname === "/v1/cloud/services/info" && req.method === "GET")
+      return send(res, 200, { ok: true, ...serviceInfo() }, rid);
+
+    if (url.pathname === "/v1/cloud/services" && req.method === "GET") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      return send(res, 200, { ok: true, services: listServices(identity.id) }, rid);
+    }
+
+    if (url.pathname === "/v1/cloud/services" && req.method === "POST") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const body = await readJson(req);
+      const service = await createService({ ownerId: identity.id, buildId: body.buildId, command: body.command, cwd: body.cwd, env: body.env, healthUrl: body.healthUrl });
+      return send(res, 201, { ok: true, service }, rid);
+    }
+
+    const serviceMatch = url.pathname.match(/^\/v1\/cloud\/services\/([^/]+)$/);
+    if (serviceMatch && req.method === "GET") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const service = await getService(serviceMatch[1], identity.id);
+      return service ? send(res, 200, { ok: true, service }, rid) : send(res, 404, { ok: false, error: "Service not found" }, rid);
+    }
+    if (serviceMatch && req.method === "DELETE") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const service = await stopService(serviceMatch[1], identity.id);
+      return service ? send(res, 200, { ok: true, service }, rid) : send(res, 404, { ok: false, error: "Service not found" }, rid);
+    }
+    const healthMatch = url.pathname.match(/^\/v1\/cloud\/services\/([^/]+)\/health$/);
+    if (healthMatch && req.method === "GET") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const health = await checkService(healthMatch[1], identity.id);
+      return health ? send(res, 200, { ok: true, ...health }, rid) : send(res, 404, { ok: false, error: "Service not found" }, rid);
+    }
 
     if (url.pathname === "/v1/cloud/build/log-info" && req.method === "GET")
       return send(res, 200, { ok: true, ...buildLogInfo() }, rid);

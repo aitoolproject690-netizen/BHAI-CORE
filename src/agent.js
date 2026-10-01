@@ -9,6 +9,7 @@ import { config } from "./config.js";
 import { authorizeTool, getToolPolicy } from "./policy.js";
 import { recordAudit } from "./audit.js";
 import { getApproval } from "./approval.js";
+import { githubRepoList, githubRepoGet, githubFileRead, githubFileWrite, githubRepoCreate } from "./github.js";
 
 export const AGENT_TOOLS = Object.freeze([
   { name: "chat", description: "Generate text with configured AI providers.", input: ["messages", "provider", "temperature", "maxAttempts"] },
@@ -102,10 +103,14 @@ export async function executeAgentTool(name, input = {}, identity = {}, options 
     case "job_get":
       return getStoredJob(required(input.id, "id"));
     case "github_repo_list":
+      return githubRepoList(input);
     case "github_repo_get":
+      return githubRepoGet(required(input.repository, "repository"));
     case "github_file_read":
+      return githubFileRead({ repository: required(input.repository, "repository"), path: required(input.path, "path"), ref: input.ref });
     case "github_file_write":
+      return githubFileWrite({ repository: required(input.repository, "repository"), path: required(input.path, "path"), content: required(input.content, "content"), message: input.message, branch: input.branch, sha: input.sha });
     case "github_repo_create":
-      throw new Error("GitHub connector runtime is not configured in BHAI-CORE");
+      return githubRepoCreate({ name: required(input.name, "name"), description: input.description, private: input.private });
   }
 }

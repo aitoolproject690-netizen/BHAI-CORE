@@ -8,7 +8,8 @@ const emptyState = () => ({
   usage: {},
   providerUsage: {},
   jobs: {},
-  files: {}
+  files: {},
+  ragChunks: {}
 });
 
 let state = emptyState();
@@ -27,7 +28,8 @@ async function ensureLoaded() {
       usage: parsed.usage ?? {},
       providerUsage: parsed.providerUsage ?? {},
       jobs: parsed.jobs ?? {},
-      files: parsed.files ?? {}
+      files: parsed.files ?? {},
+      ragChunks: parsed.ragChunks ?? {}
     };
   } catch {
     state = emptyState();

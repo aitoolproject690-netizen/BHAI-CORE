@@ -28,6 +28,9 @@ export async function createRoute({ ownerId, hostname, serviceId, targetHost="12
     throw Object.assign(new Error("ownerId, hostname, serviceId and valid targetPort required"), { code:"ROUTE_FIELDS_REQUIRED", status:400 });
   if (!validHostname(host))
     throw Object.assign(new Error("Invalid route hostname"), { code:"ROUTE_HOST_INVALID", status:400 });
+  const upstreamHost = String(targetHost || "127.0.0.1").trim();
+  if (!["127.0.0.1", "localhost", "::1"].includes(upstreamHost))
+    throw Object.assign(new Error("Route target must be loopback"), { code:"ROUTE_TARGET_INVALID", status:400 });
   const existing = await findRouteByHostname(host);
   if (existing && existing.ownerId !== ownerId)
     throw Object.assign(new Error("Hostname is already owned"), { code:"ROUTE_HOST_CONFLICT", status:409 });
@@ -35,7 +38,7 @@ export async function createRoute({ ownerId, hostname, serviceId, targetHost="12
     throw Object.assign(new Error("Hostname already routed"), { code:"ROUTE_EXISTS", status:409 });
   const id = "rte_" + crypto.randomUUID();
   const now = new Date().toISOString();
-  const route = { id, ownerId, hostname:host, serviceId, targetHost:String(targetHost || "127.0.0.1"), targetPort:Number(targetPort), status:"active", createdAt:now, updatedAt:now };
+  const route = { id, ownerId, hostname:host, serviceId, targetHost:upstreamHost, targetPort:Number(targetPort), status:"active", createdAt:now, updatedAt:now };
   await updateStore(store => { store.routes ??= {}; store.routes[id] = route; return store; });
   return publicRoute(route);
 }

@@ -95,8 +95,6 @@ export async function promoteDeployment(id, ownerId) {
   if (previous?.serviceId && previous.serviceId !== target.serviceId) {
     await rebindServiceRoutes(previous.serviceId, target.serviceId, service.port);
     await rebindDomainServices(previous.serviceId, target.serviceId);
-  } else {
-    await rebindServiceRoutes(null, target.serviceId, service.port);
   }
 
   await updateStore(next => {

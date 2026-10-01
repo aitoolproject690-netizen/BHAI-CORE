@@ -6,6 +6,7 @@ import { getModelRegistry } from "./models.js";
 import { enqueue, getStoredJob } from "./queue.js";
 import { generate } from "./router.js";
 import { config } from "./config.js";
+import { authorizeTool, getToolPolicy } from "./policy.js";
 
 export const AGENT_TOOLS = Object.freeze([
   { name: "chat", description: "Generate text with configured AI providers.", input: ["messages", "provider", "temperature", "maxAttempts"] },
@@ -26,13 +27,14 @@ function required(value, name) {
 }
 
 export function listAgentTools() {
-  return AGENT_TOOLS.map(tool => ({ ...tool, input: [...tool.input] }));
+  return AGENT_TOOLS.map(tool => ({ ...tool, input: [...tool.input], policy: getToolPolicy(tool.name) }));
 }
 
 export async function executeAgentTool(name, input = {}, identity = {}) {
   const tool = String(name || "").trim();
   if (!AGENT_TOOLS.some(item => item.name === tool)) throw new Error("Unknown agent tool: " + tool);
   const ownerId = required(identity.id, "authenticated identity");
+  authorizeTool(tool, identity);
 
   switch (tool) {
     case "chat":

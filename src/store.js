@@ -13,7 +13,8 @@ const emptyState = () => ({
   ragChunks: {},
   auditLog: [],
   approvals: {},
-    services: {}
+    services: {},
+  deployments: {}
 });
 
 let state = emptyState();
@@ -36,7 +37,8 @@ async function ensureLoaded() {
       ragChunks: parsed.ragChunks ?? {},
       auditLog: parsed.auditLog ?? [],
       approvals: parsed.approvals,
-    services: parsed.services || {}
+    services: parsed.services || {},
+    deployments: parsed.deployments || {}
     };
   } catch {
     state = emptyState();

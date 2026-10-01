@@ -44,7 +44,8 @@ async function ensureLoaded() {
       servicePorts: parsed.servicePorts || {},
       routes: parsed.routes || {},
       domains: parsed.domains || {},
-      autoDeploy: parsed.autoDeploy || {}
+      autoDeploy: parsed.autoDeploy || {},
+      certificates: parsed.certificates || {}
     };
   } catch {
     state = emptyState();

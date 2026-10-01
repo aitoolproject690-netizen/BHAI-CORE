@@ -9,7 +9,7 @@ const ORDER_STATUSES=new Set(["pending","ready","processing","valid","invalid","
 const CHALLENGE_STATUSES=new Set(["pending","published","verified","failed"]);
 
 function pubChallenge(c){return{id:c.id,orderId:c.orderId,type:c.type,url:c.url,status:c.status,recordName:c.recordName,createdAt:c.createdAt,updatedAt:c.updatedAt};}
-function pubOrder(o){return{id:o.id,ownerId:o.ownerId,certificateId:o.certificateId,hostname:o.hostname,status:o.status,challenge:o.challenge,challengeId:o.challengeId,authorizationUrl:o.authorizationUrl,orderUrl:o.orderUrl,expiresAt:o.expiresAt,lastError:o.lastError,createdAt:o.createdAt,updatedAt:o.updatedAt};}
+function pubOrder(o){return{id:o.id,ownerId:o.ownerId,certificateId:o.certificateId,hostname:o.hostname,status:o.status,challenge:o.challenge,challengeId:o.challengeId,authorizationUrl:o.authorizationUrl,orderUrl:o.orderUrl,challengeToken:o.challengeToken||null,challengeUrl:o.challengeUrl||null,expiresAt:o.expiresAt,lastError:o.lastError,createdAt:o.createdAt,updatedAt:o.updatedAt};}
 export function buildDns01RecordValue(token,jwk){return dns01KeyAuthorization(token,jwk);}
 
 export async function createAcmeOrder({ownerId,certificateId,hostname,challenge="dns-01"}={}){
@@ -18,7 +18,7 @@ export async function createAcmeOrder({ownerId,certificateId,hostname,challenge=
  if(cert.hostname!==hostname.toLowerCase())throw Object.assign(new Error("Order hostname does not match certificate"),{code:"ACME_HOSTNAME_MISMATCH",status:409});
  if(!["dns-01","http-01"].includes(challenge))throw Object.assign(new Error("Unsupported challenge"),{code:"ACME_CHALLENGE_INVALID",status:400});
  const id="ord_"+crypto.randomUUID(), now=new Date().toISOString();
- const order={id,ownerId,certificateId,hostname:hostname.toLowerCase(),status:"pending",challenge,challengeId:null,authorizationUrl:null,orderUrl:null,expiresAt:null,lastError:null,createdAt:now,updatedAt:now};
+ const order={id,ownerId,certificateId,hostname:hostname.toLowerCase(),status:"pending",challenge,challengeId:null,authorizationUrl:null,orderUrl:null,challengeToken:null,challengeUrl:null,expiresAt:null,lastError:null,createdAt:now,updatedAt:now};
  await updateStore(s=>{s.acmeOrders??={};s.acmeOrders[id]=order;return s;});
  return pubOrder(order);
 }

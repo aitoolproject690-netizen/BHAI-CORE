@@ -40,7 +40,8 @@ async function launch(service) {
   service.status = "running";
   service.updatedAt = new Date().toISOString();
   await persistService(service);
-  await setServiceRouteStatus(service.id, "active");
+  // Services with a health URL remain unrouted until readiness succeeds.
+  if (!service.healthUrl) await setServiceRouteStatus(service.id, "active");
   runtime.exit.then(async result => {
     if (!services.has(service.id)) return;
     if (service.status === "stopping" || service.status === "stopped") { service.status = "stopped"; await setServiceRouteStatus(service.id, "disabled"); service.updatedAt = new Date().toISOString(); await persistService(service); return; }

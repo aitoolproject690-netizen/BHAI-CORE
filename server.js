@@ -32,6 +32,7 @@ import { getBuildDetails, buildLogInfo } from "./src/buildLogs.js";
 import { createService, createServiceFromDeployment, getService, stopService, checkService, monitorService, listServices, serviceInfo } from "./src/service.js";
 import { getDeployment, listDeployments, setDeploymentStatus, deploymentInfo } from "./src/deployment.js";
 import { createDomain, getDomain, listDomains, setDomainStatus, domainInfo } from "./src/domain.js";
+import { createAutoDeploy, getAutoDeploy, listAutoDeploys, setAutoDeployStatus, autoDeployInfo } from "./src/autodeploy.js";
 
 const cfg = config();
 
@@ -335,6 +336,39 @@ const server = http.createServer(async (req, res) => {
       const body = await readJson(req);
       const deployment = await setDeploymentStatus(deploymentMatch[1], identity.id, body.status);
       return deployment ? send(res, 200, { ok: true, deployment }, rid) : send(res, 404, { ok: false, error: "Deployment not found" }, rid);
+    }
+
+    if (url.pathname === "/v1/cloud/autodeploy/info" && req.method === "GET")
+      return send(res, 200, { ok: true, ...autoDeployInfo() }, rid);
+
+    if (url.pathname === "/v1/cloud/autodeploy" && req.method === "GET") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      return send(res, 200, { ok: true, autoDeploy: await listAutoDeploys(identity.id) }, rid);
+    }
+
+    if (url.pathname === "/v1/cloud/autodeploy" && req.method === "POST") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const body = await readJson(req);
+      const hook = await createAutoDeploy({ ownerId: identity.id, repository: body.repository, branch: body.branch });
+      return send(res, 201, { ok: true, autoDeploy: hook }, rid);
+    }
+
+    const autoDeployMatch = url.pathname.match(/^\/v1\/cloud\/autodeploy\/([^/]+)$/);
+    if (autoDeployMatch && req.method === "GET") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const hook = await getAutoDeploy(autoDeployMatch[1], identity.id);
+      return hook ? send(res, 200, { ok: true, autoDeploy: hook }, rid) : send(res, 404, { ok: false, error: "Auto-deploy not found" }, rid);
+    }
+
+    if (autoDeployMatch && req.method === "POST") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const body = await readJson(req);
+      const hook = await setAutoDeployStatus(autoDeployMatch[1], identity.id, body.status);
+      return hook ? send(res, 200, { ok: true, autoDeploy: hook }, rid) : send(res, 404, { ok: false, error: "Auto-deploy not found" }, rid);
     }
 
     if (url.pathname === "/v1/cloud/domains/info" && req.method === "GET")

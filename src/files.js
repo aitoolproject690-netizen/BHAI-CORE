@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import path from "node:path";
 import { getStore, updateStore } from "./store.js";
+import { indexFile, removeFileIndex } from "./rag.js";
 
 const MAX_FILE_BYTES = Number(process.env.BHAI_MAX_FILE_BYTES || 5_000_000);
 const MAX_TEXT_CHARS = Number(process.env.BHAI_MAX_TEXT_CHARS || 200_000);
@@ -45,6 +46,7 @@ export async function createTextFile({ ownerId, name, text, mimeType = "text/pla
     store.files[id] = item;
     return store;
   });
+  await indexFile(item);
   const { text: _, ...metadata } = item;
   return metadata;
 }
@@ -72,6 +74,7 @@ export async function deleteFile(id, ownerId) {
     deleted = true;
     return store;
   });
+  if (deleted) await removeFileIndex(id, ownerId);
   return deleted;
 }
 

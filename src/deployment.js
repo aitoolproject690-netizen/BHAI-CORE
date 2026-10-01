@@ -4,7 +4,7 @@ import { getStore, updateStore } from "./store.js";
 const STATUSES = new Set(["ready", "active", "stopped", "failed"]);
 
 function publicDeployment(d) {
-  return { id:d.id, ownerId:d.ownerId, repository:d.repository, branch:d.branch, buildId:d.buildId, path:d.path, status:d.status, createdAt:d.createdAt, updatedAt:d.updatedAt };
+  return { id:d.id, ownerId:d.ownerId, repository:d.repository, branch:d.branch, buildId:d.buildId, status:d.status, createdAt:d.createdAt, updatedAt:d.updatedAt };
 }
 
 export async function createDeployment({ ownerId, repository, branch = "main", buildId, path } = {}) {

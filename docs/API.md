@@ -137,3 +137,12 @@ The current search is deterministic text matching. The storage contract is desig
 - `DELETE /v1/conversations/:id` — delete an owner-scoped conversation.
 
 Memory is persisted in the existing JSON store, isolated by API-key identity, bounded by message/context limits, and redacts common API-key patterns before storage.
+
+
+## Agent Safety / Permissions
+- `GET /v1/agent/policies` — authenticated tool risk/permission metadata.
+- Agent execution checks the centralized policy before running a tool.
+- API keys may carry explicit `scopes` when created by the admin endpoint, for example `["agent:read","models:read"]`.
+- Legacy keys without stored scopes remain compatible with the existing core-agent permission set.
+- Permission failures use `PERMISSION_DENIED` and HTTP 403 when surfaced through an HTTP endpoint.
+- Future privileged tools such as GitHub writes, deployments, environment/secrets, and destructive operations should receive dedicated scopes rather than inheriting broad agent permissions.

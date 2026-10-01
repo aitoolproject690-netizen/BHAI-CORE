@@ -55,12 +55,15 @@ export async function setDomainStatus(id, ownerId, status) {
   return found ? getDomain(id, ownerId) : null;
 }
 
-export async function rebindDomainServices(fromServiceId, toServiceId) {
+export async function rebindDomainServices(fromServiceId, toServiceId, ownerId = null) {
   if (!toServiceId) return 0;
   let changed = 0;
   await updateStore(store => {
     for (const domain of Object.values(store.domains || {})) {
-      if (domain.serviceId === fromServiceId) {
+      if (
+        domain.serviceId === fromServiceId &&
+        (!ownerId || domain.ownerId === ownerId)
+      ) {
         domain.serviceId = toServiceId;
         domain.updatedAt = new Date().toISOString();
         changed++;

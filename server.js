@@ -25,6 +25,8 @@ import { planAgentRequest, validatePlan, runAgentPlan } from "./src/planner.js";
 import { createConversation, listConversations, getConversation, deleteConversation, appendMessage, getConversationContext, memoryInfo } from "./src/memory.js";
 import { withRetry, classifyError } from "./src/retry.js";
 import { listToolPolicies } from "./src/policy.js";
+import { recordAudit, listAudit, auditInfo } from "./src/audit.js";
+import { createApproval, getApproval, decideApproval, approvalInfo } from "./src/approval.js";
 
 const cfg = config();
 
@@ -157,6 +159,39 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: result.status === "succeeded", ...result }, rid);
     }
 
+    if (url.pathname === "/v1/agent/audit" && req.method === "GET") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      return send(res, 200, { ok: true, ...auditInfo(), events: await listAudit({ actorId: identity.id, limit: url.searchParams.get("limit") }) }, rid);
+    }
+
+    if (url.pathname === "/v1/agent/approvals" && req.method === "POST") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const body = await readJson(req);
+      if (!body.tool) return send(res, 400, { ok: false, error: "tool is required" }, rid);
+      return send(res, 201, { ok: true, approval: await createApproval({ actorId: identity.id, tool: body.tool, input: body.input, requestId: rid }) }, rid);
+    }
+
+    const approvalMatch = url.pathname.match(/^\/v1\/agent\/approvals\/([^/]+)$/);
+    if (approvalMatch && req.method === "GET") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const approval = await getApproval(approvalMatch[1], identity.id);
+      return approval ? send(res, 200, { ok: true, approval }, rid) : send(res, 404, { ok: false, error: "Approval not found" }, rid);
+    }
+
+    if (approvalMatch && req.method === "POST") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const body = await readJson(req);
+      const approval = await decideApproval(approvalMatch[1], identity.id, body.decision);
+      return approval ? send(res, 200, { ok: true, approval }, rid) : send(res, 404, { ok: false, error: "Approval not found or no longer pending" }, rid);
+    }
+
+    if (url.pathname === "/v1/agent/approval-info" && req.method === "GET")
+      return send(res, 200, { ok: true, ...approvalInfo() }, rid);
+
     if (url.pathname === "/v1/agent/policies" && req.method === "GET") {
       const identity = await authenticate(req.headers["x-bhai-key"]);
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
@@ -174,7 +209,7 @@ const server = http.createServer(async (req, res) => {
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
       const body = await readJson(req, 16_000_000);
       if (!body.tool) return send(res, 400, { ok: false, error: "tool is required" }, rid);
-      const result = await executeAgentTool(body.tool, body.input || {}, identity);
+      const result = await executeAgentTool(body.tool, body.input || {}, identity, { approvalId: body.approvalId, requestId: rid });
       return send(res, 200, { ok: true, tool: body.tool, result }, rid);
     }
 

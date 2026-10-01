@@ -63,7 +63,7 @@ async function openAICompatibleStream(url, headers, body, onToken, timeoutMs = 6
 }
 
 async function ollamaChat({ url, model, messages, temperature = 0.7 }) {
-  const baseUrl = String(url || "http://127.0.0.1:11434").replace(/\\/$/, "");
+  const baseUrl = String(url || "http://127.0.0.1:11434").replace(/\/$/, "");
   const data = await jsonFetch(baseUrl + "/api/chat", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -75,7 +75,7 @@ async function ollamaChat({ url, model, messages, temperature = 0.7 }) {
 }
 
 async function ollamaChatStream({ url, model, messages, temperature = 0.7, onToken }) {
-  const baseUrl = String(url || "http://127.0.0.1:11434").replace(/\\/$/, "");
+  const baseUrl = String(url || "http://127.0.0.1:11434").replace(/\/$/, "");
   const response = await fetch(baseUrl + "/api/chat", {
     method: "POST",
     headers: { "content-type": "application/json" },

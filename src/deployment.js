@@ -1,34 +1,55 @@
 import crypto from "node:crypto";
 import { getStore, updateStore } from "./store.js";
+import { getService, checkService } from "./service.js";
+import { rebindServiceRoutes } from "./network.js";
+import { rebindDomainServices } from "./domain.js";
 
 const STATUSES = new Set(["ready", "active", "stopped", "failed"]);
 
-function publicDeployment(d) {
-  return { id:d.id, ownerId:d.ownerId, repository:d.repository, branch:d.branch, buildId:d.buildId, status:d.status, createdAt:d.createdAt, updatedAt:d.updatedAt };
+function productionKey({ ownerId, repository, branch }) {
+  return `${ownerId}:${repository}:${branch}`;
 }
 
-export async function createDeployment({ ownerId, repository, branch = "main", buildId, path } = {}) {
-  if (!ownerId || !repository || !buildId || !path) throw Object.assign(new Error("ownerId, repository, buildId and path required"), { code:"DEPLOYMENT_FIELDS_REQUIRED", status:400 });
+function publicDeployment(d, production = false) {
+  return {
+    id:d.id, ownerId:d.ownerId, repository:d.repository, branch:d.branch,
+    buildId:d.buildId, serviceId:d.serviceId || null, status:d.status,
+    production:Boolean(production), createdAt:d.createdAt, updatedAt:d.updatedAt
+  };
+}
+
+export async function createDeployment({ ownerId, repository, branch = "main", buildId, path, serviceId = null } = {}) {
+  if (!ownerId || !repository || !buildId || !path)
+    throw Object.assign(new Error("ownerId, repository, buildId and path required"), { code:"DEPLOYMENT_FIELDS_REQUIRED", status:400 });
   const id = "dep_" + crypto.randomUUID();
   const now = new Date().toISOString();
-  const deployment = { id, ownerId, repository, branch, buildId, path, status:"ready", createdAt:now, updatedAt:now };
+  const deployment = { id, ownerId, repository, branch, buildId, path, serviceId, status:"ready", createdAt:now, updatedAt:now };
   await updateStore(store => { store.deployments ??= {}; store.deployments[id] = deployment; return store; });
-  return publicDeployment(deployment);
+  return publicDeployment(deployment, false);
+}
+
+async function isProduction(id, ownerId) {
+  const store = await getStore();
+  return Object.values(store.production || {}).some(d => d === id && store.deployments?.[id]?.ownerId === ownerId);
 }
 
 export async function getDeployment(id, ownerId) {
   const store = await getStore();
   const d = store.deployments?.[id];
-  return d && d.ownerId === ownerId ? publicDeployment(d) : null;
+  return d && d.ownerId === ownerId ? publicDeployment(d, await isProduction(id, ownerId)) : null;
 }
 
 export async function listDeployments(ownerId) {
   const store = await getStore();
-  return Object.values(store.deployments || {}).filter(d => d.ownerId === ownerId).map(publicDeployment);
+  const production = new Set(Object.values(store.production || {}));
+  return Object.values(store.deployments || {})
+    .filter(d => d.ownerId === ownerId)
+    .map(d => publicDeployment(d, production.has(d.id)));
 }
 
 export async function setDeploymentStatus(id, ownerId, status) {
-  if (!STATUSES.has(status)) throw Object.assign(new Error("Invalid deployment status"), { code:"DEPLOYMENT_STATUS_INVALID", status:400 });
+  if (!STATUSES.has(status))
+    throw Object.assign(new Error("Invalid deployment status"), { code:"DEPLOYMENT_STATUS_INVALID", status:400 });
   let found = false;
   await updateStore(store => {
     const d = store.deployments?.[id];
@@ -41,6 +62,74 @@ export async function setDeploymentStatus(id, ownerId, status) {
   return found ? getDeployment(id, ownerId) : null;
 }
 
+export async function attachDeploymentService(id, ownerId, serviceId) {
+  if (!serviceId) throw Object.assign(new Error("serviceId required"), { code:"DEPLOYMENT_SERVICE_REQUIRED", status:400 });
+  let found = false;
+  await updateStore(store => {
+    const d = store.deployments?.[id];
+    if (!d || d.ownerId !== ownerId) return store;
+    d.serviceId = serviceId;
+    d.updatedAt = new Date().toISOString();
+    found = true;
+    return store;
+  });
+  return found ? getDeployment(id, ownerId) : null;
+}
+
+export async function promoteDeployment(id, ownerId) {
+  const target = await getDeployment(id, ownerId);
+  if (!target) return null;
+  if (!target.serviceId)
+    throw Object.assign(new Error("Deployment has no service"), { code:"DEPLOYMENT_SERVICE_MISSING", status:409 });
+  const service = await getService(target.serviceId, ownerId);
+  if (!service || !["running", "unhealthy"].includes(service.status))
+    throw Object.assign(new Error("Deployment service is not running"), { code:"DEPLOYMENT_NOT_READY", status:409 });
+  if (service.status === "unhealthy")
+    throw Object.assign(new Error("Deployment service is unhealthy"), { code:"DEPLOYMENT_UNHEALTHY", status:409 });
+
+  const key = productionKey(target);
+  const store = await getStore();
+  const previousId = store.production?.[key] || null;
+  const previous = previousId ? store.deployments?.[previousId] : null;
+
+  if (previous?.serviceId && previous.serviceId !== target.serviceId) {
+    await rebindServiceRoutes(previous.serviceId, target.serviceId, service.port);
+    await rebindDomainServices(previous.serviceId, target.serviceId);
+  } else {
+    await rebindServiceRoutes(null, target.serviceId, service.port);
+  }
+
+  await updateStore(next => {
+    next.production ??= {};
+    next.production[key] = target.id;
+    const d = next.deployments?.[target.id];
+    if (d) { d.status = "active"; d.updatedAt = new Date().toISOString(); }
+    return next;
+  });
+
+  return getDeployment(target.id, ownerId);
+}
+
+export async function rollbackDeployment(id, ownerId) {
+  const target = await getDeployment(id, ownerId);
+  if (!target) return null;
+  return promoteDeployment(target.id, ownerId);
+}
+
+export async function getProductionDeployment({ ownerId, repository, branch = "main" } = {}) {
+  if (!ownerId || !repository) return null;
+  const store = await getStore();
+  const id = store.production?.[productionKey({ ownerId, repository, branch })];
+  return id ? getDeployment(id, ownerId) : null;
+}
+
 export function deploymentInfo() {
-  return { persistent: true, ownerScoped: true, statuses:[...STATUSES], autoStartSupported:true };
+  return {
+    persistent: true,
+    ownerScoped: true,
+    statuses:[...STATUSES],
+    autoStartSupported:true,
+    rollbackSupported:true,
+    productionPointer:true
+  };
 }

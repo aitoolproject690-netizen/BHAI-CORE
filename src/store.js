@@ -14,7 +14,9 @@ const emptyState = () => ({
   auditLog: [],
   approvals: {},
     services: {},
-  deployments: {}
+  deployments: {},
+  servicePorts: {},
+  routes: {}
 });
 
 let state = emptyState();
@@ -39,6 +41,8 @@ async function ensureLoaded() {
       approvals: parsed.approvals,
     services: parsed.services || {},
     deployments: parsed.deployments || {},
+      servicePorts: parsed.servicePorts || {},
+      routes: parsed.routes || {},
       domains: parsed.domains || {},
       autoDeploy: parsed.autoDeploy || {}
     };

@@ -15,7 +15,8 @@ test("service lifecycle is owner scoped", async () => {
 test("service metadata persists without persisting a live child process", async () => {
   resetStoreForTests();
   const s = await createService({ ownerId:"owner-persist", buildId:"build-persist", command:"sleep 5", cwd:process.cwd() });
-  await stopService(s.id, "owner-persist");
+  const stopped = await stopService(s.id, "owner-persist");
+  assert.equal(stopped.status, "stopped");
   const store = await getStore();
   assert.equal(store.services[s.id].ownerId, "owner-persist");
   assert.equal(store.services[s.id].pid, null);

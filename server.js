@@ -24,6 +24,7 @@ import { listAgentTools, executeAgentTool } from "./src/agent.js";
 import { planAgentRequest, validatePlan, runAgentPlan } from "./src/planner.js";
 import { createConversation, listConversations, getConversation, deleteConversation, appendMessage, getConversationContext, memoryInfo } from "./src/memory.js";
 import { withRetry, classifyError } from "./src/retry.js";
+import { listToolPolicies } from "./src/policy.js";
 
 const cfg = config();
 
@@ -154,6 +155,12 @@ const server = http.createServer(async (req, res) => {
       validatePlan(plan);
       const result = await runAgentPlan(plan, identity, { conversationId: body.conversationId });
       return send(res, 200, { ok: result.status === "succeeded", ...result }, rid);
+    }
+
+    if (url.pathname === "/v1/agent/policies" && req.method === "GET") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      return send(res, 200, { ok: true, policies: listToolPolicies() }, rid);
     }
 
     if (url.pathname === "/v1/agent/tools" && req.method === "GET") {
@@ -346,7 +353,7 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/v1/keys" && req.method === "POST") {
       if (!adminAuthorized(req)) return send(res, 401, { ok: false, error: "Admin authentication required" }, rid);
       const body = await readJson(req);
-      return send(res, 201, { ok: true, ...(await createApiKey(body.name || "app")) }, rid);
+      return send(res, 201, { ok: true, ...(await createApiKey(body.name || "app", body.scopes)) }, rid);
     }
 
     if (url.pathname.startsWith("/v1/keys/") && req.method === "DELETE") {

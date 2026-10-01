@@ -87,3 +87,12 @@ The current search is deterministic text matching. The storage contract is desig
 - `GET /v1/models?probe=true` — additionally probes configured Ollama and discovers locally installed models from `/api/tags`.
 - `GET /v1/models/capabilities?provider=ollama&model=llava:latest` — returns capability metadata for a provider/model pair.
 - Ollama model discovery never returns API keys or external provider credentials.
+
+
+## Vision
+- `POST /v1/vision/analyze` — authenticated image understanding endpoint.
+- Body: `{ "prompt": "...", "image": { "data": "<base64 or data URL>" }, "provider": "ollama" }`.
+- The provider is optional; BHAI selects the first configured vision-capable model.
+- Current adapters: Ollama, Gemini, OpenAI, Anthropic.
+- Image request body limit is 12 MB; individual image limit defaults to 8 MB.
+- Provider credentials are never returned.

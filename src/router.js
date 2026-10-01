@@ -1,5 +1,6 @@
 import { config } from "./config.js";
 import { providerAdapters } from "./providers.js";
+import { breakerState, canAttempt, recordFailure, recordSuccess } from "./circuitBreaker.js";
 function isConfigured(name,cfg){ return Boolean(cfg.providers[name]?.key && providerAdapters[name]); }
 export function getProviderStatus(){
   const cfg=config();
@@ -17,8 +18,8 @@ export async function generate({messages,provider,temperature=0.7,maxAttempts}={
     const name=candidates[i];
     try{
       const result=await providerAdapters[name]({...cfg.providers[name],messages,temperature});
-      return {ok:true,provider:name,model:cfg.providers[name].model,text:result.text,attempts:i+1};
-    }catch(error){ errors.push({provider:name,error:error.message}); }
+      recordSuccess(name);\n      return {ok:true,provider:name,model:cfg.providers[name].model,text:result.text,attempts:i+1};
+    }catch(error){ recordFailure(name); errors.push({provider:name,error:error.message}); }
   }
   const error=new Error("All configured AI providers failed");
   error.details=errors;

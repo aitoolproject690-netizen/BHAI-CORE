@@ -82,10 +82,13 @@ export async function promoteDeployment(id, ownerId) {
   if (!target.serviceId)
     throw Object.assign(new Error("Deployment has no service"), { code:"DEPLOYMENT_SERVICE_MISSING", status:409 });
   const service = await getService(target.serviceId, ownerId);
-  if (!service || !["running", "unhealthy"].includes(service.status))
+  if (!service || service.status !== "running")
     throw Object.assign(new Error("Deployment service is not running"), { code:"DEPLOYMENT_NOT_READY", status:409 });
-  if (service.status === "unhealthy")
-    throw Object.assign(new Error("Deployment service is unhealthy"), { code:"DEPLOYMENT_UNHEALTHY", status:409 });
+  if (service.healthUrl) {
+    const checked = await checkService(target.serviceId, ownerId);
+    if (!checked?.health?.ok)
+      throw Object.assign(new Error("Deployment health check failed"), { code:"DEPLOYMENT_HEALTH_FAILED", status:409 });
+  }
 
   const key = productionKey(target);
   const store = await getStore();

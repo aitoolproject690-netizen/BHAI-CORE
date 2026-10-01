@@ -22,3 +22,9 @@ test("planner enforces dependency ordering", () => {
     { id: "one", tool: "models", dependsOn: [] }
   ]), /earlier step/);
 });
+
+test("planner remains compatible with explicit tool inputs", () => {
+  const plan = planAgentRequest({ tool: "models", input: { probe: false } });
+  assert.equal(plan[0].tool, "models");
+  assert.deepEqual(plan[0].input, { probe: false });
+});

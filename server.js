@@ -7,6 +7,8 @@ import { recordUsage, allUsage } from "./src/usage.js";
 import { assertBudget } from "./src/budget.js";
 import { authenticate, createApiKey, listApiKeys, revokeApiKey } from "./src/auth.js";
 import { startSSE, writeSSE, endSSE } from "./src/stream.js";
+
+function adminAuthorized(req) {\n  const expected = process.env.BHAI_CORE_ADMIN_KEY;\n  return Boolean(expected && req.headers["x-bhai-admin-key"] === expected);\n}
 const cfg=config();
 function send(res,status,body){res.writeHead(status,{"content-type":"application/json; charset=utf-8","cache-control":"no-store","access-control-allow-origin":"*"});res.end(JSON.stringify(body));}
 function authorized(req){if(!cfg.apiKey)return true;return (req.headers.authorization||"")==="Bearer "+cfg.apiKey;}

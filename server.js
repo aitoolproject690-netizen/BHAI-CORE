@@ -11,6 +11,8 @@ import { enqueue, getStoredJob } from "./src/queue.js";
 import { startSSE, sendEvent, endSSE } from "./src/stream.js";
 import { EVENTS, tokenEvent, completeEvent, errorEvent } from "./src/events.js";
 import { providerAdapters } from "./src/providers.js";
+import { canAttempt, recordFailure, recordSuccess } from "./src/circuitBreaker.js";
+import { withRetry, classifyError } from "./src/retry.js";
 
 const cfg = config();
 
@@ -128,24 +130,89 @@ const server = http.createServer(async (req, res) => {
       const selected = provider || cfg.providerOrder.find(name => cfg.providers[name]?.key && providerAdapters[name + "Stream"]);
       const adapter = providerAdapters[selected + "Stream"];
       const providerCfg = cfg.providers[selected];
+      const usageKey = identity.id;
+      const inputChars = JSON.stringify(body).length;
+
+      await assertBudget(usageKey, {
+        maxRequests: process.env.BHAI_MAX_REQUESTS,
+        maxInputChars: process.env.BHAI_MAX_INPUT_CHARS
+      });
 
       if (!adapter || !providerCfg?.key)
         return send(res, 503, { ok: false, error: "No streaming provider is configured" }, rid);
 
+      if (!canAttempt(selected))
+        return send(res, 503, { ok: false, error: "Provider circuit is open", provider: selected }, rid);
+
       startSSE(res);
       sendEvent(res, { type: EVENTS.START, requestId: rid, provider: selected, model: providerCfg.model });
 
+      const startedAt = Date.now();
+      let emitted = false;
+      let retries = 0;
+
       try {
-        const result = await adapter({
-          ...providerCfg,
-          messages: body.messages,
-          temperature: body.temperature ?? 0.7,
-          onToken: async token => sendEvent(res, tokenEvent(token))
+        const result = await withRetry(
+          async () => adapter({
+            ...providerCfg,
+            messages: body.messages,
+            temperature: body.temperature ?? 0.7,
+            onToken: async token => {
+              emitted = true;
+              sendEvent(res, tokenEvent(token));
+            }
+          }),
+          {
+            retries: Number(process.env.BHAI_PROVIDER_RETRIES ?? 2),
+            onRetry: () => { retries += 1; }
+          }
+        );
+
+        const latencyMs = Date.now() - startedAt;
+        recordSuccess(selected);
+        await recordProviderUsage({
+          provider: selected,
+          success: true,
+          latencyMs,
+          retries
         });
-        sendEvent(res, completeEvent({ provider: selected, model: providerCfg.model, attempts: 1 }));
+        await recordUsage({
+          key: usageKey,
+          input: inputChars,
+          output: String(result.text || "").length
+        });
+
+        sendEvent(res, completeEvent({
+          provider: selected,
+          model: providerCfg.model,
+          attempts: retries + 1
+        }));
         endSSE(res);
       } catch (error) {
-        sendEvent(res, errorEvent(error));
+        const latencyMs = Date.now() - startedAt;
+        if (emitted) {
+          error = Object.assign(new Error(error?.message || "Streaming failed after output started"), { status: 400 });
+        }
+        recordFailure(selected);
+        await recordProviderUsage({
+          provider: selected,
+          success: false,
+          latencyMs,
+          retries,
+          error
+        });
+        await recordUsage({
+          key: usageKey,
+          input: inputChars,
+          output: 0,
+          failed: true
+        });
+
+        sendEvent(res, {
+          ...errorEvent(error),
+          kind: classifyError(error),
+          retries
+        });
         endSSE(res);
       }
       return;

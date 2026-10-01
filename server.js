@@ -14,6 +14,7 @@ import { providerAdapters } from "./src/providers.js";
 import { storageInfo } from "./src/store.js";
 import { createTextFile, getFile, listFiles, deleteFile, searchFiles, fileLimits } from "./src/files.js";
 import { searchRag, ragContext } from "./src/rag.js";
+import { embeddingInfo } from "./src/embeddings.js";
 import { canAttempt, recordFailure, recordSuccess } from "./src/circuitBreaker.js";
 import { withRetry, classifyError } from "./src/retry.js";
 
@@ -115,12 +116,14 @@ const server = http.createServer(async (req, res) => {
       }, rid);
     }
 
+    if (url.pathname === "/v1/embeddings" && req.method === "GET") return send(res, 200, { ok: true, embedding: embeddingInfo() }, rid);
+
     if (url.pathname === "/v1/rag/search" && req.method === "GET") {
       const identity = await authenticate(req.headers["x-bhai-key"]);
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
       return send(res, 200, {
         ok: true,
-        results: await searchRag(identity.id, url.searchParams.get("q"), url.searchParams.get("limit"))
+        results: await searchRag(identity.id, url.searchParams.get("q"), url.searchParams.get("limit"), { mode: url.searchParams.get("mode") || "hybrid" })
       }, rid);
     }
 
@@ -129,7 +132,7 @@ const server = http.createServer(async (req, res) => {
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
       return send(res, 200, {
         ok: true,
-        ...(await ragContext(identity.id, url.searchParams.get("q"), url.searchParams.get("limit")))
+        ...(await ragContext(identity.id, url.searchParams.get("q"), url.searchParams.get("limit"), { mode: url.searchParams.get("mode") || "hybrid" }))
       }, rid);
     }
 

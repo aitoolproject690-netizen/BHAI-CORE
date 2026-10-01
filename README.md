@@ -46,3 +46,7 @@ The default local store is JSON at `data/bhai-core-store.json`. Set `BHAI_STORE_
 
 ## Streaming
 The core includes an SSE utility layer for incremental events. Provider adapters can emit token/chunk events through the same transport as the API evolves.
+
+
+## Event protocol
+Streaming uses provider-neutral events: `start`, `token`, `complete`, and `error`. Job execution uses stable states such as `queued` and `running`, with room for worker-backed states later.

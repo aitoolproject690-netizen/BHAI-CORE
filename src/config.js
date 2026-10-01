@@ -8,6 +8,10 @@ export function config() {
     host: env("HOST", "0.0.0.0"),
     apiKey: env("BHAI_CORE_API_KEY"),
     providerOrder: env("AI_PROVIDER_ORDER", "ollama,gemini,openai,anthropic,huggingface").split(",").map(s => s.trim().toLowerCase()).filter(Boolean),
+    github: {
+      token: env("GITHUB_TOKEN"),
+      url: env("GITHUB_API_URL", "https://api.github.com")
+    },
     providers: {
       ollama: {
         key: env("OLLAMA_ENABLED", "false") === "true" ? "local" : "",

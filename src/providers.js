@@ -95,7 +95,7 @@ async function ollamaChatStream({ url, model, messages, temperature = 0.7, onTok
     const { value, done } = await reader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\\n");
+    const lines = buffer.split("\n");
     buffer = lines.pop() || "";
     for (const rawLine of lines) {
       if (!rawLine.trim()) continue;

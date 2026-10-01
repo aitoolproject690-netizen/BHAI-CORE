@@ -29,7 +29,7 @@ import { recordAudit, listAudit, auditInfo } from "./src/audit.js";
 import { createApproval, getApproval, decideApproval, approvalInfo } from "./src/approval.js";
 import { cloudBuildInfo } from "./src/cloudBuild.js";
 import { getBuildDetails, buildLogInfo } from "./src/buildLogs.js";
-import { createService, getService, stopService, checkService, listServices, serviceInfo } from "./src/service.js";
+import { createService, getService, stopService, checkService, monitorService, listServices, serviceInfo } from "./src/service.js";
 
 const cfg = config();
 
@@ -340,6 +340,14 @@ const server = http.createServer(async (req, res) => {
       const service = await stopService(serviceMatch[1], identity.id);
       return service ? send(res, 200, { ok: true, service }, rid) : send(res, 404, { ok: false, error: "Service not found" }, rid);
     }
+    const monitorMatch = url.pathname.match(/^\/v1\/cloud\/services\/([^/]+)\/monitor$/);
+    if (monitorMatch && req.method === "POST") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const result = await monitorService(monitorMatch[1], identity.id);
+      return result ? send(res, 200, { ok: true, ...result }, rid) : send(res, 404, { ok: false, error: "Service not found" }, rid);
+    }
+
     const healthMatch = url.pathname.match(/^\/v1\/cloud\/services\/([^/]+)\/health$/);
     if (healthMatch && req.method === "GET") {
       const identity = await authenticate(req.headers["x-bhai-key"]);

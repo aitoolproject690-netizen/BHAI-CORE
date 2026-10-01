@@ -80,3 +80,10 @@ The current search is deterministic text matching. The storage contract is desig
 - Files are automatically chunked and indexed when created.
 - Deleting a file removes its RAG index.
 - Current ranking is deterministic keyword scoring; the index can later be replaced with embeddings/vector search.
+
+
+## Models and capabilities
+- `GET /v1/models` — lists configured models and their capability metadata.
+- `GET /v1/models?probe=true` — additionally probes configured Ollama and discovers locally installed models from `/api/tags`.
+- `GET /v1/models/capabilities?provider=ollama&model=llava:latest` — returns capability metadata for a provider/model pair.
+- Ollama model discovery never returns API keys or external provider credentials.

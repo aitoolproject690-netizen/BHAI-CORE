@@ -52,3 +52,9 @@ The core includes an SSE utility layer for incremental events. Streaming uses ci
 
 ## Event protocol
 Streaming uses provider-neutral events: `start`, `token`, `complete`, and `error`. Job execution uses stable states such as `queued` and `running`, with room for worker-backed states later.
+
+
+## Custom domains and HTTPS
+BHAI-CORE supports optional local HTTPS termination so a future BHAI-CLOUD ingress layer does not depend on Render's TLS handling. Set `BHAI_TLS_ENABLED=true` and provide a certificate/key pair with `BHAI_TLS_CERT_FILE` and `BHAI_TLS_KEY_FILE`. HTTPS listens on `BHAI_TLS_PORT` (default 8443). Certificate issuance/renewal is intentionally external for now; the core only terminates and validates configured certificates. Use `GET /v1/cloud/tls/info` to inspect non-secret TLS configuration.
+
+The domain/route layer remains owner-scoped. Public DNS and ACME certificate automation are separate infrastructure concerns and are not silently assumed to exist.

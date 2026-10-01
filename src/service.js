@@ -34,7 +34,7 @@ async function launch(service) {
   await persistService(service);
   runtime.exit.then(async result => {
     if (!services.has(service.id)) return;
-    if (service.status === "stopping") { service.status = "stopped"; service.updatedAt = new Date().toISOString(); await persistService(service); return; }
+    if (service.status === "stopping" || service.status === "stopped") { service.status = "stopped"; service.updatedAt = new Date().toISOString(); await persistService(service); return; }
     service.status = result.code === 0 ? "stopped" : "crashed";
     service.updatedAt = new Date().toISOString();
     await persistService(service);

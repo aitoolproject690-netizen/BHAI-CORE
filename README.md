@@ -13,6 +13,8 @@ Independent AI foundation for the BHAI ecosystem.
 ## Endpoints
 GET /health
 GET /v1/providers
+GET /v1/usage
+GET /v1/metrics
 POST /v1/chat/completions
 
 Example:
@@ -24,7 +26,7 @@ Example:
 1. Core gateway + routing
 2. Provider health and circuit breaker
 3. Streaming
-4. Usage metering and budgets
+4. Usage metering, provider telemetry and budgets
 5. Auth/API keys
 6. Files/RAG
 7. Vision/image/voice adapters

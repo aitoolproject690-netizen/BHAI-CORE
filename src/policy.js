@@ -14,7 +14,8 @@ const TOOL_POLICIES = Object.freeze({
   github_file_read: { risk: "low", permissions: ["github:read", "agent:read"] },
   github_file_write: { risk: "high", permissions: ["github:write", "agent:write"] },
   github_repo_create: { risk: "high", permissions: ["github:admin", "agent:write"] },
-  cloud_build_plan: { risk: "low", permissions: ["github:read", "agent:read"] }
+  cloud_build_plan: { risk: "low", permissions: ["github:read", "agent:read"] },
+  cloud_build_execute: { risk: "high", permissions: ["cloud:build", "agent:write"] }
 });
 
 export const DEFAULT_PERMISSIONS = Object.freeze([

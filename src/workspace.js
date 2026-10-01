@@ -12,7 +12,7 @@ function safePart(value, fallback = "workspace") {
 
 export async function createWorkspace({ ownerId, repository, branch = "main", ttlMs = DEFAULT_TTL } = {}) {
   if (!ownerId) throw new Error("ownerId is required");
-  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(String(repository || ""))) throw new Error("repository must be owner/name");
+  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(String(repository || "")) || String(repository).includes("..")) throw new Error("repository must be owner/name");
   const id = "ws_" + crypto.randomUUID();
   const root = path.join(process.env.BHAI_WORKSPACE_ROOT || path.join(os.tmpdir(), "bhai-core-workspaces"), safePart(ownerId), id);
   await fs.mkdir(root, { recursive: true });

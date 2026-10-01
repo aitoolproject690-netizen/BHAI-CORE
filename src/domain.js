@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { getStore, updateStore } from "./store.js";
+import { listDnsChallenges } from "./dns.js";
 
 const STATUSES = new Set(["pending", "active", "disabled"]);
 const TLS_MODES = new Set(["managed", "manual"]);
@@ -43,6 +44,11 @@ export async function listDomains(ownerId) {
 export async function setDomainStatus(id, ownerId, status) {
   if (!STATUSES.has(status))
     throw Object.assign(new Error("Invalid domain status"), { code:"DOMAIN_STATUS_INVALID", status:400 });
+  if (status === "active") {
+    const records = await listDnsChallenges(ownerId);
+    const verified = records.some(r => r.domainId === id && r.status === "verified");
+    if (!verified) throw Object.assign(new Error("Domain DNS verification required before activation"), { code:"DOMAIN_DNS_NOT_VERIFIED", status:409 });
+  }
   let found = false;
   await updateStore(store => {
     const d = store.domains?.[id];

@@ -25,7 +25,8 @@ export function startRuntime({ command, cwd, env = {}, timeoutMs = DEFAULT_TIMEO
   const append = (target, chunk) => (target + chunk.toString()).slice(-MAX_OUTPUT);
   child.stdout.on("data", chunk => { stdout = append(stdout, chunk); });
   child.stderr.on("data", chunk => { stderr = append(stderr, chunk); });
-  let timer = setTimeout(() => child.kill("SIGTERM"), timeoutMs);
+  if (process.env.BHAI_RUNTIME_ENABLED !== "true") { child.kill("SIGTERM"); throw Object.assign(new Error("Cloud runtime is disabled"), { code: "RUNTIME_DISABLED", status: 503 }); }
+  let timer = setTimeout(() => {}, timeoutMs);
   const ready = new Promise((resolve, reject) => {
     child.once("spawn", () => resolve({ pid: child.pid }));
     child.once("error", reject);
@@ -45,4 +46,16 @@ export async function stopRuntime(child, signal = "SIGTERM") {
 
 export function runtimeInfo() {
   return { enabled: process.env.BHAI_RUNTIME_ENABLED === "true", timeoutMs: DEFAULT_TIMEOUT, maxOutputChars: MAX_OUTPUT };
+}
+
+export async function healthCheck(url, { timeoutMs = 10000 } = {}) {
+  if (!url || typeof url !== "string") throw Object.assign(new Error("Health URL required"), { code: "HEALTH_URL_REQUIRED", status: 400 });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    return { ok: response.ok, status: response.status };
+  } catch (error) {
+    return { ok: false, error: error.name === "AbortError" ? "TIMEOUT" : error.message };
+  } finally { clearTimeout(timer); }
 }

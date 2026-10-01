@@ -110,6 +110,9 @@ async function ollamaChatStream({ url, model, messages, temperature = 0.7, onTok
 }
 
 export const providerAdapters = {
+  async ollama({ url, model, messages, temperature = 0.7 }) {
+    return ollamaChat({ url, model, messages, temperature });
+  },
   async gemini({ key, model, messages, temperature = 0.7 }) {
     const contents = messages.map(m => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: String(m.content ?? "") }] }));
     const data = await jsonFetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent?key=" + encodeURIComponent(key), {

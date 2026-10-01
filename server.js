@@ -31,6 +31,7 @@ import { cloudBuildInfo } from "./src/cloudBuild.js";
 import { getBuildDetails, buildLogInfo } from "./src/buildLogs.js";
 import { createService, createServiceFromDeployment, getService, stopService, checkService, monitorService, listServices, serviceInfo } from "./src/service.js";
 import { getDeployment, listDeployments, setDeploymentStatus, deploymentInfo } from "./src/deployment.js";
+import { createDomain, getDomain, listDomains, setDomainStatus, domainInfo } from "./src/domain.js";
 
 const cfg = config();
 
@@ -334,6 +335,41 @@ const server = http.createServer(async (req, res) => {
       const body = await readJson(req);
       const deployment = await setDeploymentStatus(deploymentMatch[1], identity.id, body.status);
       return deployment ? send(res, 200, { ok: true, deployment }, rid) : send(res, 404, { ok: false, error: "Deployment not found" }, rid);
+    }
+
+    if (url.pathname === "/v1/cloud/domains/info" && req.method === "GET")
+      return send(res, 200, { ok: true, ...domainInfo() }, rid);
+
+    if (url.pathname === "/v1/cloud/domains" && req.method === "GET") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      return send(res, 200, { ok: true, domains: await listDomains(identity.id) }, rid);
+    }
+
+    if (url.pathname === "/v1/cloud/domains" && req.method === "POST") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const body = await readJson(req);
+      const service = await getService(body.serviceId, identity.id);
+      if (!service) return send(res, 404, { ok: false, error: "Service not found" }, rid);
+      const domain = await createDomain({ ownerId: identity.id, serviceId: body.serviceId, hostname: body.hostname, tls: body.tls });
+      return send(res, 201, { ok: true, domain }, rid);
+    }
+
+    const domainMatch = url.pathname.match(/^\/v1\/cloud\/domains\/([^/]+)$/);
+    if (domainMatch && req.method === "GET") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const domain = await getDomain(domainMatch[1], identity.id);
+      return domain ? send(res, 200, { ok: true, domain }, rid) : send(res, 404, { ok: false, error: "Domain not found" }, rid);
+    }
+
+    if (domainMatch && req.method === "POST") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const body = await readJson(req);
+      const domain = await setDomainStatus(domainMatch[1], identity.id, body.status);
+      return domain ? send(res, 200, { ok: true, domain }, rid) : send(res, 404, { ok: false, error: "Domain not found" }, rid);
     }
 
     if (url.pathname === "/v1/cloud/services/info" && req.method === "GET")

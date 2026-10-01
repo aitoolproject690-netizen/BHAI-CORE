@@ -68,6 +68,27 @@ export async function recordAutoDeployRun(id, ownerId, { commit, deploymentId, s
   return found ? getAutoDeploy(id, ownerId) : null;
 }
 
+export async function claimWebhookDelivery(deliveryId, ttlMs = Number(process.env.BHAI_WEBHOOK_REPLAY_TTL_MS || 86400000)) {
+  const id = String(deliveryId || "").trim();
+  if (!id) return { accepted:false, reason:"missing" };
+  const now = Date.now();
+  let accepted = false;
+  await updateStore(store => {
+    store.webhookDeliveries ??= {};
+    for (const [key, value] of Object.entries(store.webhookDeliveries)) {
+      if (!value || Number(value.expiresAt || 0) <= now) delete store.webhookDeliveries[key];
+    }
+    if (store.webhookDeliveries[id]) return store;
+    store.webhookDeliveries[id] = {
+      receivedAt:new Date(now).toISOString(),
+      expiresAt:now + Math.max(60000, ttlMs)
+    };
+    accepted = true;
+    return store;
+  });
+  return { accepted, reason:accepted ? "new" : "duplicate" };
+}
+
 export function autoDeployInfo() {
-  return { persistent:true, ownerScoped:true, statuses:[...STATUSES], trigger:"github_push", webhookSecretRequired:true };
+  return { persistent:true, ownerScoped:true, statuses:[...STATUSES], trigger:"github_push", webhookSecretRequired:true, replayProtection:true };
 }

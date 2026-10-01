@@ -1,6 +1,8 @@
 import crypto from "node:crypto";
 import { getStore, updateStore } from "./store.js";
 
+const STATUSES = new Set(["ready", "active", "stopped", "failed"]);
+
 function publicDeployment(d) {
   return { id:d.id, ownerId:d.ownerId, repository:d.repository, branch:d.branch, buildId:d.buildId, path:d.path, status:d.status, createdAt:d.createdAt, updatedAt:d.updatedAt };
 }
@@ -26,6 +28,7 @@ export async function listDeployments(ownerId) {
 }
 
 export async function setDeploymentStatus(id, ownerId, status) {
+  if (!STATUSES.has(status)) throw Object.assign(new Error("Invalid deployment status"), { code:"DEPLOYMENT_STATUS_INVALID", status:400 });
   let found = false;
   await updateStore(store => {
     const d = store.deployments?.[id];
@@ -39,5 +42,5 @@ export async function setDeploymentStatus(id, ownerId, status) {
 }
 
 export function deploymentInfo() {
-  return { persistent: true, ownerScoped: true, statuses:["ready","active","stopped","failed"] };
+  return { persistent: true, ownerScoped: true, statuses:[...STATUSES] };
 }

@@ -15,6 +15,7 @@ import { storageInfo } from "./src/store.js";
 import { createTextFile, getFile, listFiles, deleteFile, searchFiles, fileLimits } from "./src/files.js";
 import { searchRag, ragContext } from "./src/rag.js";
 import { embeddingInfo } from "./src/embeddings.js";
+import { getModelRegistry, modelCapabilities } from "./src/models.js";
 import { canAttempt, recordFailure, recordSuccess } from "./src/circuitBreaker.js";
 import { withRetry, classifyError } from "./src/retry.js";
 
@@ -77,6 +78,18 @@ const server = http.createServer(async (req, res) => {
 
     if (url.pathname === "/v1/providers" && req.method === "GET")
       return send(res, 200, { ok: true, providers: getProviderStatus() }, rid);
+
+    if (url.pathname === "/v1/models" && req.method === "GET") {
+      const probe = url.searchParams.get("probe") === "true";
+      return send(res, 200, await getModelRegistry({ probeOllama: probe }), rid);
+    }
+
+    if (url.pathname === "/v1/models/capabilities" && req.method === "GET") {
+      const provider = url.searchParams.get("provider");
+      const model = url.searchParams.get("model");
+      if (!provider || !model) return send(res, 400, { ok: false, error: "provider and model are required" }, rid);
+      return send(res, 200, { ok: true, provider, model, capabilities: modelCapabilities(provider, model) }, rid);
+    }
 
     if (url.pathname === "/v1/usage" && req.method === "GET")
       return send(res, 200, { ok: true, usage: await allUsage() }, rid);

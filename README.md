@@ -7,7 +7,7 @@ Independent AI foundation for the BHAI ecosystem.
 - Provider adapters
 - Automatic provider fallback
 - Centralized configuration
-- Health/provider status
+- Health/provider status and telemetry
 - No lock-in to Render, Replit, or one AI provider
 
 ## Endpoints
@@ -47,7 +47,7 @@ Run `npm test` for the test suite and `npm run check` for syntax checks.
 The default local store is JSON at `data/bhai-core-store.json`. Set `BHAI_STORE_FILE` to another path. The storage API is intentionally isolated so production can later use SQLite or PostgreSQL without changing the HTTP/API contract.
 
 ## Streaming
-The core includes an SSE utility layer for incremental events. Provider adapters can emit token/chunk events through the same transport as the API evolves.
+The core includes an SSE utility layer for incremental events. Streaming uses circuit-breaker protection, bounded retries before output starts, request budgets, and provider telemetry.
 
 
 ## Event protocol

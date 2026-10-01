@@ -114,6 +114,9 @@ const server = http.createServer(async (req, res) => {
       }, rid);
     }
 
+    if (url.pathname === "/v1/files/limits" && req.method === "GET")
+      return send(res, 200, { ok: true, limits: fileLimits() }, rid);
+
     const fileMatch = url.pathname.match(/^\/v1\/files\/([^/]+)$/);
     if (fileMatch && req.method === "GET") {
       const identity = await authenticate(req.headers["x-bhai-key"]);
@@ -128,9 +131,6 @@ const server = http.createServer(async (req, res) => {
       const deleted = await deleteFile(fileMatch[1], identity.id);
       return send(res, deleted ? 200 : 404, { ok: deleted }, rid);
     }
-
-    if (url.pathname === "/v1/files/limits" && req.method === "GET")
-      return send(res, 200, { ok: true, limits: fileLimits() }, rid);
 
     if (url.pathname === "/v1/keys" && req.method === "GET") {
       if (!adminAuthorized(req)) return send(res, 401, { ok: false, error: "Admin authentication required" }, rid);

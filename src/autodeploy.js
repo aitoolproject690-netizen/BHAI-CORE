@@ -27,7 +27,7 @@ export async function getAutoDeploy(id, ownerId) {
   return h && h.ownerId === ownerId ? publicHook(h) : null;
 }
 
-export async function listAutoDeploys(ownerId) {
+export async function findAutoDeploysByRepository(repository) {\n  const store = await getStore();\n  return Object.values(store.autoDeploy || {}).filter(h => h.repository === repository).map(publicHook);\n}\n\nexport async function listAutoDeploys(ownerId) {
   const store = await getStore();
   return Object.values(store.autoDeploy || {}).filter(h => h.ownerId === ownerId).map(publicHook);
 }

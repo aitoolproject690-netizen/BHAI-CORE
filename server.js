@@ -33,6 +33,7 @@ import { getBuildDetails, buildLogInfo } from "./src/buildLogs.js";
 import { createService, createServiceFromDeployment, getService, stopService, checkService, monitorService, listServices, serviceInfo } from "./src/service.js";
 import { getDeployment, listDeployments, setDeploymentStatus, deploymentInfo, promoteDeployment, rollbackDeployment, getProductionDeployment } from "./src/deployment.js";
 import { createDomain, getDomain, listDomains, setDomainStatus, domainInfo, attachDomainRoute } from "./src/domain.js";
+import { createCertificate, getCertificate, listCertificates, setCertificateStatus, certificateInfo } from "./src/certificates.js";
 import { createAutoDeploy, getAutoDeploy, listAutoDeploys, setAutoDeployStatus, autoDeployInfo, findAutoDeploysByRepository, recordAutoDeployRun, claimWebhookDelivery } from "./src/autodeploy.js";
 import { createRoute, getRoute, listRoutes, setRouteStatus, findRouteByHostname, networkInfo, proxyRequest } from "./src/network.js";
 import { executeCloudBuildJob } from "./src/cloudJob.js";
@@ -475,6 +476,34 @@ const server = http.createServer(async (req, res) => {
       const body = await readJson(req);
       const route = await setRouteStatus(routeMatch[1], identity.id, body.status);
       return route ? send(res, 200, { ok:true, route }, rid) : send(res, 404, { ok:false, error:"Route not found" }, rid);
+    }
+
+    if (url.pathname === "/v1/cloud/certificates/info" && req.method === "GET") return send(res, 200, { ok:true, certificates:certificateInfo() }, rid);
+    if (url.pathname === "/v1/cloud/certificates" && req.method === "GET") {
+      const auth = authenticate(req);
+      if (!auth.ok) return send(res, 401, auth, rid);
+      return send(res, 200, { ok:true, certificates:await listCertificates(auth.keyId) }, rid);
+    }
+    if (url.pathname === "/v1/cloud/certificates" && req.method === "POST") {
+      const auth = authenticate(req);
+      if (!auth.ok) return send(res, 401, auth, rid);
+      const body = await readJson(req);
+      const cert = await createCertificate({ ...body, ownerId:auth.keyId });
+      return send(res, 202, { ok:true, certificate:cert }, rid);
+    }
+    if (url.pathname.startsWith("/v1/cloud/certificates/") && req.method === "GET") {
+      const auth = authenticate(req);
+      if (!auth.ok) return send(res, 401, auth, rid);
+      const id = url.pathname.split("/").pop();
+      const cert = await getCertificate(id, auth.keyId);
+      return cert ? send(res, 200, { ok:true, certificate:cert }, rid) : send(res, 404, { ok:false, error:"Certificate not found" }, rid);
+    }
+    if (url.pathname.startsWith("/v1/cloud/certificates/") && req.method === "POST") {
+      const auth = authenticate(req);
+      if (!auth.ok) return send(res, 401, auth, rid);
+      const id = url.pathname.split("/").pop(), body=await readJson(req);
+      const cert = await setCertificateStatus(id, auth.keyId, body.status, body.patch||{});
+      return cert ? send(res, 200, { ok:true, certificate:cert }, rid) : send(res, 404, { ok:false, error:"Certificate not found" }, rid);
     }
 
     if (url.pathname === "/v1/cloud/domains/info" && req.method === "GET")

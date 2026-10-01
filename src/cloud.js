@@ -59,6 +59,22 @@ export function createBuildPlan({ repository, branch, repo, files }) {
   };
 }
 
+export async function runBuildPlan(plan, { cwd } = {}) {
+  if (!plan || !plan.runtime) throw new Error("build plan is required");
+  const { buildRunnerInfo, runBuildCommand } = await import("./buildRunner.js");
+  if (!buildRunnerInfo().enabled) {
+    const error = new Error("Build runner is disabled"); error.code = "BUILD_RUNNER_DISABLED"; error.status = 503; throw error;
+  }
+  const steps = [];
+  for (const [name, command] of Object.entries(plan.commands || {})) {
+    if (!command || name === "start") continue;
+    const result = await runBuildCommand(command, { cwd });
+    steps.push({ name, ...result });
+    if (!result.ok) return { ok: false, repository: plan.repository, runtime: plan.runtime, steps };
+  }
+  return { ok: true, repository: plan.repository, runtime: plan.runtime, steps };
+}
+
 export function buildPlanInfo() {
   return { maxPackageChars: LIMIT, supportedRuntimes: ["node","python","go","rust","docker"] };
 }

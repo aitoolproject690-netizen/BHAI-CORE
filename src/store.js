@@ -46,6 +46,7 @@ async function ensureLoaded() {
       domains: parsed.domains || {},
       autoDeploy: parsed.autoDeploy || {},
       certificates: parsed.certificates || {},
+      acmeAccounts: parsed.acmeAccounts || {},
       dnsRecords: parsed.dnsRecords || {}
     };
   } catch {

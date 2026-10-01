@@ -80,7 +80,7 @@ export function listServices(ownerId) {
 function publicService(s) {
   return { id:s.id, ownerId:s.ownerId, buildId:s.buildId, status:s.status, pid:s.pid || null, restartCount:s.restartCount, healthUrl:s.healthUrl, createdAt:s.createdAt, updatedAt:s.updatedAt };
 }
-export function serviceInfo() { return { enabled: process.env.BHAI_RUNTIME_ENABLED === "true", maxRestarts: MAX_RESTARTS, healthIntervalMs: HEALTH_INTERVAL, inMemory:true }; }
+export function serviceInfo() { return { enabled: process.env.BHAI_RUNTIME_ENABLED === "true", maxRestarts: MAX_RESTARTS, healthIntervalMs: HEALTH_INTERVAL, persistentMetadata:true }; }
 
 export async function monitorService(id, ownerId) {
   const s = services.get(id);

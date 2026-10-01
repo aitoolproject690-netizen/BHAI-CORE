@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import crypto from "node:crypto";
 
 const file = process.env.BHAI_STORE_FILE || "./data/bhai-core-store.json";
 
@@ -40,7 +41,7 @@ async function ensureLoaded() {
 
 async function persist(snapshot) {
   await fs.mkdir(path.dirname(file), { recursive: true });
-  const tmp = file + ".tmp";
+  const tmp = `${file}.${process.pid}.${crypto.randomUUID()}.tmp`;
   await fs.writeFile(tmp, JSON.stringify(snapshot, null, 2), "utf8");
   await fs.rename(tmp, file);
 }

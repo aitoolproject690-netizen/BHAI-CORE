@@ -5,13 +5,14 @@ function hash(value) {
   return crypto.createHash("sha256").update(value).digest("hex");
 }
 
-export async function createApiKey(name = "default") {
+export async function createApiKey(name = "default", scopes) {
   const raw = "bhai_" + crypto.randomBytes(24).toString("base64url");
   const id = hash(raw).slice(0, 16);
   await updateStore(store => {
     store.apiKeys[id] = {
       id, name, hash: hash(raw),
-      createdAt: new Date().toISOString(), active: true
+      createdAt: new Date().toISOString(), active: true,
+      scopes: Array.isArray(scopes) && scopes.length ? [...new Set(scopes)] : undefined
     };
     return store;
   });
@@ -34,7 +35,7 @@ export async function authenticate(value) {
   const digest = hash(value);
   const store = await getStore();
   for (const item of Object.values(store.apiKeys)) {
-    if (item.active && item.hash === digest) return { id: item.id, name: item.name };
+    if (item.active && item.hash === digest) return { id: item.id, name: item.name, scopes: item.scopes };
   }
   return null;
 }

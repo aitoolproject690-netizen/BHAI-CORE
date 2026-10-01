@@ -16,6 +16,7 @@ import { createTextFile, getFile, listFiles, deleteFile, searchFiles, fileLimits
 import { searchRag, ragContext } from "./src/rag.js";
 import { embeddingInfo } from "./src/embeddings.js";
 import { getModelRegistry, modelCapabilities } from "./src/models.js";
+import { analyzeImage, getVisionCandidates } from "./src/vision.js";
 import { canAttempt, recordFailure, recordSuccess } from "./src/circuitBreaker.js";
 import { withRetry, classifyError } from "./src/retry.js";
 
@@ -41,11 +42,11 @@ function adminAuthorized(req) {
   return Boolean(expected && req.headers["x-bhai-admin-key"] === expected);
 }
 
-async function readJson(req) {
+async function readJson(req, maxBytes = 2_000_000) {
   let body = "";
   for await (const chunk of req) {
     body += chunk;
-    if (body.length > 2_000_000) throw new Error("Request body too large");
+    if (body.length > maxBytes) throw new Error("Request body too large");
   }
   return body ? JSON.parse(body) : {};
 }
@@ -82,6 +83,27 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/v1/models" && req.method === "GET") {
       const probe = url.searchParams.get("probe") === "true";
       return send(res, 200, await getModelRegistry({ probeOllama: probe }), rid);
+    }
+
+    if (url.pathname === "/v1/vision/analyze" && req.method === "POST") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const body = await readJson(req, 12_000_000);
+      const candidates = getVisionCandidates();
+      const selected = body.provider
+        ? candidates.find(item => item.provider === String(body.provider).toLowerCase())
+        : candidates[0];
+      if (!selected) return send(res, 503, { ok: false, error: "No configured vision-capable model" }, rid);
+      const providerCfg = cfg.providers[selected.provider];
+      const result = await analyzeImage({
+        provider: selected.provider,
+        model: body.model || selected.model,
+        key: providerCfg.key,
+        url: providerCfg.url,
+        prompt: body.prompt,
+        image: body.image
+      });
+      return send(res, 200, { ok: true, ...result }, rid);
     }
 
     if (url.pathname === "/v1/models/capabilities" && req.method === "GET") {

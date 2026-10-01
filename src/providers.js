@@ -114,7 +114,7 @@ export const providerAdapters = {
     return ollamaChat({ url, model, messages, temperature });
   },
   async gemini({ key, model, messages, temperature = 0.7 }) {
-    const contents = messages.map(m => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: String(m.content ?? "") }] }));
+    const contents = messages.map(m => ({ role: m.role === "assistant" ? "model" : "user", parts: Array.isArray(m.content) ? m.content.map(part => part?.type === "image" ? { inlineData: { mimeType: part.mimeType, data: part.data } } : { text: String(part?.text ?? "") }) : [{ text: String(m.content ?? "") }] }));
     const data = await jsonFetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent?key=" + encodeURIComponent(key), {
       method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify({contents,generationConfig:{temperature}})
     });

@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { decryptPrivateKey, createJws } from "./acmeCrypto.js";
+import { createJws } from "./acmeCrypto.js";
 const b64=v=>Buffer.from(v).toString("base64url").replace(/=+$/,"");
 export function jwkThumbprint(jwk){const canonical=JSON.stringify({crv:jwk.crv,kty:jwk.kty,x:jwk.x,y:jwk.y});return b64(crypto.createHash("sha256").update(canonical).digest());}
 async function request(url,options={},timeoutMs=10000){const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),timeoutMs);try{const res=await fetch(url,{...options,signal:controller.signal});const text=await res.text();let body=null;try{body=text?JSON.parse(text):null;}catch{body=text;}return {res,body};}finally{clearTimeout(timer);}}

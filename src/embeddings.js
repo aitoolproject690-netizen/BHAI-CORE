@@ -36,6 +36,16 @@ export function embedMany(texts, options = {}) {
 }
 
 export function embeddingInfo() {
+  const provider = String(process.env.BHAI_EMBEDDING_PROVIDER || "local-hash").toLowerCase();
+  if (provider === "ollama") {
+    return {
+      provider: "ollama",
+      semantic: true,
+      model: process.env.BHAI_OLLAMA_EMBEDDING_MODEL || "nomic-embed-text",
+      url: process.env.BHAI_OLLAMA_URL || "http://127.0.0.1:11434",
+      replaceable: true
+    };
+  }
   return {
     provider: "local-hash",
     semantic: false,

@@ -1,4 +1,5 @@
 import http from "node:http";
+import { startTlsServer, tlsInfo } from "./src/tls.js";
 import { config } from "./src/config.js";
 import { generate, getProviderStatus } from "./src/router.js";
 import { publicError } from "./src/errors.js";
@@ -827,4 +828,9 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(cfg.port, cfg.host, () =>
   console.log("BHAI-CORE listening on http://" + cfg.host + ":" + cfg.port)
-);
+});
+
+const tlsServer = startTlsServer(server.listeners("request")[0]);
+if (tlsServer) {
+  console.log("BHAI-CORE TLS:", JSON.stringify(tlsInfo()));
+}

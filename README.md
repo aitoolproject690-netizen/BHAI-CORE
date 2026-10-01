@@ -44,7 +44,7 @@ Run `npm test` for the test suite and `npm run check` for syntax checks.
 
 
 ## Persistent storage
-The default local store is JSON at `data/bhai-core-store.json`. Set `BHAI_STORE_FILE` to another path. The storage API is intentionally isolated so production can later use SQLite or PostgreSQL without changing the HTTP/API contract.
+The default persistent store is JSON at `data/bhai-core-store.json`. Set `BHAI_STORE_FILE` to another path. Storage access is isolated behind one store API, so a future SQLite/PostgreSQL backend can replace the JSON backend without changing the HTTP/API contract.
 
 ## Streaming
 The core includes an SSE utility layer for incremental events. Streaming uses circuit-breaker protection, bounded retries before output starts, request budgets, and provider telemetry.

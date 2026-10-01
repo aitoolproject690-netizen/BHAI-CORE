@@ -1,4 +1,4 @@
-import { createWorkspace, cleanupWorkspace } from "./workspace.js";
+import { createWorkspace, cleanupWorkspace, createDeploymentWorkspace } from "./workspace.js";
 import { checkoutGithubRepository } from "./source.js";
 import { runCloudBuild } from "./cloudBuild.js";
 

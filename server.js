@@ -35,6 +35,7 @@ import { getDeployment, listDeployments, setDeploymentStatus, deploymentInfo, pr
 import { createDomain, getDomain, listDomains, setDomainStatus, domainInfo, attachDomainRoute } from "./src/domain.js";
 import { createCertificate, getCertificate, listCertificates, setCertificateStatus, certificateInfo } from "./src/certificates.js";
 import { createDnsChallenge, getDnsChallenge, listDnsChallenges, setDnsChallengeStatus, verifyDnsChallenge, dnsInfo } from "./src/dns.js";
+import { getAcmeDirectory, acmeInfo, createAcmeAccount, listAcmeAccounts, renewDueCertificates } from "./src/acme.js";
 import { createAutoDeploy, getAutoDeploy, listAutoDeploys, setAutoDeployStatus, autoDeployInfo, findAutoDeploysByRepository, recordAutoDeployRun, claimWebhookDelivery } from "./src/autodeploy.js";
 import { createRoute, getRoute, listRoutes, setRouteStatus, findRouteByHostname, networkInfo, proxyRequest } from "./src/network.js";
 import { executeCloudBuildJob } from "./src/cloudJob.js";
@@ -479,6 +480,11 @@ const server = http.createServer(async (req, res) => {
       return route ? send(res, 200, { ok:true, route }, rid) : send(res, 404, { ok:false, error:"Route not found" }, rid);
     }
 
+    if (url.pathname === "/v1/cloud/acme/info" && req.method === "GET") return send(res,200,{ok:true,acme:acmeInfo()},rid);
+    if (url.pathname === "/v1/cloud/acme/directory" && req.method === "GET") { try{return send(res,200,{ok:true,...await getAcmeDirectory()},rid);}catch(error){return send(res,error.status||502,{ok:false,error:error.message,code:error.code||"ACME_ERROR"},rid);} }
+    if (url.pathname === "/v1/cloud/acme/accounts" && req.method === "GET") { const identity=await authenticate(req.headers["x-bhai-key"]);if(!identity)return send(res,401,{ok:false,error:"BHAI key required"},rid);return send(res,200,{ok:true,accounts:await listAcmeAccounts(identity.id)},rid); }
+    if (url.pathname === "/v1/cloud/acme/accounts" && req.method === "POST") { const identity=await authenticate(req.headers["x-bhai-key"]);if(!identity)return send(res,401,{ok:false,error:"BHAI key required"},rid);const account=await createAcmeAccount({ownerId:identity.id});return send(res,202,{ok:true,account},rid); }
+    if (url.pathname === "/v1/cloud/acme/renew" && req.method === "POST") { const identity=await authenticate(req.headers["x-bhai-key"]);if(!identity)return send(res,401,{ok:false,error:"BHAI key required"},rid);return send(res,200,{ok:true,...await renewDueCertificates(identity.id)},rid); }
     if (url.pathname === "/v1/cloud/dns/info" && req.method === "GET") return send(res, 200, { ok:true, dns:dnsInfo() }, rid);
     if (url.pathname === "/v1/cloud/dns/challenges" && req.method === "GET") {
       const identity = await authenticate(req.headers["x-bhai-key"]); if (!identity) return send(res,401,{ok:false,error:"BHAI key required"},rid);

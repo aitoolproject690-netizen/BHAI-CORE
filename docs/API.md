@@ -54,3 +54,10 @@ Event sequence:
 - `complete` or `error`
 
 Currently streaming adapters are available for OpenAI and Hugging Face's OpenAI-compatible router.
+
+
+## Metrics
+- `GET /v1/usage` — usage totals grouped by app/API key.
+- `GET /v1/metrics` — provider telemetry: requests, successes, failures, retries, cumulative/last latency, last status and last error.
+
+Provider pricing is intentionally not hard-coded; future billing can attach a configurable price catalog without changing provider routing.

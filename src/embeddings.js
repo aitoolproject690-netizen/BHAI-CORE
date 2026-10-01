@@ -67,7 +67,7 @@ export function cosineSimilarity(a, b) {
 }
 
 async function ollamaEmbed(text, options = {}) {
-  const baseUrl = String(options.url || process.env.BHAI_OLLAMA_URL || "http://127.0.0.1:11434").replace(/\\/$/, "");
+  const baseUrl = String(options.url || process.env.BHAI_OLLAMA_URL || "http://127.0.0.1:11434").replace(/\/$/, "");
   const model = String(options.model || process.env.BHAI_OLLAMA_EMBEDDING_MODEL || "nomic-embed-text");
   const response = await fetch(baseUrl + "/api/embed", {
     method: "POST",

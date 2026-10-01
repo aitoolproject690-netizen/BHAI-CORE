@@ -3,7 +3,7 @@ import { checkoutGithubRepository } from "./source.js";
 import { runCloudBuild } from "./cloudBuild.js";
 import fs from "node:fs/promises";
 import path from "node:path";
-import crypto from "node:crypto";
+import { createDeployment } from "./deployment.js";
 
 export async function executeCloudBuildJob({ ownerId, repository, branch = "main", plan } = {}) {
   const workspace = await createWorkspace({ ownerId, repository, branch });
@@ -19,7 +19,7 @@ export async function executeCloudBuildJob({ ownerId, repository, branch = "main
       const deploymentId = "dep_" + crypto.randomUUID();
       const target = await createDeploymentWorkspace({ ownerId, deploymentId });
       await fs.cp(workspace.path, target.path, { recursive: true, force: true, filter: (src) => !src.includes(path.sep + ".git" + path.sep) });
-      deployment = { id: deploymentId, path: target.path, persistent: true };
+      deployment = await createDeployment({ ownerId, repository, branch, buildId: deploymentId, path: target.path });
     }
     return {
       status: build.ok ? "succeeded" : "failed",

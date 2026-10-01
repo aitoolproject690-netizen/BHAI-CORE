@@ -61,3 +61,14 @@ Currently streaming adapters are available for OpenAI and Hugging Face's OpenAI-
 - `GET /v1/metrics` — provider telemetry: requests, successes, failures, retries, cumulative/last latency, last status and last error.
 
 Provider pricing is intentionally not hard-coded; future billing can attach a configurable price catalog without changing provider routing.
+
+
+## Files
+- `GET /v1/files` — list files owned by the authenticated BHAI key.
+- `POST /v1/files` — create a text file from `name`, `text`, and optional `mimeType`.
+- `GET /v1/files/:id` — retrieve an owned file and its text.
+- `DELETE /v1/files/:id` — delete an owned file.
+- `GET /v1/files/search?q=...` — owner-scoped text search with snippets.
+- `GET /v1/files/limits` — current file/text limits.
+
+The current search is deterministic text matching. The storage contract is designed so chunking and vector/embedding search can be added later without changing file ownership or API-key boundaries.

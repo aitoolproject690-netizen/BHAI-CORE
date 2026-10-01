@@ -47,6 +47,7 @@ async function ensureLoaded() {
       autoDeploy: parsed.autoDeploy || {},
       certificates: parsed.certificates || {},
       acmeAccounts: parsed.acmeAccounts || {},
+      acmeOrders: parsed.acmeOrders || {},
       dnsRecords: parsed.dnsRecords || {}
     };
   } catch {

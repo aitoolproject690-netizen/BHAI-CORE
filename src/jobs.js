@@ -1,12 +1,12 @@
 import crypto from "node:crypto";
 
-const jobs = new Map();
+const jobs = new Map();\n\nexport const JOB_STATUS = Object.freeze({ QUEUED:"queued", RUNNING:"running", SUCCEEDED:"succeeded", FAILED:"failed", CANCELLED:"cancelled" });
 
 export function createJob(type, payload = {}) {
   const id = "job_" + crypto.randomUUID();
   const job = {
     id, type, payload,
-    status: "queued",
+    status: JOB_STATUS.QUEUED,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };

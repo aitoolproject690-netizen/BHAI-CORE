@@ -38,3 +38,8 @@ The internal job protocol uses:
 - `cancelled`
 
 A persistent queue/worker implementation will use this contract without changing the public API.
+
+
+## Jobs
+- `POST /v1/jobs` — enqueue an authenticated job; returns HTTP 202.
+- `GET /v1/jobs/:id` — retrieve an authenticated job and its current status.

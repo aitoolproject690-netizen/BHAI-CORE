@@ -42,5 +42,5 @@ export async function setDeploymentStatus(id, ownerId, status) {
 }
 
 export function deploymentInfo() {
-  return { persistent: true, ownerScoped: true, statuses:[...STATUSES] };
+  return { persistent: true, ownerScoped: true, statuses:[...STATUSES], autoStartSupported:true };
 }

@@ -27,6 +27,7 @@ import { withRetry, classifyError } from "./src/retry.js";
 import { listToolPolicies } from "./src/policy.js";
 import { recordAudit, listAudit, auditInfo } from "./src/audit.js";
 import { createApproval, getApproval, decideApproval, approvalInfo } from "./src/approval.js";
+import { cloudBuildInfo } from "./src/cloudBuild.js";
 
 const cfg = config();
 
@@ -303,6 +304,9 @@ const server = http.createServer(async (req, res) => {
       if (!provider || !model) return send(res, 400, { ok: false, error: "provider and model are required" }, rid);
       return send(res, 200, { ok: true, provider, model, capabilities: modelCapabilities(provider, model) }, rid);
     }
+
+    if (url.pathname === "/v1/cloud/build/info" && req.method === "GET")
+      return send(res, 200, { ok: true, cloudBuild: cloudBuildInfo() }, rid);
 
     if (url.pathname === "/v1/usage" && req.method === "GET")
       return send(res, 200, { ok: true, usage: await allUsage() }, rid);

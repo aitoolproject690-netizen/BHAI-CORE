@@ -1,38 +1,47 @@
-import crypto from "node:crypto";\nimport { getStore, updateStore } from "./store.js";
-
-const keys = new Map();
+import crypto from "node:crypto";
+import { getStore, updateStore } from "./store.js";
 
 function hash(value) {
   return crypto.createHash("sha256").update(value).digest("hex");
 }
 
-export function createApiKey(name = "default") {
+export async function createApiKey(name = "default") {
   const raw = "bhai_" + crypto.randomBytes(24).toString("base64url");
   const id = hash(raw).slice(0, 16);
-  // Persist asynchronously; callers can await this function.\n  return updateStore(store => {\n    store.apiKeys[id] = { id, name, hash: hash(raw), createdAt: new Date().toISOString(), active: true };\n    return store;\n  }).then(() => ({ id, key: raw, name }));
+  await updateStore(store => {
+    store.apiKeys[id] = {
+      id, name, hash: hash(raw),
+      createdAt: new Date().toISOString(), active: true
+    };
+    return store;
+  });
   return { id, key: raw, name };
 }
 
-export function revokeApiKey(id) {
-  const item = keys.get(id);
-  if (!item) return false;
-  item.active = false;
-  return true;
+export async function revokeApiKey(id) {
+  let found = false;
+  await updateStore(store => {
+    if (!store.apiKeys[id]) return store;
+    store.apiKeys[id].active = false;
+    found = true;
+    return store;
+  });
+  return found;
 }
 
-export function authenticate(value) {
+export async function authenticate(value) {
   if (!value) return null;
   const digest = hash(value);
-  for (const item of keys.values()) {
+  const store = await getStore();
+  for (const item of Object.values(store.apiKeys)) {
     if (item.active && item.hash === digest) return { id: item.id, name: item.name };
   }
   return null;
 }
 
-export function listApiKeys() {
-  return [...keys.values()].map(({ hash, ...safe }) => safe);
+export async function listApiKeys() {
+  const store = await getStore();
+  return Object.values(store.apiKeys).map(({ hash, ...safe }) => safe);
 }
 
-export function resetApiKeys() {
-  keys.clear();
-}
+export function resetApiKeys() {}

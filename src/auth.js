@@ -1,4 +1,4 @@
-import crypto from "node:crypto";
+import crypto from "node:crypto";\nimport { getStore, updateStore } from "./store.js";
 
 const keys = new Map();
 
@@ -9,7 +9,7 @@ function hash(value) {
 export function createApiKey(name = "default") {
   const raw = "bhai_" + crypto.randomBytes(24).toString("base64url");
   const id = hash(raw).slice(0, 16);
-  keys.set(id, { id, name, hash: hash(raw), createdAt: new Date().toISOString(), active: true });
+  // Persist asynchronously; callers can await this function.\n  return updateStore(store => {\n    store.apiKeys[id] = { id, name, hash: hash(raw), createdAt: new Date().toISOString(), active: true };\n    return store;\n  }).then(() => ({ id, key: raw, name }));
   return { id, key: raw, name };
 }
 

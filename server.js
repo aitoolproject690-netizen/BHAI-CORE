@@ -31,7 +31,7 @@ import { cloudBuildInfo } from "./src/cloudBuild.js";
 import { getBuildDetails, buildLogInfo } from "./src/buildLogs.js";
 import { createService, createServiceFromDeployment, getService, stopService, checkService, monitorService, listServices, serviceInfo } from "./src/service.js";
 import { getDeployment, listDeployments, setDeploymentStatus, deploymentInfo, promoteDeployment, rollbackDeployment, getProductionDeployment } from "./src/deployment.js";
-import { createDomain, getDomain, listDomains, setDomainStatus, domainInfo } from "./src/domain.js";
+import { createDomain, getDomain, listDomains, setDomainStatus, domainInfo, attachDomainRoute } from "./src/domain.js";
 import { createAutoDeploy, getAutoDeploy, listAutoDeploys, setAutoDeployStatus, autoDeployInfo, findAutoDeploysByRepository, recordAutoDeployRun, claimWebhookDelivery } from "./src/autodeploy.js";
 import { createRoute, getRoute, listRoutes, setRouteStatus, findRouteByHostname, networkInfo, proxyRequest } from "./src/network.js";
 import { executeCloudBuildJob } from "./src/cloudJob.js";
@@ -491,7 +491,9 @@ const server = http.createServer(async (req, res) => {
       if (!service) return send(res, 404, { ok: false, error: "Service not found" }, rid);
       const domain = await createDomain({ ownerId: identity.id, serviceId: body.serviceId, hostname: body.hostname, tls: body.tls });
       const route = await createRoute({ ownerId: identity.id, serviceId: body.serviceId, hostname: body.hostname, targetPort: service.port });
-      return send(res, 201, { ok: true, domain, route }, rid);
+      if (domain.status !== "active") await setRouteStatus(route.id, identity.id, "disabled");
+      const linkedDomain = await attachDomainRoute(domain.id, identity.id, route.id);
+      return send(res, 201, { ok: true, domain: linkedDomain || domain, route }, rid);
     }
 
     const domainMatch = url.pathname.match(/^\/v1\/cloud\/domains\/([^/]+)$/);
@@ -507,7 +509,9 @@ const server = http.createServer(async (req, res) => {
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
       const body = await readJson(req);
       const domain = await setDomainStatus(domainMatch[1], identity.id, body.status);
-      return domain ? send(res, 200, { ok: true, domain }, rid) : send(res, 404, { ok: false, error: "Domain not found" }, rid);
+      if (!domain) return send(res, 404, { ok: false, error: "Domain not found" }, rid);
+      if (domain.routeId) await setRouteStatus(domain.routeId, identity.id, domain.status === "active" ? "active" : "disabled");
+      return send(res, 200, { ok: true, domain }, rid);
     }
 
     if (url.pathname === "/v1/cloud/services/info" && req.method === "GET")

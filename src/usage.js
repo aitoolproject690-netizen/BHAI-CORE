@@ -1,27 +1,30 @@
-const usage = new Map();
+import { getStore, updateStore } from "./store.js";
 
-function bucket(key) {
-  if (!usage.has(key)) usage.set(key, { requests: 0, failures: 0, charsIn: 0, charsOut: 0 });
-  return usage.get(key);
+const empty = () => ({ requests: 0, failures: 0, charsIn: 0, charsOut: 0 });
+
+export async function recordUsage({ key = "anonymous", input = 0, output = 0, failed = false }) {
+  let result;
+  await updateStore(store => {
+    const b = store.usage[key] || empty();
+    b.requests += 1;
+    b.charsIn += input;
+    b.charsOut += output;
+    if (failed) b.failures += 1;
+    store.usage[key] = b;
+    result = { ...b };
+    return store;
+  });
+  return result;
 }
 
-export function recordUsage({ key = "anonymous", input = 0, output = 0, failed = false }) {
-  const b = bucket(key);
-  b.requests += 1;
-  b.charsIn += input;
-  b.charsOut += output;
-  if (failed) b.failures += 1;
-  return { ...b };
+export async function getUsage(key = "anonymous") {
+  const store = await getStore();
+  return { ...(store.usage[key] || empty()) };
 }
 
-export function getUsage(key = "anonymous") {
-  return { ...bucket(key) };
+export async function allUsage() {
+  const store = await getStore();
+  return Object.fromEntries(Object.entries(store.usage).map(([k, v]) => [k, { ...v }]));
 }
 
-export function allUsage() {
-  return Object.fromEntries([...usage.entries()].map(([k,v]) => [k, { ...v }]));
-}
-
-export function resetUsage() {
-  usage.clear();
-}
+export function resetUsage() {}

@@ -2,9 +2,12 @@ import { createWorkspace, cleanupWorkspace, createDeploymentWorkspace } from "./
 import { checkoutGithubRepository } from "./source.js";
 import { runCloudBuild } from "./cloudBuild.js";
 import fs from "node:fs/promises";
-import path from "node:path";
-import crypto from "node:crypto";
 import { createDeployment } from "./deployment.js";
+
+function shouldCopySource(sourcePath) {
+  const name = sourcePath.split(/[\\/]/).pop();
+  return name !== ".git";
+}
 
 export async function executeCloudBuildJob({ ownerId, repository, branch = "main", plan } = {}) {
   const workspace = await createWorkspace({ ownerId, repository, branch });
@@ -19,7 +22,7 @@ export async function executeCloudBuildJob({ ownerId, repository, branch = "main
     if (build.ok) {
       const deploymentId = "dep_" + crypto.randomUUID();
       const target = await createDeploymentWorkspace({ ownerId, deploymentId });
-      await fs.cp(workspace.path, target.path, { recursive: true, force: true, filter: (src) => !src.includes(path.sep + ".git" + path.sep) });
+      await fs.cp(workspace.path, target.path, { recursive: true, force: true, filter: shouldCopySource });
       deployment = await createDeployment({ ownerId, repository, branch, buildId: deploymentId, path: target.path });
     }
     return {

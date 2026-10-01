@@ -62,6 +62,53 @@ async function openAICompatibleStream(url, headers, body, onToken, timeoutMs = 6
   return fullText;
 }
 
+async function ollamaChat({ url, model, messages, temperature = 0.7 }) {
+  const baseUrl = String(url || "http://127.0.0.1:11434").replace(/\\/$/, "");
+  const data = await jsonFetch(baseUrl + "/api/chat", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ model, messages, stream: false, options: { temperature } })
+  });
+  const text = data?.message?.content || "";
+  if (!text) throw new Error("Ollama returned no text");
+  return { text, raw: data };
+}
+
+async function ollamaChatStream({ url, model, messages, temperature = 0.7, onToken }) {
+  const baseUrl = String(url || "http://127.0.0.1:11434").replace(/\\/$/, "");
+  const response = await fetch(baseUrl + "/api/chat", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ model, messages, stream: true, options: { temperature } }),
+    signal: timeoutSignal(60000)
+  });
+  if (!response.ok) {
+    const error = new Error(await response.text());
+    error.status = response.status;
+    throw error;
+  }
+  if (!response.body) throw new Error("Ollama returned no stream body");
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "", fullText = "";
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\\n");
+    buffer = lines.pop() || "";
+    for (const rawLine of lines) {
+      if (!rawLine.trim()) continue;
+      try {
+        const data = JSON.parse(rawLine);
+        const token = data?.message?.content || "";
+        if (token) { fullText += token; await onToken(token); }
+      } catch {}
+    }
+  }
+  return { text: fullText };
+}
+
 export const providerAdapters = {
   async gemini({ key, model, messages, temperature = 0.7 }) {
     const contents = messages.map(m => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: String(m.content ?? "") }] }));
@@ -101,6 +148,11 @@ export const providerAdapters = {
     const text = data?.choices?.[0]?.message?.content || "";
     if (!text) throw new Error("Hugging Face returned no text");
     return {text,raw:data};
+  },
+
+  async ollamaStream({ url, model, messages, temperature = 0.7, onToken }) {
+    if (typeof onToken !== "function") throw new Error("onToken callback is required");
+    return ollamaChatStream({ url, model, messages, temperature, onToken });
   },
 
   async openaiStream({ key, model, messages, temperature = 0.7, onToken }) {

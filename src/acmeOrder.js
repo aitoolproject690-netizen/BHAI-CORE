@@ -2,12 +2,15 @@ import crypto from "node:crypto";
 import { getStore, updateStore } from "./store.js";
 import { createDnsChallenge } from "./dns.js";
 import { getCertificate } from "./certificates.js";
+import { verifyDnsChallenge } from "./dns.js";
+import { dns01KeyAuthorization } from "./acmeProtocol.js";
 
 const ORDER_STATUSES=new Set(["pending","ready","processing","valid","invalid","failed"]);
 const CHALLENGE_STATUSES=new Set(["pending","published","verified","failed"]);
 
 function pubChallenge(c){return{id:c.id,orderId:c.orderId,type:c.type,url:c.url,status:c.status,recordName:c.recordName,createdAt:c.createdAt,updatedAt:c.updatedAt};}
 function pubOrder(o){return{id:o.id,ownerId:o.ownerId,certificateId:o.certificateId,hostname:o.hostname,status:o.status,challenge:o.challenge,challengeId:o.challengeId,authorizationUrl:o.authorizationUrl,orderUrl:o.orderUrl,expiresAt:o.expiresAt,lastError:o.lastError,createdAt:o.createdAt,updatedAt:o.updatedAt};}
+export function buildDns01RecordValue(token,jwk){return dns01KeyAuthorization(token,jwk);}
 
 export async function createAcmeOrder({ownerId,certificateId,hostname,challenge="dns-01"}={}){
  if(!ownerId||!certificateId||!hostname)throw Object.assign(new Error("ownerId, certificateId and hostname required"),{code:"ACME_ORDER_FIELDS_REQUIRED",status:400});
@@ -31,6 +34,13 @@ export async function prepareDnsChallenge(orderId,ownerId,{recordName,recordValu
  return {order:await getAcmeOrder(orderId,ownerId),record};
 }
 
+export async function verifyOrderDnsChallenge(orderId,ownerId){
+ const s=await getStore(),o=s.acmeOrders?.[orderId]; if(!o||o.ownerId!==ownerId)return null;
+ if(!o.challengeId)throw Object.assign(new Error("DNS challenge not prepared"),{code:"ACME_DNS_CHALLENGE_MISSING",status:409});
+ const result=await verifyDnsChallenge(o.challengeId,ownerId);
+ if(result?.verified) await updateStore(s=>{const x=s.acmeOrders?.[orderId];if(x){x.status="processing";x.updatedAt=new Date().toISOString();}return s;});
+ return {order:await getAcmeOrder(orderId,ownerId),verification:result};
+}
 export async function setAcmeOrderStatus(id,ownerId,status,patch={}){
  if(!ORDER_STATUSES.has(status))throw Object.assign(new Error("Invalid ACME order status"),{code:"ACME_ORDER_STATUS_INVALID",status:400});
  let found=false;await updateStore(s=>{const o=s.acmeOrders?.[id];if(!o||o.ownerId!==ownerId)return s;o.status=status;Object.assign(o,patch);o.updatedAt=new Date().toISOString();found=true;return s;});

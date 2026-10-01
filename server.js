@@ -6,6 +6,7 @@ import { requestId } from "./src/requestId.js";
 import { recordUsage, allUsage } from "./src/usage.js";
 import { assertBudget } from "./src/budget.js";
 import { authenticate, createApiKey, listApiKeys, revokeApiKey } from "./src/auth.js";
+import { health, readiness } from "./src/health.js";
 
 const cfg = config();
 
@@ -59,7 +60,7 @@ const server = http.createServer(async (req, res) => {
       }, rid);
     }
 
-    if (!authorized(req)) return send(res, 401, { ok: false, error: "Unauthorized" }, rid);
+    if (url.pathname === "/ready" && req.method === "GET") {\n      const result = readiness();\n      return send(res, result.ready ? 200 : 503, result, rid);\n    }\n\n    if (!authorized(req)) return send(res, 401, { ok: false, error: "Unauthorized" }, rid);
 
     if (url.pathname === "/v1/providers" && req.method === "GET")
       return send(res, 200, { ok: true, providers: getProviderStatus() }, rid);

@@ -152,7 +152,7 @@ const server = http.createServer(async (req, res) => {
       const body = await readJson(req, 16_000_000);
       const plan = body.plan || planAgentRequest(body);
       validatePlan(plan);
-      const result = await runAgentPlan(plan, identity);
+      const result = await runAgentPlan(plan, identity, { conversationId: body.conversationId });
       return send(res, 200, { ok: result.status === "succeeded", ...result }, rid);
     }
 

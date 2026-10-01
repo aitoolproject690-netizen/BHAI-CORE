@@ -4,7 +4,7 @@ import { breakerState, canAttempt, recordFailure, recordSuccess } from "./circui
 function isConfigured(name,cfg){ return Boolean(cfg.providers[name]?.key && providerAdapters[name]); }
 export function getProviderStatus(){
   const cfg=config();
-  return Object.fromEntries(Object.keys(providerAdapters).map(name => [name,{configured:isConfigured(name,cfg),model:cfg.providers[name].model,enabled:cfg.providerOrder.includes(name)}]));
+  return Object.fromEntries(Object.keys(providerAdapters).map(name => [name,{configured:isConfigured(name,cfg),model:cfg.providers[name].model,enabled:cfg.providerOrder.includes(name),breaker:breakerState(name)}]));
 }
 export async function generate({messages,provider,temperature=0.7,maxAttempts}={}){
   if(!Array.isArray(messages)||messages.length===0) throw new Error("messages must be a non-empty array");

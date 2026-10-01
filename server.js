@@ -21,7 +21,6 @@ import { createImageRequest, submitComfyUI, imageProviderInfo } from "./src/imag
 import { createSpeechRequest, transcribeWhisper, createTtsRequest, synthesizePiper, voiceProviderInfo } from "./src/voice.js";
 import { canAttempt, recordFailure, recordSuccess } from "./src/circuitBreaker.js";
 import { listAgentTools, executeAgentTool } from "./src/agent.js";
-import { listAgentTools, executeAgentTool } from "./src/agent.js";
 import { withRetry, classifyError } from "./src/retry.js";
 
 const cfg = config();

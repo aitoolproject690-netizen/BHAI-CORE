@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { startRuntime, stopRuntime, healthCheck } from "./runtime.js";
 import { getStore, updateStore } from "./store.js";
 import { allocatePort, releasePort } from "./portAllocator.js";
+import { setServiceRouteStatus } from "./network.js";
 const services = new Map();
 
 async function persistService(s) {
@@ -11,7 +12,11 @@ async function persistService(s) {
 
 export async function restoreServices() {
   const store = await getStore();
-  for (const record of Object.values(store.services || {})) services.set(record.id, { ...record, child:null, pid:null, status: record.status === "running" ? "stale" : record.status });
+  for (const record of Object.values(store.services || {})) {
+    const restored = { ...record, child:null, pid:null, status: record.status === "running" ? "stale" : record.status };
+    services.set(record.id, restored);
+    if (restored.status === "stale" || restored.status === "stopped" || restored.status === "crashed") await setServiceRouteStatus(record.id, "disabled");
+  }
   return services.size;
 }
 const MAX_RESTARTS = Number(process.env.BHAI_RUNTIME_MAX_RESTARTS || 3);
@@ -35,15 +40,18 @@ async function launch(service) {
   service.status = "running";
   service.updatedAt = new Date().toISOString();
   await persistService(service);
+  await setServiceRouteStatus(service.id, "active");
   runtime.exit.then(async result => {
     if (!services.has(service.id)) return;
     if (service.status === "stopping" || service.status === "stopped") { service.status = "stopped"; service.updatedAt = new Date().toISOString(); await persistService(service); return; }
     service.status = result.code === 0 ? "stopped" : "crashed";
     service.updatedAt = new Date().toISOString();
+    await setServiceRouteStatus(service.id, "disabled");
     await persistService(service);
     if (service.status === "crashed" && service.restartCount < MAX_RESTARTS) {
       service.restartCount++;
       service.status = "restarting";
+      await persistService(service);
       await new Promise(r => setTimeout(r, Math.min(5000 * service.restartCount, 15000)));
       if (services.has(service.id)) await launch(service);
     }
@@ -59,6 +67,7 @@ export async function stopService(id, ownerId) {
   s.status = "stopping";
   await stopRuntime(s.child);
   await releasePort(s.port);
+  await setServiceRouteStatus(s.id, "disabled");
   s.status = "stopped";
   s.updatedAt = new Date().toISOString();
   await persistService(s);
@@ -71,10 +80,12 @@ export async function checkService(id, ownerId) {
   const health = await healthCheck(s.healthUrl);
   if (!health.ok && s.status === "running") {
     s.status = "unhealthy";
+    await setServiceRouteStatus(s.id, "disabled");
     s.updatedAt = new Date().toISOString();
     await persistService(s);
   } else if (health.ok && s.status === "unhealthy") {
     s.status = "running";
+    await setServiceRouteStatus(s.id, "active");
     s.updatedAt = new Date().toISOString();
     await persistService(s);
   }
@@ -96,6 +107,7 @@ export async function monitorService(id, ownerId) {
   if (!result.health.ok && s.status === "unhealthy" && s.restartCount < MAX_RESTARTS) {
     s.restartCount++;
     s.status = "restarting";
+    await setServiceRouteStatus(s.id, "disabled");
     s.updatedAt = new Date().toISOString();
     await persistService(s);
     if (s.child) await stopRuntime(s.child);

@@ -108,7 +108,7 @@ const server = http.createServer(async (req, res) => {
       if (event !== "push") return send(res, 202, { ok:true, ignored:true, event }, rid);
       const body = JSON.parse(raw);
       const repository = body.repository?.full_name;
-      const branch = String(body.ref || "").replace(/^refs\\/heads\\//, "");
+      const branch = String(body.ref || "").replace(/^refs\/heads\//, "");
       const commit = body.after || null;
       if (!repository || !branch || !commit) return send(res, 400, { ok:false, error:"Invalid push payload" }, rid);
       const hooks = (await findAutoDeploysByRepository(repository)).filter(h => h.status === "enabled" && h.branch === branch);

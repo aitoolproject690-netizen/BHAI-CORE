@@ -4,7 +4,7 @@ import { breakerState, canAttempt, recordFailure, recordSuccess } from "./circui
 import { withRetry, classifyError } from "./retry.js";
 import { recordProviderUsage } from "./usage.js";
 
-function isConfigured(name, cfg) {
+export function isProviderConfigured(name, cfg = config()) {
   return Boolean(cfg.providers[name]?.key && providerAdapters[name]);
 }
 
@@ -16,7 +16,7 @@ export function getProviderStatus() {
       .map(name => [
         name,
         {
-          configured: isConfigured(name, cfg),
+          configured: isProviderConfigured(name, cfg),
           model: cfg.providers[name].model,
           enabled: cfg.providerOrder.includes(name),
           breaker: breakerState(name)

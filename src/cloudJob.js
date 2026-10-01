@@ -3,6 +3,7 @@ import { checkoutGithubRepository } from "./source.js";
 import { runCloudBuild } from "./cloudBuild.js";
 import fs from "node:fs/promises";
 import path from "node:path";
+import crypto from "node:crypto";
 import { createDeployment } from "./deployment.js";
 
 export async function executeCloudBuildJob({ ownerId, repository, branch = "main", plan } = {}) {

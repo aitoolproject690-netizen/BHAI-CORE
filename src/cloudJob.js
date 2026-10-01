@@ -2,6 +2,7 @@ import { createWorkspace, cleanupWorkspace, createDeploymentWorkspace } from "./
 import { checkoutGithubRepository } from "./source.js";
 import { runCloudBuild } from "./cloudBuild.js";
 import fs from "node:fs/promises";
+import crypto from "node:crypto";
 import { createDeployment } from "./deployment.js";
 
 function shouldCopySource(sourcePath) {

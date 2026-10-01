@@ -98,3 +98,9 @@ export async function monitorService(id, ownerId) {
   }
   return { ...result, restarted: false, restartCount: s.restartCount };
 }
+
+export async function createServiceFromDeployment({ ownerId, deployment, command, env = {}, healthUrl = null } = {}) {
+  if (!deployment?.id || deployment.ownerId !== ownerId || !deployment.path)
+    throw Object.assign(new Error("Valid owned deployment required"), { code:"DEPLOYMENT_REQUIRED", status:400 });
+  return createService({ ownerId, buildId: deployment.id, command, cwd: deployment.path, env, healthUrl });
+}

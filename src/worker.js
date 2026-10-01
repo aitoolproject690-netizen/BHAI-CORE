@@ -1,10 +1,11 @@
-import { getQueuedJob, finishJob, failJob } from "./queue.js";
+import { getQueuedJob, finishJob, failJob, updateJob } from "./queue.js";
 
 export async function processOne(handler) {
   const job = await getQueuedJob();
   if (!job) return null;
 
   try {
+    await updateJob(job.id, { startedAt: new Date().toISOString() });
     const result = await handler(job);
     return await finishJob(job.id, result);
   } catch (error) {

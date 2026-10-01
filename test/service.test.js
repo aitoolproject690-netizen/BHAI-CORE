@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 process.env.BHAI_RUNTIME_ENABLED="true";
 import { createService, getService, stopService, restoreServices } from "../src/service.js";
 import { getStore, resetStoreForTests } from "../src/store.js";
+import { createRoute, findRouteByHostname } from "../src/network.js";
 
 test("service lifecycle is owner scoped", async () => {
   const s = await createService({ ownerId:"owner-1", buildId:"build-1", command:"sleep 5", cwd:process.cwd() });
@@ -24,4 +25,13 @@ test("service metadata persists without persisting a live child process", async 
   await restoreServices();
   const restored = await getService(s.id, "owner-persist");
   assert.equal(restored.pid, null);
+});
+
+test("stopping a service disables its route", async () => {
+  resetStoreForTests();
+  const s = await createService({ ownerId:"owner-route", buildId:"build-route", command:"sleep 5", cwd:process.cwd() });
+  await createRoute({ ownerId:"owner-route", hostname:"app.route-test.com", serviceId:s.id, targetPort:s.port });
+  assert.equal((await findRouteByHostname("app.route-test.com")).id, (await findRouteByHostname("app.route-test.com")).id);
+  await stopService(s.id, "owner-route");
+  assert.equal(await findRouteByHostname("app.route-test.com"), null);
 });

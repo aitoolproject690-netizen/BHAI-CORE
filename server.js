@@ -30,6 +30,7 @@ import { createApproval, getApproval, decideApproval, approvalInfo } from "./src
 import { cloudBuildInfo } from "./src/cloudBuild.js";
 import { getBuildDetails, buildLogInfo } from "./src/buildLogs.js";
 import { createService, getService, stopService, checkService, monitorService, listServices, serviceInfo } from "./src/service.js";
+import { getDeployment, listDeployments, setDeploymentStatus, deploymentInfo } from "./src/deployment.js";
 
 const cfg = config();
 
@@ -309,6 +310,31 @@ const server = http.createServer(async (req, res) => {
 
     if (url.pathname === "/v1/cloud/build/info" && req.method === "GET")
       return send(res, 200, { ok: true, cloudBuild: cloudBuildInfo() }, rid);
+
+    if (url.pathname === "/v1/cloud/deployments/info" && req.method === "GET")
+      return send(res, 200, { ok: true, ...deploymentInfo() }, rid);
+
+    if (url.pathname === "/v1/cloud/deployments" && req.method === "GET") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      return send(res, 200, { ok: true, deployments: await listDeployments(identity.id) }, rid);
+    }
+
+    const deploymentMatch = url.pathname.match(/^\/v1\/cloud\/deployments\/([^/]+)$/);
+    if (deploymentMatch && req.method === "GET") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const deployment = await getDeployment(deploymentMatch[1], identity.id);
+      return deployment ? send(res, 200, { ok: true, deployment }, rid) : send(res, 404, { ok: false, error: "Deployment not found" }, rid);
+    }
+
+    if (deploymentMatch && req.method === "POST") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const body = await readJson(req);
+      const deployment = await setDeploymentStatus(deploymentMatch[1], identity.id, body.status);
+      return deployment ? send(res, 200, { ok: true, deployment }, rid) : send(res, 404, { ok: false, error: "Deployment not found" }, rid);
+    }
 
     if (url.pathname === "/v1/cloud/services/info" && req.method === "GET")
       return send(res, 200, { ok: true, ...serviceInfo() }, rid);

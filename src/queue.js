@@ -10,7 +10,7 @@ export async function enqueue(type, payload = {}) {
   const id = makeId();
   let job;
   await updateStore(store => {
-    job = { id, type, payload, status: JOB_STATUS.QUEUED, attempts: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    job = { id, type, payload, ownerId: payload?.ownerId || null, status: JOB_STATUS.QUEUED, attempts: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
     store.jobs ??= {};
     store.jobs[id] = job;
     return store;

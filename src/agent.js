@@ -7,6 +7,8 @@ import { enqueue, getStoredJob } from "./queue.js";
 import { generate } from "./router.js";
 import { config } from "./config.js";
 import { authorizeTool, getToolPolicy } from "./policy.js";
+import { recordAudit } from "./audit.js";
+import { getApproval } from "./approval.js";
 
 export const AGENT_TOOLS = Object.freeze([
   { name: "chat", description: "Generate text with configured AI providers.", input: ["messages", "provider", "temperature", "maxAttempts"] },
@@ -30,11 +32,20 @@ export function listAgentTools() {
   return AGENT_TOOLS.map(tool => ({ ...tool, input: [...tool.input], policy: getToolPolicy(tool.name) }));
 }
 
-export async function executeAgentTool(name, input = {}, identity = {}) {
+export async function executeAgentTool(name, input = {}, identity = {}, options = {}) {
   const tool = String(name || "").trim();
   if (!AGENT_TOOLS.some(item => item.name === tool)) throw new Error("Unknown agent tool: " + tool);
   const ownerId = required(identity.id, "authenticated identity");
-  authorizeTool(tool, identity);
+  const policy = authorizeTool(tool, identity);
+  if (policy.risk === "high" && options.approvalId) {
+    const approval = await getApproval(options.approvalId, identity.id);
+    if (!approval || approval.tool !== tool || approval.status !== "approved") {
+      const error = new Error("Approved action required for tool " + tool);
+      error.code = "APPROVAL_REQUIRED"; error.status = 428;
+      throw error;
+    }
+  }
+  await recordAudit({ actorId: identity.id, action: "agent.execute", tool, status: "started", requestId: options.requestId });
 
   switch (tool) {
     case "chat":

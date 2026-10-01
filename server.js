@@ -5,6 +5,8 @@ import { publicError } from "./src/errors.js";
 import { requestId } from "./src/requestId.js";
 import { recordUsage, allUsage } from "./src/usage.js";
 import { assertBudget } from "./src/budget.js";
+import { authenticate, createApiKey, listApiKeys, revokeApiKey } from "./src/auth.js";
+import { startSSE, writeSSE, endSSE } from "./src/stream.js";
 const cfg=config();
 function send(res,status,body){res.writeHead(status,{"content-type":"application/json; charset=utf-8","cache-control":"no-store","access-control-allow-origin":"*"});res.end(JSON.stringify(body));}
 function authorized(req){if(!cfg.apiKey)return true;return (req.headers.authorization||"")==="Bearer "+cfg.apiKey;}

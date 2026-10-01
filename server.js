@@ -25,6 +25,6 @@ const server=http.createServer(async(req,res)=>{
       return send(res,200,await generate({messages:body.messages,provider:body.provider,temperature:body.temperature,maxAttempts:body.max_attempts}));
     }
     return send(res,404,{ok:false,error:"Not found"});
-  }catch(error){recordUsage({ key: req.headers["x-bhai-key"] || "anonymous", failed: true });\n    return send(res, error.code === "BUDGET_EXCEEDED" ? 429 : 500, {ok:false,...publicError(error),requestId:rid});}
+  }catch(error){await recordUsage({ key: req.headers["x-bhai-key"] || "anonymous", failed: true });\n    return send(res, error.code === "BUDGET_EXCEEDED" ? 429 : 500, {ok:false,...publicError(error),requestId:rid});}
 });
 server.listen(cfg.port,cfg.host,()=>console.log("BHAI-CORE listening on http://"+cfg.host+":"+cfg.port));

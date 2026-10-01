@@ -2,6 +2,7 @@ import { config } from "./config.js";
 import { providerAdapters } from "./providers.js";
 import { breakerState, canAttempt, recordFailure, recordSuccess } from "./circuitBreaker.js";
 import { withRetry, classifyError } from "./retry.js";
+import { recordProviderUsage } from "./usage.js";
 
 function isConfigured(name, cfg) {
   return Boolean(cfg.providers[name]?.key && providerAdapters[name]);
@@ -10,15 +11,17 @@ function isConfigured(name, cfg) {
 export function getProviderStatus() {
   const cfg = config();
   return Object.fromEntries(
-    Object.keys(providerAdapters).map(name => [
-      name,
-      {
-        configured: isConfigured(name, cfg),
-        model: cfg.providers[name].model,
-        enabled: cfg.providerOrder.includes(name),
-        breaker: breakerState(name)
-      }
-    ])
+    Object.keys(providerAdapters)
+      .filter(name => !name.endsWith("Stream"))
+      .map(name => [
+        name,
+        {
+          configured: isConfigured(name, cfg),
+          model: cfg.providers[name].model,
+          enabled: cfg.providerOrder.includes(name),
+          breaker: breakerState(name)
+        }
+      ])
   );
 }
 
@@ -43,21 +46,33 @@ export async function generate({ messages, provider, temperature = 0.7, maxAttem
       continue;
     }
 
+    const startedAt = Date.now();
+    let retries = 0;
+
     try {
       const result = await withRetry(
         () => providerAdapters[name]({ ...cfg.providers[name], messages, temperature }),
-        { retries: Number(process.env.BHAI_PROVIDER_RETRIES ?? 2) }
+        {
+          retries: Number(process.env.BHAI_PROVIDER_RETRIES ?? 2),
+          onRetry: () => { retries += 1; }
+        }
       );
+      const latencyMs = Date.now() - startedAt;
       recordSuccess(name);
+      await recordProviderUsage({ provider: name, success: true, latencyMs, retries });
       return {
         ok: true,
         provider: name,
         model: cfg.providers[name].model,
         text: result.text,
-        attempts: i + 1
+        attempts: i + 1,
+        retries,
+        latency_ms: latencyMs
       };
     } catch (error) {
+      const latencyMs = Date.now() - startedAt;
       recordFailure(name);
+      await recordProviderUsage({ provider: name, success: false, latencyMs, retries, error });
       errors.push({
         provider: name,
         kind: classifyError(error),

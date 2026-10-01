@@ -2,6 +2,9 @@ import http from "node:http";
 import { config } from "./src/config.js";
 import { generate, getProviderStatus } from "./src/router.js";
 import { publicError } from "./src/errors.js";
+import { requestId } from "./src/requestId.js";
+import { recordUsage, allUsage } from "./src/usage.js";
+import { assertBudget } from "./src/budget.js";
 const cfg=config();
 function send(res,status,body){res.writeHead(status,{"content-type":"application/json; charset=utf-8","cache-control":"no-store","access-control-allow-origin":"*"});res.end(JSON.stringify(body));}
 function authorized(req){if(!cfg.apiKey)return true;return (req.headers.authorization||"")==="Bearer "+cfg.apiKey;}
@@ -18,6 +21,6 @@ const server=http.createServer(async(req,res)=>{
       return send(res,200,await generate({messages:body.messages,provider:body.provider,temperature:body.temperature,maxAttempts:body.max_attempts}));
     }
     return send(res,404,{ok:false,error:"Not found"});
-  }catch(error){return send(res,500,{ok:false,...publicError(error)});}
+  }catch(error){recordUsage({ key: req.headers["x-bhai-key"] || "anonymous", failed: true });\n    return send(res, error.code === "BUDGET_EXCEEDED" ? 429 : 500, {ok:false,...publicError(error),requestId:rid});}
 });
 server.listen(cfg.port,cfg.host,()=>console.log("BHAI-CORE listening on http://"+cfg.host+":"+cfg.port));

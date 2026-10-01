@@ -146,3 +146,12 @@ Memory is persisted in the existing JSON store, isolated by API-key identity, bo
 - Legacy keys without stored scopes remain compatible with the existing core-agent permission set.
 - Permission failures use `PERMISSION_DENIED` and HTTP 403 when surfaced through an HTTP endpoint.
 - Future privileged tools such as GitHub writes, deployments, environment/secrets, and destructive operations should receive dedicated scopes rather than inheriting broad agent permissions.
+
+
+## GitHub Agent foundation
+- Registered provider-neutral tools: `github_repo_list`, `github_repo_get`, `github_file_read`, `github_file_write`, and `github_repo_create`.
+- Read operations require `github:read`.
+- File writes require `github:write` and agent write permission.
+- Repository creation requires the future `github:admin` scope and agent write permission.
+- High-risk GitHub operations are designed to require an approval record before execution.
+- The runtime connector is intentionally not faked: until a GitHub runtime adapter is configured, these tools return a clear configuration error.

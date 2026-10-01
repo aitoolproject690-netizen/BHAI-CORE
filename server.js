@@ -30,7 +30,7 @@ import { createApproval, getApproval, decideApproval, approvalInfo } from "./src
 import { cloudBuildInfo } from "./src/cloudBuild.js";
 import { getBuildDetails, buildLogInfo } from "./src/buildLogs.js";
 import { createService, createServiceFromDeployment, getService, stopService, checkService, monitorService, listServices, serviceInfo } from "./src/service.js";
-import { getDeployment, listDeployments, setDeploymentStatus, deploymentInfo } from "./src/deployment.js";
+import { getDeployment, listDeployments, setDeploymentStatus, deploymentInfo, promoteDeployment, rollbackDeployment, getProductionDeployment } from "./src/deployment.js";
 import { createDomain, getDomain, listDomains, setDomainStatus, domainInfo } from "./src/domain.js";
 import { createAutoDeploy, getAutoDeploy, listAutoDeploys, setAutoDeployStatus, autoDeployInfo, findAutoDeploysByRepository, recordAutoDeployRun } from "./src/autodeploy.js";
 import { createRoute, getRoute, listRoutes, setRouteStatus, findRouteByHostname, networkInfo, proxyRequest } from "./src/network.js";
@@ -373,10 +373,32 @@ const server = http.createServer(async (req, res) => {
       return deployment ? send(res, 200, { ok: true, deployment }, rid) : send(res, 404, { ok: false, error: "Deployment not found" }, rid);
     }
 
+    const rollbackMatch = url.pathname.match(/^\/v1\/cloud\/deployments\/([^/]+)\/rollback$/);
+    if (rollbackMatch && req.method === "POST") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const deployment = await rollbackDeployment(rollbackMatch[1], identity.id);
+      return deployment ? send(res, 200, { ok: true, deployment, rolledBack: true }, rid) : send(res, 404, { ok: false, error: "Deployment not found" }, rid);
+    }
+
+    if (url.pathname === "/v1/cloud/deployments/production" && req.method === "GET") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const repository = url.searchParams.get("repository");
+      const branch = url.searchParams.get("branch") || "main";
+      if (!repository) return send(res, 400, { ok: false, error: "repository is required" }, rid);
+      const deployment = await getProductionDeployment({ ownerId: identity.id, repository, branch });
+      return deployment ? send(res, 200, { ok: true, deployment }, rid) : send(res, 404, { ok: false, error: "Production deployment not found" }, rid);
+    }
+
     if (deploymentMatch && req.method === "POST") {
       const identity = await authenticate(req.headers["x-bhai-key"]);
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
       const body = await readJson(req);
+      if (body.status === "active") {
+        const deployment = await promoteDeployment(deploymentMatch[1], identity.id);
+        return deployment ? send(res, 200, { ok: true, deployment }, rid) : send(res, 404, { ok: false, error: "Deployment not found" }, rid);
+      }
       const deployment = await setDeploymentStatus(deploymentMatch[1], identity.id, body.status);
       return deployment ? send(res, 200, { ok: true, deployment }, rid) : send(res, 404, { ok: false, error: "Deployment not found" }, rid);
     }

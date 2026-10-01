@@ -96,8 +96,8 @@ export async function promoteDeployment(id, ownerId) {
   const previous = previousId ? store.deployments?.[previousId] : null;
 
   if (previous?.serviceId && previous.serviceId !== target.serviceId) {
-    await rebindServiceRoutes(previous.serviceId, target.serviceId, service.port);
-    await rebindDomainServices(previous.serviceId, target.serviceId);
+    await rebindServiceRoutes(previous.serviceId, target.serviceId, service.port, ownerId);
+    await rebindDomainServices(previous.serviceId, target.serviceId, ownerId);
   }
 
   await updateStore(next => {
@@ -114,6 +114,20 @@ export async function promoteDeployment(id, ownerId) {
 export async function rollbackDeployment(id, ownerId) {
   const target = await getDeployment(id, ownerId);
   if (!target) return null;
+
+  const current = await getProductionDeployment({
+    ownerId,
+    repository: target.repository,
+    branch: target.branch
+  });
+  if (!current)
+    throw Object.assign(new Error("No production deployment exists"), { code:"ROLLBACK_NO_PRODUCTION", status:409 });
+  if (current.id === target.id)
+    throw Object.assign(new Error("Deployment is already production"), { code:"ROLLBACK_ALREADY_PRODUCTION", status:409 });
+
+  if (target.status === "failed" || target.status === "stopped")
+    throw Object.assign(new Error("Rollback target is not deployable"), { code:"ROLLBACK_TARGET_INVALID", status:409 });
+
   return promoteDeployment(target.id, ownerId);
 }
 

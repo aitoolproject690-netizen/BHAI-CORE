@@ -6,7 +6,11 @@ import { requestId } from "./src/requestId.js";
 import { recordUsage, allUsage } from "./src/usage.js";
 import { assertBudget } from "./src/budget.js";
 import { authenticate, createApiKey, listApiKeys, revokeApiKey } from "./src/auth.js";
-import { health, readiness } from "./src/health.js";\nimport { enqueue, getStoredJob } from "./src/queue.js";
+import { health, readiness } from "./src/health.js";
+import { enqueue, getStoredJob } from "./src/queue.js";
+import { startSSE, sendEvent, endSSE } from "./src/stream.js";
+import { EVENTS, tokenEvent, completeEvent, errorEvent } from "./src/events.js";
+import { providerAdapters } from "./src/providers.js";
 
 const cfg = config();
 
@@ -41,6 +45,7 @@ async function readJson(req) {
 
 const server = http.createServer(async (req, res) => {
   const rid = requestId(req);
+
   try {
     if (req.method === "OPTIONS") {
       res.writeHead(204, {
@@ -53,14 +58,16 @@ const server = http.createServer(async (req, res) => {
 
     const url = new URL(req.url, "http://" + (req.headers.host || "localhost"));
 
-    if (url.pathname === "/health" && req.method === "GET") {
-      return send(res, 200, {
-        ok: true, service: "BHAI-CORE", version: "0.1.0",
-        providers: getProviderStatus()
-      }, rid);
+    if (url.pathname === "/health" && req.method === "GET")
+      return send(res, 200, health(), rid);
+
+    if (url.pathname === "/ready" && req.method === "GET") {
+      const result = readiness();
+      return send(res, result.ready ? 200 : 503, result, rid);
     }
 
-    if (url.pathname === "/ready" && req.method === "GET") {\n      const result = readiness();\n      return send(res, result.ready ? 200 : 503, result, rid);\n    }\n\n    if (!authorized(req)) return send(res, 401, { ok: false, error: "Unauthorized" }, rid);
+    if (!authorized(req))
+      return send(res, 401, { ok: false, error: "Unauthorized" }, rid);
 
     if (url.pathname === "/v1/providers" && req.method === "GET")
       return send(res, 200, { ok: true, providers: getProviderStatus() }, rid);
@@ -84,6 +91,57 @@ const server = http.createServer(async (req, res) => {
       const id = url.pathname.split("/").pop();
       const revoked = await revokeApiKey(id);
       return send(res, revoked ? 200 : 404, { ok: revoked }, rid);
+    }
+
+    if (url.pathname === "/v1/jobs" && req.method === "POST") {
+      const providedKey = req.headers["x-bhai-key"];
+      if (!await authenticate(providedKey)) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const body = await readJson(req);
+      return send(res, 202, await enqueue(body.type || "generic", body.payload || {}), rid);
+    }
+
+    const jobMatch = url.pathname.match(/^\/v1\/jobs\/([^/]+)$/);
+    if (jobMatch && req.method === "GET") {
+      const providedKey = req.headers["x-bhai-key"];
+      if (!await authenticate(providedKey)) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const job = await getStoredJob(jobMatch[1]);
+      return job ? send(res, 200, job, rid) : send(res, 404, { ok: false, error: "Job not found" }, rid);
+    }
+
+    if (url.pathname === "/v1/chat/completions/stream" && req.method === "POST") {
+      const providedKey = req.headers["x-bhai-key"];
+      const identity = await authenticate(providedKey);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+
+      const body = await readJson(req);
+      if (!Array.isArray(body.messages) || body.messages.length === 0)
+        return send(res, 400, { ok: false, error: "messages must be a non-empty array" }, rid);
+
+      const provider = String(body.provider || "").toLowerCase();
+      const selected = provider || cfg.providerOrder.find(name => cfg.providers[name]?.key && providerAdapters[name + "Stream"]);
+      const adapter = providerAdapters[selected + "Stream"];
+      const providerCfg = cfg.providers[selected];
+
+      if (!adapter || !providerCfg?.key)
+        return send(res, 503, { ok: false, error: "No streaming provider is configured" }, rid);
+
+      startSSE(res);
+      sendEvent(res, { type: EVENTS.START, requestId: rid, provider: selected, model: providerCfg.model });
+
+      try {
+        const result = await adapter({
+          ...providerCfg,
+          messages: body.messages,
+          temperature: body.temperature ?? 0.7,
+          onToken: async token => sendEvent(res, tokenEvent(token))
+        });
+        sendEvent(res, completeEvent({ provider: selected, model: providerCfg.model, attempts: 1 }));
+        endSSE(res);
+      } catch (error) {
+        sendEvent(res, errorEvent(error));
+        endSSE(res);
+      }
+      return;
     }
 
     if (url.pathname === "/v1/chat/completions" && req.method === "POST") {

@@ -12,6 +12,7 @@ import { startSSE, sendEvent, endSSE } from "./src/stream.js";
 import { EVENTS, tokenEvent, completeEvent, errorEvent } from "./src/events.js";
 import { providerAdapters } from "./src/providers.js";
 import { storageInfo } from "./src/store.js";
+import { createTextFile, getFile, listFiles, deleteFile, searchFiles, fileLimits } from "./src/files.js";
 import { canAttempt, recordFailure, recordSuccess } from "./src/circuitBreaker.js";
 import { withRetry, classifyError } from "./src/retry.js";
 
@@ -84,6 +85,52 @@ const server = http.createServer(async (req, res) => {
         providers: await allProviderUsage(),
         timestamp: new Date().toISOString()
       }, rid);
+
+    if (url.pathname === "/v1/files" && req.method === "GET") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      return send(res, 200, { ok: true, files: await listFiles(identity.id) }, rid);
+    }
+
+    if (url.pathname === "/v1/files" && req.method === "POST") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const body = await readJson(req);
+      const file = await createTextFile({
+        ownerId: identity.id,
+        name: body.name,
+        text: body.text,
+        mimeType: body.mimeType
+      });
+      return send(res, 201, { ok: true, file }, rid);
+    }
+
+    if (url.pathname === "/v1/files/search" && req.method === "GET") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      return send(res, 200, {
+        ok: true,
+        results: await searchFiles(identity.id, url.searchParams.get("q"), url.searchParams.get("limit"))
+      }, rid);
+    }
+
+    const fileMatch = url.pathname.match(/^\/v1\/files\/([^/]+)$/);
+    if (fileMatch && req.method === "GET") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const file = await getFile(fileMatch[1], identity.id);
+      return file ? send(res, 200, { ok: true, file }, rid) : send(res, 404, { ok: false, error: "File not found" }, rid);
+    }
+
+    if (fileMatch && req.method === "DELETE") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const deleted = await deleteFile(fileMatch[1], identity.id);
+      return send(res, deleted ? 200 : 404, { ok: deleted }, rid);
+    }
+
+    if (url.pathname === "/v1/files/limits" && req.method === "GET")
+      return send(res, 200, { ok: true, limits: fileLimits() }, rid);
 
     if (url.pathname === "/v1/keys" && req.method === "GET") {
       if (!adminAuthorized(req)) return send(res, 401, { ok: false, error: "Admin authentication required" }, rid);

@@ -32,6 +32,7 @@ export async function withRetry(fn, options = {}) {
   const retries = Number(options.retries ?? 2);
   const baseMs = Number(options.baseMs ?? 250);
   const maxMs = Number(options.maxMs ?? 4000);
+  const onRetry = typeof options.onRetry === "function" ? options.onRetry : null;
 
   let attempt = 0;
   while (true) {
@@ -41,6 +42,7 @@ export async function withRetry(fn, options = {}) {
       const kind = classifyError(error);
       if (kind !== "retryable" || attempt >= retries) throw error;
       attempt += 1;
+      onRetry?.({ attempt, error });
       await new Promise(resolve => setTimeout(resolve, backoffMs(attempt, baseMs, maxMs)));
     }
   }

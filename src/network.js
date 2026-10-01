@@ -78,12 +78,17 @@ export async function setServiceRouteStatus(serviceId, status) {
   return changed;
 }
 
-export async function rebindServiceRoutes(fromServiceId, toServiceId, targetPort) {
+export async function rebindServiceRoutes(fromServiceId, toServiceId, targetPort, ownerId = null) {
   if (!toServiceId) return 0;
   let changed = 0;
   await updateStore(store => {
     for (const route of Object.values(store.routes || {})) {
-      if ((fromServiceId == null || route.serviceId === fromServiceId) && route.ownerId && route.status === "active") {
+      if (
+        (fromServiceId == null || route.serviceId === fromServiceId) &&
+        route.ownerId &&
+        (!ownerId || route.ownerId === ownerId) &&
+        route.status === "active"
+      ) {
         route.serviceId = toServiceId;
         if (validPort(targetPort)) route.targetPort = Number(targetPort);
         route.updatedAt = new Date().toISOString();

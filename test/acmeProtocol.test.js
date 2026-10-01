@@ -1,0 +1,4 @@
+import test from "node:test";import assert from "node:assert/strict";import {generateAccountKey,createJws} from "../src/acmeCrypto.js";import {jwkThumbprint,dns01KeyAuthorization} from "../src/acmeProtocol.js";
+test("JWK thumbprint is stable",()=>{const {jwk}=generateAccountKey();assert.equal(jwkThumbprint(jwk),jwkThumbprint({...jwk}));});
+test("dns-01 key authorization digest is base64url",()=>{const {jwk}=generateAccountKey();const v=dns01KeyAuthorization("token",jwk);assert.match(v,/^[A-Za-z0-9_-]+$/);});
+test("ES256 JWS uses compact signature bytes",()=>{const {privateKey}=generateAccountKey();const j=createJws({protectedHeader:{alg:"ES256",nonce:"n",url:"u"},payload:{},privateKey});assert.equal(Buffer.from(j.signature,"base64url").length,64);});

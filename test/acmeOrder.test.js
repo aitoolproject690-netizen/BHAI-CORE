@@ -1,0 +1,4 @@
+import test from "node:test";import assert from "node:assert/strict";import {resetStoreForTests} from "../src/store.js";import {createAcmeOrder,prepareDnsChallenge,getAcmeOrder,acmeOrderInfo} from "../src/acmeOrder.js";
+test("ACME order is owner scoped",async()=>{resetStoreForTests();const o=await createAcmeOrder({ownerId:"u1",certificateId:"cert1",hostname:"app.example.com"});assert.equal(await getAcmeOrder(o.id,"u2"),null);});
+test("DNS challenge preparation creates a challenge record",async()=>{resetStoreForTests();const o=await createAcmeOrder({ownerId:"u1",certificateId:"cert1",hostname:"app.example.com"});const x=await prepareDnsChallenge(o.id,"u1",{recordValue:"token"});assert.equal(x.record.value,"token");assert.equal(x.order.status,"ready");});
+test("issuance remains separated from order state machine",()=>{assert.equal(acmeOrderInfo().privateKeyExposure,false);});

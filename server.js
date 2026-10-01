@@ -32,7 +32,7 @@ import { getBuildDetails, buildLogInfo } from "./src/buildLogs.js";
 import { createService, createServiceFromDeployment, getService, stopService, checkService, monitorService, listServices, serviceInfo } from "./src/service.js";
 import { getDeployment, listDeployments, setDeploymentStatus, deploymentInfo, promoteDeployment, rollbackDeployment, getProductionDeployment } from "./src/deployment.js";
 import { createDomain, getDomain, listDomains, setDomainStatus, domainInfo } from "./src/domain.js";
-import { createAutoDeploy, getAutoDeploy, listAutoDeploys, setAutoDeployStatus, autoDeployInfo, findAutoDeploysByRepository, recordAutoDeployRun } from "./src/autodeploy.js";
+import { createAutoDeploy, getAutoDeploy, listAutoDeploys, setAutoDeployStatus, autoDeployInfo, findAutoDeploysByRepository, recordAutoDeployRun, claimWebhookDelivery } from "./src/autodeploy.js";
 import { createRoute, getRoute, listRoutes, setRouteStatus, findRouteByHostname, networkInfo, proxyRequest } from "./src/network.js";
 import { executeCloudBuildJob } from "./src/cloudJob.js";
 import crypto from "node:crypto";

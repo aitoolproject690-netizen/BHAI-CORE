@@ -13,7 +13,7 @@ function validHostname(hostname) {
 function publicDomain(d) {
   return {
     id:d.id, ownerId:d.ownerId, serviceId:d.serviceId, hostname:d.hostname,
-    status:d.status, tls:d.tls, createdAt:d.createdAt, updatedAt:d.updatedAt
+    status:d.status, tls:d.tls, routeId:d.routeId || null, createdAt:d.createdAt, updatedAt:d.updatedAt
   };
 }
 
@@ -24,7 +24,7 @@ export async function createDomain({ ownerId, serviceId, hostname, tls = "manage
     throw Object.assign(new Error("Invalid TLS mode"), { code:"DOMAIN_TLS_INVALID", status:400 });
   const id = "dom_" + crypto.randomUUID();
   const now = new Date().toISOString();
-  const domain = { id, ownerId, serviceId, hostname:hostname.toLowerCase(), status:"pending", tls, createdAt:now, updatedAt:now };
+  const domain = { id, ownerId, serviceId, hostname:hostname.toLowerCase(), status:"pending", tls, routeId:null, createdAt:now, updatedAt:now };
   await updateStore(store => { store.domains ??= {}; store.domains[id] = domain; return store; });
   return publicDomain(domain);
 }
@@ -48,6 +48,20 @@ export async function setDomainStatus(id, ownerId, status) {
     const d = store.domains?.[id];
     if (!d || d.ownerId !== ownerId) return store;
     d.status = status;
+    d.updatedAt = new Date().toISOString();
+    found = true;
+    return store;
+  });
+  return found ? getDomain(id, ownerId) : null;
+}
+
+export async function attachDomainRoute(id, ownerId, routeId) {
+  if (!routeId) return null;
+  let found = false;
+  await updateStore(store => {
+    const d = store.domains?.[id];
+    if (!d || d.ownerId !== ownerId) return store;
+    d.routeId = routeId;
     d.updatedAt = new Date().toISOString();
     found = true;
     return store;

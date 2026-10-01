@@ -43,8 +43,8 @@ export async function executeAgentTool(name, input = {}, identity = {}, options 
   if (!AGENT_TOOLS.some(item => item.name === tool)) throw new Error("Unknown agent tool: " + tool);
   const ownerId = required(identity.id, "authenticated identity");
   const policy = authorizeTool(tool, identity);
-  if (policy.risk === "high" && options.approvalId) {
-    const approval = await getApproval(options.approvalId, identity.id);
+  if (policy.risk === "high") {
+    const approval = options.approvalId ? await getApproval(options.approvalId, identity.id) : null;
     if (!approval || approval.tool !== tool || approval.status !== "approved") {
       const error = new Error("Approved action required for tool " + tool);
       error.code = "APPROVAL_REQUIRED"; error.status = 428;

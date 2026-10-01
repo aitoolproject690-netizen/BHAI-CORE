@@ -3,7 +3,7 @@ import { config } from "./src/config.js";
 import { generate, getProviderStatus } from "./src/router.js";
 import { publicError } from "./src/errors.js";
 import { requestId } from "./src/requestId.js";
-import { recordUsage, allUsage } from "./src/usage.js";
+import { recordUsage, allUsage, allProviderUsage } from "./src/usage.js";
 import { assertBudget } from "./src/budget.js";
 import { authenticate, createApiKey, listApiKeys, revokeApiKey } from "./src/auth.js";
 import { health, readiness } from "./src/health.js";
@@ -74,6 +74,13 @@ const server = http.createServer(async (req, res) => {
 
     if (url.pathname === "/v1/usage" && req.method === "GET")
       return send(res, 200, { ok: true, usage: await allUsage() }, rid);
+
+    if (url.pathname === "/v1/metrics" && req.method === "GET")
+      return send(res, 200, {
+        ok: true,
+        providers: await allProviderUsage(),
+        timestamp: new Date().toISOString()
+      }, rid);
 
     if (url.pathname === "/v1/keys" && req.method === "GET") {
       if (!adminAuthorized(req)) return send(res, 401, { ok: false, error: "Admin authentication required" }, rid);

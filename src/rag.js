@@ -53,7 +53,24 @@ export async function indexFile(file) {
   return chunks.map(({ tokens, vector, ...chunk }) => chunk);
 }
 
-export async function reindexOwner(ownerId) {\n  if (!ownerId) throw new Error("ownerId is required");\n  const store = await getStore();\n  const files = Object.values(store.files || {}).filter(file => file.ownerId === ownerId);\n  let chunks = 0;\n  for (const file of files) chunks += (await indexFile(file)).length;\n  return { files: files.length, chunks, embedding: embeddingInfo() };\n}\n\nexport async function reindexFile(fileId, ownerId) {\n  const store = await getStore();\n  const file = store.files?.[fileId];\n  if (!file || file.ownerId !== ownerId) return null;\n  const indexed = await indexFile(file);\n  return { fileId, chunks: indexed.length, embedding: embeddingInfo() };\n}\n\nexport async function removeFileIndex(fileId, ownerId) {
+export async function reindexOwner(ownerId) {
+  if (!ownerId) throw new Error("ownerId is required");
+  const store = await getStore();
+  const files = Object.values(store.files || {}).filter(file => file.ownerId === ownerId);
+  let chunks = 0;
+  for (const file of files) chunks += (await indexFile(file)).length;
+  return { files: files.length, chunks, embedding: embeddingInfo() };
+}
+
+export async function reindexFile(fileId, ownerId) {
+  const store = await getStore();
+  const file = store.files?.[fileId];
+  if (!file || file.ownerId !== ownerId) return null;
+  const indexed = await indexFile(file);
+  return { fileId, chunks: indexed.length, embedding: embeddingInfo() };
+}
+
+export async function removeFileIndex(fileId, ownerId) {
   let removed = 0;
   await updateStore(store => {
     store.ragChunks ??= {};
@@ -103,6 +120,9 @@ export async function ragContext(ownerId, query, limit = 5, options = {}) {
   const results = await searchRag(ownerId, query, limit, options);
   return {
     query: String(query || ""), embedding: embeddingInfo(), results,
-    context: results.map((item, i) => `[Source ${i + 1}: ${item.fileId}, chunk ${item.index}]\n${item.content}`).join("\n\n")
+    context: results.map((item, i) => `[Source ${i + 1}: ${item.fileId}, chunk ${item.index}]
+${item.content}`).join("
+
+")
   };
 }

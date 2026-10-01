@@ -1,4 +1,5 @@
 import { executeAgentTool, listAgentTools } from "./agent.js";
+import { getConversationContext, appendMessage } from "./memory.js";
 
 const TOOL_NAMES = new Set(listAgentTools().map(tool => tool.name));
 const MAX_STEPS = Number(process.env.BHAI_AGENT_MAX_STEPS || 8);
@@ -44,12 +45,31 @@ export function validatePlan(plan) {
   return true;
 }
 
-export async function runAgentPlan(plan, identity) {
+export async function runAgentPlan(plan, identity, options = {}) {
+  const conversationId = options.conversationId;
+  let context = null;
+  if (conversationId) {
+    context = await getConversationContext(conversationId, identity.id);
+    if (!context) throw new Error("Conversation not found");
+  }
   validatePlan(plan);
   const results = [];
   for (const step of plan) {
     try {
-      const result = await executeAgentTool(step.tool, step.input || {}, identity);
+      let input = step.input || {};
+      if (step.tool === "chat" && context) {
+        const messages = Array.isArray(input.messages) ? input.messages : [];
+        input = {
+          ...input,
+          messages: [...context.messages, ...messages]
+        };
+      }
+      const result = await executeAgentTool(step.tool, input, identity);
+      if (conversationId && step.tool === "chat") {
+        const userMessage = (input.messages || []).filter(item => item.role === "user").at(-1);
+        if (userMessage?.content) await appendMessage(conversationId, identity.id, { role: "user", content: userMessage.content });
+        if (result?.text) await appendMessage(conversationId, identity.id, { role: "assistant", content: result.text });
+      }
       results.push({ id: step.id, tool: step.tool, status: "succeeded", result });
     } catch (error) {
       results.push({ id: step.id, tool: step.tool, status: "failed", error: error.message });

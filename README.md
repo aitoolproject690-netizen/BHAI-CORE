@@ -39,3 +39,10 @@ BHAI-CORE now includes provider circuit breakers. Repeated provider failures tem
 
 ## Development
 Run `npm test` for the test suite and `npm run check` for syntax checks.
+
+
+## Persistent storage
+The default local store is JSON at `data/bhai-core-store.json`. Set `BHAI_STORE_FILE` to another path. The storage API is intentionally isolated so production can later use SQLite or PostgreSQL without changing the HTTP/API contract.
+
+## Streaming
+The core includes an SSE utility layer for incremental events. Provider adapters can emit token/chunk events through the same transport as the API evolves.

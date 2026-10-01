@@ -21,7 +21,7 @@ import { createImageRequest, submitComfyUI, imageProviderInfo } from "./src/imag
 import { createSpeechRequest, transcribeWhisper, createTtsRequest, synthesizePiper, voiceProviderInfo } from "./src/voice.js";
 import { canAttempt, recordFailure, recordSuccess } from "./src/circuitBreaker.js";
 import { listAgentTools, executeAgentTool } from "./src/agent.js";
-import { planAgentRequest, validatePlan, runAgentPlan } from "./src/planner.js";
+import { planAgentRequest, validatePlan, runAgentPlan } from "./src/planner.js";\nimport { createConversation, listConversations, getConversation, deleteConversation, appendMessage, getConversationContext, memoryInfo } from "./src/memory.js";
 import { withRetry, classifyError } from "./src/retry.js";
 
 const cfg = config();
@@ -80,6 +80,62 @@ const server = http.createServer(async (req, res) => {
 
     if (!authorized(req))
       return send(res, 401, { ok: false, error: "Unauthorized" }, rid);
+
+    if (url.pathname === "/v1/memory/info" && req.method === "GET")
+      return send(res, 200, { ok: true, memory: memoryInfo() }, rid);
+
+    if (url.pathname === "/v1/conversations" && req.method === "GET") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      return send(res, 200, { ok: true, conversations: await listConversations(identity.id) }, rid);
+    }
+
+    if (url.pathname === "/v1/conversations" && req.method === "POST") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const body = await readJson(req);
+      return send(res, 201, { ok: true, conversation: await createConversation(identity.id, body.title) }, rid);
+    }
+
+    const conversationMatch = url.pathname.match(/^\/v1\/conversations\/([^/]+)$/);
+    if (conversationMatch && req.method === "GET") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const conversation = await getConversation(conversationMatch[1], identity.id);
+      return conversation
+        ? send(res, 200, { ok: true, conversation }, rid)
+        : send(res, 404, { ok: false, error: "Conversation not found" }, rid);
+    }
+
+    if (conversationMatch && req.method === "DELETE") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const deleted = await deleteConversation(conversationMatch[1], identity.id);
+      return send(res, deleted ? 200 : 404, { ok: deleted }, rid);
+    }
+
+    const contextMatch = url.pathname.match(/^\/v1\/conversations\/([^/]+)\/context$/);
+    if (contextMatch && req.method === "GET") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const context = await getConversationContext(contextMatch[1], identity.id);
+      return context
+        ? send(res, 200, { ok: true, ...context }, rid)
+        : send(res, 404, { ok: false, error: "Conversation not found" }, rid);
+    }
+
+    const messagesMatch = url.pathname.match(/^\/v1\/conversations\/([^/]+)\/messages$/);
+    if (messagesMatch && req.method === "POST") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const body = await readJson(req);
+      const message = await appendMessage(messagesMatch[1], identity.id, {
+        role: body.role,
+        content: body.content,
+        metadata: body.metadata
+      });
+      return send(res, 201, { ok: true, message }, rid);
+    }
 
     if (url.pathname === "/v1/agent/plan" && req.method === "POST") {
       const identity = await authenticate(req.headers["x-bhai-key"]);

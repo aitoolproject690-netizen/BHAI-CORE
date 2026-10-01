@@ -39,7 +39,8 @@ async function ensureLoaded() {
       approvals: parsed.approvals,
     services: parsed.services || {},
     deployments: parsed.deployments || {},
-      domains: parsed.domains || {}
+      domains: parsed.domains || {},
+      autoDeploy: parsed.autoDeploy || {}
     };
   } catch {
     state = emptyState();

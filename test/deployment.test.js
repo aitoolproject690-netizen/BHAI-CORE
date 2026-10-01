@@ -13,6 +13,7 @@ test("deployments are persistent and owner-scoped", async () => {
     path: "/tmp/deployment"
   });
   assert.match(deployment.id, /^dep_/);
+  assert.equal("path" in deployment, false);
   assert.equal((await listDeployments("user-a")).length, 1);
   assert.equal((await listDeployments("user-b")).length, 0);
   assert.equal(await getDeployment(deployment.id, "user-b"), null);

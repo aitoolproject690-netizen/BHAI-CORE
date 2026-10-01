@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createDeployment, getDeployment, listDeployments, setDeploymentStatus } from "../src/deployment.js";
+import { createDeployment, getDeployment, listDeployments, setDeploymentStatus, promoteDeployment, getProductionDeployment } from "../src/deployment.js";
 import { resetStoreForTests } from "../src/store.js";
 
 test("deployments are persistent and owner-scoped", async () => {
@@ -33,4 +33,20 @@ test("deployment status accepts only supported values", async () => {
     () => setDeploymentStatus(deployment.id, "user-a", "running"),
     error => error.code === "DEPLOYMENT_STATUS_INVALID"
   );
+});
+
+test("deployment promotion requires an attached running service", async () => {
+  resetStoreForTests();
+  const deployment = await createDeployment({
+    ownerId: "user-a",
+    repository: "owner/app",
+    branch: "main",
+    buildId: "build-3",
+    path: "/tmp/deployment"
+  });
+  await assert.rejects(
+    () => promoteDeployment(deployment.id, "user-a"),
+    error => error.code === "DEPLOYMENT_SERVICE_MISSING"
+  );
+  assert.equal(await getProductionDeployment({ ownerId:"user-a", repository:"owner/app", branch:"main" }), null);
 });

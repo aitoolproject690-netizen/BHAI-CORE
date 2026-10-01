@@ -114,6 +114,10 @@ const server = http.createServer(async (req, res) => {
       if (a.length !== b.length || !crypto.timingSafeEqual(a,b)) return send(res, 401, { ok:false, error:"Invalid webhook signature" }, rid);
       const event = req.headers["x-github-event"];
       if (event !== "push") return send(res, 202, { ok:true, ignored:true, event }, rid);
+      const deliveryId = String(req.headers["x-github-delivery"] || "").trim();
+      if (!deliveryId) return send(res, 400, { ok:false, error:"Missing GitHub delivery id" }, rid);
+      const claim = await claimWebhookDelivery(deliveryId);
+      if (!claim.accepted) return send(res, 202, { ok:true, duplicate:true, deliveryId }, rid);
       const body = JSON.parse(raw);
       const repository = body.repository?.full_name;
       const branch = String(body.ref || "").replace(/^refs\/heads\//, "");

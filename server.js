@@ -28,6 +28,7 @@ import { listToolPolicies } from "./src/policy.js";
 import { recordAudit, listAudit, auditInfo } from "./src/audit.js";
 import { createApproval, getApproval, decideApproval, approvalInfo } from "./src/approval.js";
 import { cloudBuildInfo } from "./src/cloudBuild.js";
+import { getBuildDetails, buildLogInfo } from "./src/buildLogs.js";
 
 const cfg = config();
 
@@ -307,6 +308,18 @@ const server = http.createServer(async (req, res) => {
 
     if (url.pathname === "/v1/cloud/build/info" && req.method === "GET")
       return send(res, 200, { ok: true, cloudBuild: cloudBuildInfo() }, rid);
+
+    if (url.pathname === "/v1/cloud/build/log-info" && req.method === "GET")
+      return send(res, 200, { ok: true, ...buildLogInfo() }, rid);
+
+    const buildDetailsMatch = url.pathname.match(/^\/v1\/cloud\/build\/([^/]+)$/);
+    if (buildDetailsMatch && req.method === "GET") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const details = await getBuildDetails(buildDetailsMatch[1], identity.id);
+      return details ? send(res, 200, { ok: true, build: details }, rid)
+        : send(res, 404, { ok: false, error: "Build job not found" }, rid);
+    }
 
     if (url.pathname === "/v1/usage" && req.method === "GET")
       return send(res, 200, { ok: true, usage: await allUsage() }, rid);

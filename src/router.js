@@ -32,7 +32,7 @@ export async function generate({ messages, provider, temperature = 0.7, maxAttem
 
   const cfg = config();
   const requested = provider ? [String(provider).toLowerCase()] : cfg.providerOrder;
-  const candidates = requested.filter(name => isConfigured(name, cfg));
+  const candidates = requested.filter(name => isProviderConfigured(name, cfg));
 
   if (!candidates.length) throw new Error("No AI provider is configured");
 

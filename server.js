@@ -6,7 +6,7 @@ import { requestId } from "./src/requestId.js";
 import { recordUsage, allUsage } from "./src/usage.js";
 import { assertBudget } from "./src/budget.js";
 import { authenticate, createApiKey, listApiKeys, revokeApiKey } from "./src/auth.js";
-import { health, readiness } from "./src/health.js";
+import { health, readiness } from "./src/health.js";\nimport { enqueue, getStoredJob } from "./src/queue.js";
 
 const cfg = config();
 

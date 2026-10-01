@@ -112,3 +112,10 @@ The current search is deterministic text matching. The storage contract is desig
 - `POST /v1/voice/synthesize` — authenticated text-to-speech generation.
 - The default architecture is local/self-hosted; endpoints return 503 until the corresponding runtime is explicitly enabled.
 - Audio and TTS text limits are configurable with `BHAI_MAX_AUDIO_BYTES` and `BHAI_MAX_TTS_CHARS`.
+
+## Unified Agent
+- `GET /v1/agent/tools` — lists the safe, authenticated BHAI tool registry.
+- `POST /v1/agent/execute` — executes one registered tool for the authenticated app key.
+- Available tools include chat, owner-scoped RAG search/context, vision, local image generation, local voice STT/TTS, model discovery, and persistent jobs.
+- Tool metadata never exposes provider credentials.
+- The first agent layer is deterministic tool execution; higher-level planning can be added without changing the tool contracts.

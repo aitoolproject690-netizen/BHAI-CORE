@@ -105,3 +105,10 @@ The current search is deterministic text matching. The storage contract is desig
 - Optional `workflow` may provide a ComfyUI API-format workflow.
 - The default adapter submits to a local ComfyUI server; BHAI-CORE does not pretend to generate an image when no generation runtime is configured.
 - Generation is asynchronous and returns a ComfyUI `prompt_id` with HTTP 202.
+
+## Voice
+- `GET /v1/voice/providers` — reports local Whisper STT and Piper TTS configuration.
+- `POST /v1/voice/transcribe` — authenticated base64 audio transcription.
+- `POST /v1/voice/synthesize` — authenticated text-to-speech generation.
+- The default architecture is local/self-hosted; endpoints return 503 until the corresponding runtime is explicitly enabled.
+- Audio and TTS text limits are configurable with `BHAI_MAX_AUDIO_BYTES` and `BHAI_MAX_TTS_CHARS`.

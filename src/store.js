@@ -2,20 +2,35 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 const file = process.env.BHAI_STORE_FILE || "./data/bhai-core-store.json";
-let state = { apiKeys: {}, usage: {}, jobs: {} };
+
+const emptyState = () => ({
+  apiKeys: {},
+  usage: {},
+  providerUsage: {},
+  jobs: {}
+});
+
+let state = emptyState();
 let loaded = false;
 let writeChain = Promise.resolve();
 
 async function ensureLoaded() {
   if (loaded) return;
+
   try {
-    state = JSON.parse(await fs.readFile(file, "utf8"));
-    state.apiKeys ??= {};
-    state.usage ??= {};
-    state.jobs ??= {};
+    const parsed = JSON.parse(await fs.readFile(file, "utf8"));
+    state = {
+      ...emptyState(),
+      ...parsed,
+      apiKeys: parsed.apiKeys ?? {},
+      usage: parsed.usage ?? {},
+      providerUsage: parsed.providerUsage ?? {},
+      jobs: parsed.jobs ?? {}
+    };
   } catch {
-    state = { apiKeys: {}, usage: {}, jobs: {} };
+    state = emptyState();
   }
+
   loaded = true;
 }
 
@@ -32,31 +47,37 @@ export async function getStore() {
 }
 
 export async function saveStore(next) {
-  await ensureLoaded();
-  const snapshot = structuredClone(next);
-  writeChain = writeChain.then(async () => {
-    state = snapshot;
-    await persist(state);
-  });
-  await writeChain;
+  await updateStore(() => structuredClone(next));
   return state;
 }
 
 export async function updateStore(mutator) {
   await ensureLoaded();
+
   let result;
-  writeChain = writeChain.then(async () => {
-    const next = await mutator(state);
-    state = next || state;
+  const operation = writeChain.then(async () => {
+    const working = structuredClone(state);
+    const next = await mutator(working);
+    state = next || working;
     await persist(state);
     result = state;
   });
-  await writeChain;
+
+  writeChain = operation.catch(() => {});
+  await operation;
   return result;
 }
 
+export function storageInfo() {
+  return {
+    backend: "json",
+    file,
+    persistent: true
+  };
+}
+
 export function resetStoreForTests() {
-  state = { apiKeys: {}, usage: {}, jobs: {} };
+  state = emptyState();
   loaded = true;
   writeChain = Promise.resolve();
 }

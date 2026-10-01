@@ -3,7 +3,8 @@ import { checkoutGithubRepository } from "./source.js";
 import { runCloudBuild } from "./cloudBuild.js";
 import fs from "node:fs/promises";
 import crypto from "node:crypto";
-import { createDeployment } from "./deployment.js";
+import { createDeployment, setDeploymentStatus } from "./deployment.js";
+import { createServiceFromDeployment } from "./service.js";
 import { createBuildPlan } from "./cloud.js";
 
 function shouldCopySource(sourcePath) {
@@ -38,11 +39,28 @@ export async function executeCloudBuildJob({ ownerId, repository, branch = "main
     const resolvedPlan = plan || await deriveBuildPlan(workspace.path, repository, branch);
     const build = await runCloudBuild({ plan: resolvedPlan, cwd: workspace.path });
     let deployment = null;
+    let service = null;
     if (build.ok) {
       const deploymentId = "dep_" + crypto.randomUUID();
       const target = await createDeploymentWorkspace({ ownerId, deploymentId });
       await fs.cp(workspace.path, target.path, { recursive: true, force: true, filter: shouldCopySource });
       deployment = await createDeployment({ ownerId, repository, branch, buildId: deploymentId, path: target.path });
+      if (process.env.BHAI_AUTO_START_DEPLOYMENTS === "true" && resolvedPlan.commands?.start) {
+        try {
+          service = await createServiceFromDeployment({
+            ownerId,
+            deployment: { ...deployment, path: target.path },
+            command: resolvedPlan.commands.start,
+            env: {},
+            healthUrl: null
+          });
+          await setDeploymentStatus(deployment.id, ownerId, "active");
+          deployment = await createDeploymentSnapshot(deployment, ownerId);
+        } catch (error) {
+          await setDeploymentStatus(deployment.id, ownerId, "failed");
+          throw error;
+        }
+      }
     }
     return {
       status: build.ok ? "succeeded" : "failed",
@@ -51,11 +69,18 @@ export async function executeCloudBuildJob({ ownerId, repository, branch = "main
       branch,
       checkout: { ok: checkout.ok, path: checkout.path },
       build,
-      deployment
+      deployment,
+      service,
+      autoStarted: Boolean(service)
     };
   } finally {
     await cleanupWorkspace(workspace);
   }
+}
+
+async function createDeploymentSnapshot(deployment, ownerId) {
+  const { getDeployment } = await import("./deployment.js");
+  return getDeployment(deployment.id, ownerId);
 }
 
 export function cloudJobInfo() {

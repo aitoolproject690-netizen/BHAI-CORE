@@ -32,7 +32,7 @@ import { getBuildDetails, buildLogInfo } from "./src/buildLogs.js";
 import { createService, createServiceFromDeployment, getService, stopService, checkService, monitorService, listServices, serviceInfo } from "./src/service.js";
 import { getDeployment, listDeployments, setDeploymentStatus, deploymentInfo } from "./src/deployment.js";
 import { createDomain, getDomain, listDomains, setDomainStatus, domainInfo } from "./src/domain.js";
-import { createAutoDeploy, getAutoDeploy, listAutoDeploys, setAutoDeployStatus, autoDeployInfo } from "./src/autodeploy.js";
+import { createAutoDeploy, getAutoDeploy, listAutoDeploys, setAutoDeployStatus, autoDeployInfo, findAutoDeploysByRepository, recordAutoDeployRun } from "./src/autodeploy.js";\nimport { executeCloudBuildJob } from "./src/cloudJob.js";\nimport crypto from "node:crypto";
 
 const cfg = config();
 
@@ -56,7 +56,7 @@ function adminAuthorized(req) {
   return Boolean(expected && req.headers["x-bhai-admin-key"] === expected);
 }
 
-async function readJson(req, maxBytes = 2_000_000) {
+async function readJsonRaw(req, maxBytes = 2_000_000) {\n  let body = "";\n  for await (const chunk of req) { body += chunk; if (body.length > maxBytes) throw new Error("Request body too large"); }\n  return body;\n}\n\nasync function readJson(req, maxBytes = 2_000_000) {
   let body = "";
   for await (const chunk of req) {
     body += chunk;
@@ -91,7 +91,7 @@ const server = http.createServer(async (req, res) => {
     if (!authorized(req))
       return send(res, 401, { ok: false, error: "Unauthorized" }, rid);
 
-    if (url.pathname === "/v1/memory/info" && req.method === "GET")
+    if (url.pathname === "/v1/cloud/webhooks/github" && req.method === "POST") {\n      const secret = process.env.BHAI_GITHUB_WEBHOOK_SECRET;\n      if (!secret) return send(res, 503, { ok:false, error:"GitHub webhook secret is not configured" }, rid);\n      const signature = req.headers["x-hub-signature-256"] || "";\n      const raw = await readJsonRaw(req, 1_000_000);\n      const expected = "sha256=" + crypto.createHmac("sha256", secret).update(raw).digest("hex");\n      const a = Buffer.from(signature), b = Buffer.from(expected);\n      if (a.length !== b.length || !crypto.timingSafeEqual(a,b)) return send(res, 401, { ok:false, error:"Invalid webhook signature" }, rid);\n      const event = req.headers["x-github-event"];\n      if (event !== "push") return send(res, 202, { ok:true, ignored:true, event }, rid);\n      const body = JSON.parse(raw);\n      const repository = body.repository?.full_name;\n      const branch = String(body.ref || "").replace(/^refs\\/heads\\//, "");\n      const commit = body.after || null;\n      if (!repository || !branch || !commit) return send(res, 400, { ok:false, error:"Invalid push payload" }, rid);\n      const hooks = (await findAutoDeploysByRepository(repository)).filter(h => h.status === "enabled" && h.branch === branch);\n      for (const hook of hooks) {\n        await recordAutoDeployRun(hook.id, hook.ownerId, { commit, status:"running" });\n        executeCloudBuildJob({ ownerId: hook.ownerId, repository, branch }).then(async result => {\n          await recordAutoDeployRun(hook.id, hook.ownerId, { commit, deploymentId: result.deployment?.id || null, status: result.status, error: result.status === "failed" ? "Cloud build failed" : null });\n        }).catch(async error => {\n          await recordAutoDeployRun(hook.id, hook.ownerId, { commit, status:"failed", error:error.message });\n        });\n      }\n      return send(res, 202, { ok:true, event:"push", repository, branch, commit, triggered:hooks.length }, rid);\n    }\n\n    if (url.pathname === "/v1/memory/info" && req.method === "GET")
       return send(res, 200, { ok: true, memory: memoryInfo() }, rid);
 
     if (url.pathname === "/v1/conversations" && req.method === "GET") {

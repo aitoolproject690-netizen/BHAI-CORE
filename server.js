@@ -21,6 +21,7 @@ import { createImageRequest, submitComfyUI, imageProviderInfo } from "./src/imag
 import { createSpeechRequest, transcribeWhisper, createTtsRequest, synthesizePiper, voiceProviderInfo } from "./src/voice.js";
 import { canAttempt, recordFailure, recordSuccess } from "./src/circuitBreaker.js";
 import { listAgentTools, executeAgentTool } from "./src/agent.js";
+import { planAgentRequest, validatePlan, runAgentPlan } from "./src/planner.js";
 import { withRetry, classifyError } from "./src/retry.js";
 
 const cfg = config();
@@ -79,6 +80,24 @@ const server = http.createServer(async (req, res) => {
 
     if (!authorized(req))
       return send(res, 401, { ok: false, error: "Unauthorized" }, rid);
+
+    if (url.pathname === "/v1/agent/plan" && req.method === "POST") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const body = await readJson(req);
+      const plan = planAgentRequest(body);
+      return send(res, 200, { ok: true, plan }, rid);
+    }
+
+    if (url.pathname === "/v1/agent/run" && req.method === "POST") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const body = await readJson(req, 16_000_000);
+      const plan = body.plan || planAgentRequest(body);
+      validatePlan(plan);
+      const result = await runAgentPlan(plan, identity);
+      return send(res, 200, { ok: result.status === "succeeded", ...result }, rid);
+    }
 
     if (url.pathname === "/v1/agent/tools" && req.method === "GET") {
       const identity = await authenticate(req.headers["x-bhai-key"]);

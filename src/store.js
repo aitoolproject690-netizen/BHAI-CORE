@@ -16,7 +16,13 @@ const emptyState = () => ({
     services: {},
   deployments: {},
   servicePorts: {},
-  routes: {}
+  routes: {},
+  domains: {},
+  autoDeploy: {},
+  certificates: {},
+  acmeAccounts: {},
+  acmeOrders: {},
+  dnsRecords: {}
 });
 
 let state = emptyState();

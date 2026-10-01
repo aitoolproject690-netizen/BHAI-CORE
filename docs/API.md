@@ -125,4 +125,15 @@ The current search is deterministic text matching. The storage contract is desig
 - `POST /v1/agent/run` — executes a validated plan sequentially and returns per-step status.
 - Plans are limited by `BHAI_AGENT_MAX_STEPS` (default 8).
 - Failed steps stop subsequent execution; results include completed steps and the failure message.
-\n## Conversations / Memory\n\n- `GET /v1/memory/info` — memory limits and storage information.\n- `POST /v1/conversations` — create an owner-scoped conversation.\n- `GET /v1/conversations` — list the authenticated owner's conversations.\n- `GET /v1/conversations/:id` — read a conversation.\n- `POST /v1/conversations/:id/messages` — append a user/assistant/tool/system message.\n- `GET /v1/conversations/:id/context` — return bounded context for the Agent.\n- `DELETE /v1/conversations/:id` — delete an owner-scoped conversation.\n\nMemory is persisted in the existing JSON store, isolated by API-key identity, bounded by message/context limits, and redacts common API-key patterns before storage.\n
+
+## Conversations / Memory
+
+- `GET /v1/memory/info` — memory limits and storage information.
+- `POST /v1/conversations` — create an owner-scoped conversation.
+- `GET /v1/conversations` — list the authenticated owner's conversations.
+- `GET /v1/conversations/:id` — read a conversation.
+- `POST /v1/conversations/:id/messages` — append a user/assistant/tool/system message.
+- `GET /v1/conversations/:id/context` — return bounded context for the Agent.
+- `DELETE /v1/conversations/:id` — delete an owner-scoped conversation.
+
+Memory is persisted in the existing JSON store, isolated by API-key identity, bounded by message/context limits, and redacts common API-key patterns before storage.

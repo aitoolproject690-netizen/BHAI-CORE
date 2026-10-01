@@ -52,7 +52,7 @@ export async function executeCloudBuildJob({ ownerId, repository, branch = "main
             deployment: { ...deployment, path: target.path },
             command: resolvedPlan.commands.start,
             env: {},
-            healthUrl: null
+            healthUrl: resolvedPlan.healthUrl || process.env.BHAI_DEPLOYMENT_HEALTH_URL || null
           });
           await attachDeploymentService(deployment.id, ownerId, service.id);
           await promoteDeployment(deployment.id, ownerId);

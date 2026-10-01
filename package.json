@@ -1,0 +1,7 @@
+{
+  "name": "bhai-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {"start":"node server.js","test":"node --test","check":"node --check server.js && node --check src/router.js && node --check src/providers.js"}
+}

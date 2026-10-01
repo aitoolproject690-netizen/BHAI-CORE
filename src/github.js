@@ -20,7 +20,7 @@ function safeHeaders(token) {
 async function githubFetch(path, options = {}) {
   const { token, url } = githubConfig();
   if (!token) {
-    const error = new Error("GitHub runtime is not configured: GITHUB_TOKEN is missing");
+    const error = new Error("GitHub connector runtime is not configured: GITHUB_TOKEN is missing");
     error.code = "GITHUB_NOT_CONFIGURED"; error.status = 503; throw error;
   }
   const controller = new AbortController();

@@ -28,6 +28,11 @@ export function chunkText(text, options = {}) {
 
 const embeddingProvider = createEmbeddingProvider();
 
+function embeddingVersion() {
+  const info = embeddingProvider.info();
+  return JSON.stringify({ provider: info.provider, model: info.model || null, dimensions: info.dimensions || null, url: info.url || null });
+}
+
 export async function indexFile(file) {
   if (!file?.id || !file.ownerId) throw new Error("file with id and ownerId is required");
   const pieces = chunkText(file.text);
@@ -48,7 +53,7 @@ export async function indexFile(file) {
   return chunks.map(({ tokens, vector, ...chunk }) => chunk);
 }
 
-export async function removeFileIndex(fileId, ownerId) {
+export async function reindexOwner(ownerId) {\n  if (!ownerId) throw new Error("ownerId is required");\n  const store = await getStore();\n  const files = Object.values(store.files || {}).filter(file => file.ownerId === ownerId);\n  let chunks = 0;\n  for (const file of files) chunks += (await indexFile(file)).length;\n  return { files: files.length, chunks, embedding: embeddingInfo() };\n}\n\nexport async function reindexFile(fileId, ownerId) {\n  const store = await getStore();\n  const file = store.files?.[fileId];\n  if (!file || file.ownerId !== ownerId) return null;\n  const indexed = await indexFile(file);\n  return { fileId, chunks: indexed.length, embedding: embeddingInfo() };\n}\n\nexport async function removeFileIndex(fileId, ownerId) {
   let removed = 0;
   await updateStore(store => {
     store.ragChunks ??= {};
@@ -91,7 +96,7 @@ export async function searchRag(ownerId, query, limit = 5, options = {}) {
     return { ...chunk, keywordScore: keyword, vectorScore: vector, score };
   }).filter(item => item.score > 0).sort((a,b) => b.score-a.score)
     .slice(0, Math.max(1, Math.min(Number(limit) || 5, 20)));
-  return stripVectors(results).map(({ tokens, ...item }) => item);
+  return stripVectors(results).map(({ tokens, embeddingVersion: _, ...item }) => item);
 }
 
 export async function ragContext(ownerId, query, limit = 5, options = {}) {

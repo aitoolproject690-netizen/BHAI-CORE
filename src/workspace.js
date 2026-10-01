@@ -39,3 +39,20 @@ export async function workspaceInfo() {
     ttlMs: Number(process.env.BHAI_WORKSPACE_TTL_MS || DEFAULT_TTL)
   };
 }
+
+export async function createDeploymentWorkspace({ ownerId, deploymentId } = {}) {
+  if (!ownerId || !deploymentId) throw Object.assign(new Error("ownerId and deploymentId required"), { code: "DEPLOYMENT_IDENTITY_REQUIRED", status: 400 });
+  const root = process.env.BHAI_DEPLOYMENT_ROOT || path.join(os.tmpdir(), "bhai-core-deployments");
+  const safeOwner = String(ownerId).replace(/[^a-zA-Z0-9_-]/g, "_");
+  const safeDeployment = String(deploymentId).replace(/[^a-zA-Z0-9_-]/g, "_");
+  const deploymentPath = path.join(root, safeOwner, safeDeployment);
+  await fs.mkdir(deploymentPath, { recursive: true });
+  return { id: deploymentId, ownerId, path: deploymentPath, persistent: true };
+}
+export async function removeDeploymentWorkspace(workspace) {
+  if (!workspace?.path) return;
+  const root = path.resolve(process.env.BHAI_DEPLOYMENT_ROOT || path.join(os.tmpdir(), "bhai-core-deployments"));
+  const target = path.resolve(workspace.path);
+  if (!target.startsWith(root + path.sep)) throw Object.assign(new Error("Invalid deployment workspace"), { code: "DEPLOYMENT_PATH_INVALID", status: 400 });
+  await fs.rm(target, { recursive: true, force: true });
+}

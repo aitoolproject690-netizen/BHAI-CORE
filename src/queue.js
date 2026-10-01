@@ -44,6 +44,18 @@ export async function getQueuedJob() {
   return found;
 }
 
+export async function updateJob(id, patch = {}) {
+  let job = null;
+  await updateStore(store => {
+    const item = store.jobs?.[id];
+    if (!item) return store;
+    Object.assign(item, patch, { updatedAt: new Date().toISOString() });
+    job = { ...item };
+    return store;
+  });
+  return job;
+}
+
 export async function finishJob(id, result) {
   let job = null;
   await updateStore(store => {

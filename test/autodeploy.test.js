@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createAutoDeploy, getAutoDeploy, listAutoDeploys, setAutoDeployStatus, recordAutoDeployRun } from "../src/autodeploy.js";
+import { createAutoDeploy, getAutoDeploy, listAutoDeploys, setAutoDeployStatus, recordAutoDeployRun, claimWebhookDelivery } from "../src/autodeploy.js";
 import { resetStoreForTests } from "../src/store.js";
 
 test("auto-deploy is owner scoped", async () => {
@@ -19,4 +19,22 @@ test("auto-deploy status and run state are validated", async () => {
   const updated = await recordAutoDeployRun(hook.id, "user-a", { commit:"abc123", deploymentId:"dep_1", status:"succeeded" });
   assert.equal(updated.lastCommit, "abc123");
   assert.equal(updated.lastDeploymentId, "dep_1");
+});
+
+
+test("GitHub webhook delivery is accepted once and then rejected as duplicate", async () => {
+  resetStoreForTests();
+  const first = await claimWebhookDelivery("delivery-123", 60000);
+  const second = await claimWebhookDelivery("delivery-123", 60000);
+  assert.equal(first.accepted, true);
+  assert.equal(first.reason, "new");
+  assert.equal(second.accepted, false);
+  assert.equal(second.reason, "duplicate");
+});
+
+test("missing webhook delivery id is not accepted", async () => {
+  resetStoreForTests();
+  const result = await claimWebhookDelivery("");
+  assert.equal(result.accepted, false);
+  assert.equal(result.reason, "missing");
 });

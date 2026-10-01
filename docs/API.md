@@ -119,3 +119,9 @@ The current search is deterministic text matching. The storage contract is desig
 - Available tools include chat, owner-scoped RAG search/context, vision, local image generation, local voice STT/TTS, model discovery, and persistent jobs.
 - Tool metadata never exposes provider credentials.
 - The first agent layer is deterministic tool execution; higher-level planning can be added without changing the tool contracts.
+
+## Agent Planner
+- `POST /v1/agent/plan` — creates a deterministic plan from a request or validates an explicitly selected tool.
+- `POST /v1/agent/run` — executes a validated plan sequentially and returns per-step status.
+- Plans are limited by `BHAI_AGENT_MAX_STEPS` (default 8).
+- Failed steps stop subsequent execution; results include completed steps and the failure message.

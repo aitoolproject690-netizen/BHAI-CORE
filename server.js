@@ -516,7 +516,7 @@ const server = http.createServer(async (req, res) => {
     return send(res, 404, { ok: false, error: "Not found" }, rid);
   } catch (error) {
     await recordUsage({ key: req.headers["x-bhai-key"] || "anonymous", failed: true });
-    return send(res, error.code === "BUDGET_EXCEEDED" ? 429 : 500, {
+    return send(res, error.code === "BUDGET_EXCEEDED" ? 429 : error.code === "PERMISSION_DENIED" ? 403 : 500, {
       ok: false, ...publicError(error), requestId: rid
     }, rid);
   }

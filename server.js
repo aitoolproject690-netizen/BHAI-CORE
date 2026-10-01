@@ -29,7 +29,7 @@ import { recordAudit, listAudit, auditInfo } from "./src/audit.js";
 import { createApproval, getApproval, decideApproval, approvalInfo } from "./src/approval.js";
 import { cloudBuildInfo } from "./src/cloudBuild.js";
 import { getBuildDetails, buildLogInfo } from "./src/buildLogs.js";
-import { createService, getService, stopService, checkService, monitorService, listServices, serviceInfo } from "./src/service.js";
+import { createService, createServiceFromDeployment, getService, stopService, checkService, monitorService, listServices, serviceInfo } from "./src/service.js";
 import { getDeployment, listDeployments, setDeploymentStatus, deploymentInfo } from "./src/deployment.js";
 
 const cfg = config();

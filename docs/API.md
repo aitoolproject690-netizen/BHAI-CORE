@@ -53,7 +53,7 @@ Event sequence:
 - zero or more `token`
 - `complete` or `error`
 
-Currently streaming adapters are available for OpenAI and Hugging Face's OpenAI-compatible router.
+Currently streaming adapters are available for OpenAI and Hugging Face's OpenAI-compatible router. Streaming requests use the same budget checks and provider telemetry as normal chat, plus circuit-breaker protection and bounded retries for failures that happen before any token is emitted. If partial output has already been sent, the request is not retried to avoid duplicated text.
 
 
 ## Metrics

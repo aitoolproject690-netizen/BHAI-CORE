@@ -27,3 +27,14 @@ The response identifies the provider and model used.
 - Admin key management: `x-bhai-admin-key: <BHAI_CORE_ADMIN_KEY>`
 
 Provider credentials are never returned by the API.
+
+
+## Jobs (foundation)
+The internal job protocol uses:
+- `queued`
+- `running`
+- `succeeded`
+- `failed`
+- `cancelled`
+
+A persistent queue/worker implementation will use this contract without changing the public API.

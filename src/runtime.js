@@ -13,6 +13,7 @@ function validateCommand(command) {
 }
 
 export function startRuntime({ command, cwd, env = {}, timeoutMs = DEFAULT_TIMEOUT } = {}) {
+  if (process.env.BHAI_RUNTIME_ENABLED !== "true") throw Object.assign(new Error("Cloud runtime is disabled"), { code: "RUNTIME_DISABLED", status: 503 });
   const safeCommand = validateCommand(command);
   if (!cwd) throw Object.assign(new Error("Runtime cwd required"), { code: "RUNTIME_CWD_REQUIRED", status: 400 });
   const child = spawn("/bin/sh", ["-lc", safeCommand], {
@@ -25,7 +26,6 @@ export function startRuntime({ command, cwd, env = {}, timeoutMs = DEFAULT_TIMEO
   const append = (target, chunk) => (target + chunk.toString()).slice(-MAX_OUTPUT);
   child.stdout.on("data", chunk => { stdout = append(stdout, chunk); });
   child.stderr.on("data", chunk => { stderr = append(stderr, chunk); });
-  if (process.env.BHAI_RUNTIME_ENABLED !== "true") { child.kill("SIGTERM"); throw Object.assign(new Error("Cloud runtime is disabled"), { code: "RUNTIME_DISABLED", status: 503 }); }
   let timer = setTimeout(() => {}, timeoutMs);
   const ready = new Promise((resolve, reject) => {
     child.once("spawn", () => resolve({ pid: child.pid }));

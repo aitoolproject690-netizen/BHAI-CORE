@@ -14,7 +14,7 @@ function shellCommand(command) {
   return command.trim();
 }
 
-export function runBuildCommand(command, { cwd, timeoutMs = DEFAULT_TIMEOUT, maxOutputChars = DEFAULT_OUTPUT, env = {} } = {}) {
+export async function runBuildCommand(command, { cwd, timeoutMs = DEFAULT_TIMEOUT, maxOutputChars = DEFAULT_OUTPUT, env = {} } = {}) {
   const safe = shellCommand(command);
   return new Promise((resolve, reject) => {
     const child = spawn("/bin/sh", ["-lc", safe], {

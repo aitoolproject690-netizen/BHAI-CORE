@@ -20,7 +20,12 @@ export const AGENT_TOOLS = Object.freeze([
   { name: "voice_synthesize", description: "Synthesize speech through local Piper.", input: ["text", "voice", "language"] },
   { name: "models", description: "Inspect configured and locally discovered models.", input: ["probe"] },
   { name: "job_create", description: "Create a persistent asynchronous job.", input: ["type", "payload"] },
-  { name: "job_get", description: "Read a persistent job status.", input: ["id"] }
+  { name: "job_get", description: "Read a persistent job status.", input: ["id"] },
+  { name: "github_repo_list", description: "List repositories visible to the configured GitHub integration.", input: ["owner", "pageSize", "pageOffset"] },
+  { name: "github_repo_get", description: "Inspect one GitHub repository.", input: ["repository"] },
+  { name: "github_file_read", description: "Read a text file from a GitHub repository.", input: ["repository", "path", "ref"] },
+  { name: "github_file_write", description: "Write a text file to a GitHub repository.", input: ["repository", "path", "content", "message", "branch"] },
+  { name: "github_repo_create", description: "Create a GitHub repository.", input: ["name", "description", "private"] }
 ]);
 
 function required(value, name) {
@@ -96,5 +101,11 @@ export async function executeAgentTool(name, input = {}, identity = {}, options 
       return enqueue(input.type || "generic", input.payload || {});
     case "job_get":
       return getStoredJob(required(input.id, "id"));
+    case "github_repo_list":
+    case "github_repo_get":
+    case "github_file_read":
+    case "github_file_write":
+    case "github_repo_create":
+      throw new Error("GitHub connector runtime is not configured in BHAI-CORE");
   }
 }

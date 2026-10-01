@@ -33,6 +33,7 @@ import { createService, createServiceFromDeployment, getService, stopService, ch
 import { getDeployment, listDeployments, setDeploymentStatus, deploymentInfo } from "./src/deployment.js";
 import { createDomain, getDomain, listDomains, setDomainStatus, domainInfo } from "./src/domain.js";
 import { createAutoDeploy, getAutoDeploy, listAutoDeploys, setAutoDeployStatus, autoDeployInfo, findAutoDeploysByRepository, recordAutoDeployRun } from "./src/autodeploy.js";
+import { createRoute, getRoute, listRoutes, setRouteStatus, findRouteByHostname, networkInfo, proxyRequest } from "./src/network.js";
 import { executeCloudBuildJob } from "./src/cloudJob.js";
 import crypto from "node:crypto";
 
@@ -87,6 +88,13 @@ const server = http.createServer(async (req, res) => {
     }
 
     const url = new URL(req.url, "http://" + (req.headers.host || "localhost"));
+
+    const incomingHost = String(req.headers.host || "").toLowerCase();
+    const routedHost = incomingHost.replace(/:\\d+$/, "");
+    if (!routedHost.endsWith(".localhost") && routedHost !== "localhost" && !url.pathname.startsWith("/v1/") && !url.pathname.startsWith("/health") && !url.pathname.startsWith("/ready")) {
+      const route = await findRouteByHostname(routedHost);
+      if (route) return proxyRequest(req, res, route);
+    }
 
     if (url.pathname === "/health" && req.method === "GET")
       return send(res, 200, { ...health(), storage: storageInfo() }, rid);
@@ -404,6 +412,40 @@ const server = http.createServer(async (req, res) => {
       const body = await readJson(req);
       const hook = await setAutoDeployStatus(autoDeployMatch[1], identity.id, body.status);
       return hook ? send(res, 200, { ok: true, autoDeploy: hook }, rid) : send(res, 404, { ok: false, error: "Auto-deploy not found" }, rid);
+    }
+
+    if (url.pathname === "/v1/cloud/network/info" && req.method === "GET")
+      return send(res, 200, { ok:true, ...networkInfo() }, rid);
+
+    if (url.pathname === "/v1/cloud/network/routes" && req.method === "GET") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok:false, error:"BHAI key required" }, rid);
+      return send(res, 200, { ok:true, routes:await listRoutes(identity.id) }, rid);
+    }
+
+    if (url.pathname === "/v1/cloud/network/routes" && req.method === "POST") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok:false, error:"BHAI key required" }, rid);
+      const body = await readJson(req);
+      const service = await getService(body.serviceId, identity.id);
+      if (!service) return send(res, 404, { ok:false, error:"Service not found" }, rid);
+      const route = await createRoute({ ownerId:identity.id, hostname:body.hostname, serviceId:body.serviceId, targetHost:body.targetHost, targetPort:body.targetPort });
+      return send(res, 201, { ok:true, route }, rid);
+    }
+
+    const routeMatch = url.pathname.match(/^\/v1\/cloud\/network\/routes\/([^/]+)$/);
+    if (routeMatch && req.method === "GET") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok:false, error:"BHAI key required" }, rid);
+      const route = await getRoute(routeMatch[1], identity.id);
+      return route ? send(res, 200, { ok:true, route }, rid) : send(res, 404, { ok:false, error:"Route not found" }, rid);
+    }
+    if (routeMatch && req.method === "POST") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok:false, error:"BHAI key required" }, rid);
+      const body = await readJson(req);
+      const route = await setRouteStatus(routeMatch[1], identity.id, body.status);
+      return route ? send(res, 200, { ok:true, route }, rid) : send(res, 404, { ok:false, error:"Route not found" }, rid);
     }
 
     if (url.pathname === "/v1/cloud/domains/info" && req.method === "GET")

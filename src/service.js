@@ -81,3 +81,20 @@ function publicService(s) {
   return { id:s.id, ownerId:s.ownerId, buildId:s.buildId, status:s.status, pid:s.pid || null, restartCount:s.restartCount, healthUrl:s.healthUrl, createdAt:s.createdAt, updatedAt:s.updatedAt };
 }
 export function serviceInfo() { return { enabled: process.env.BHAI_RUNTIME_ENABLED === "true", maxRestarts: MAX_RESTARTS, healthIntervalMs: HEALTH_INTERVAL, inMemory:true }; }
+
+export async function monitorService(id, ownerId) {
+  const s = services.get(id);
+  if (!s || s.ownerId !== ownerId) return null;
+  const result = await checkService(id, ownerId);
+  if (!result || !s.healthUrl) return result;
+  if (!result.health.ok && s.status === "unhealthy" && s.restartCount < MAX_RESTARTS) {
+    s.restartCount++;
+    s.status = "restarting";
+    s.updatedAt = new Date().toISOString();
+    await persistService(s);
+    if (s.child) await stopRuntime(s.child);
+    await launch(s);
+    return { ...result, restarted: true, restartCount: s.restartCount };
+  }
+  return { ...result, restarted: false, restartCount: s.restartCount };
+}

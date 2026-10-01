@@ -15,7 +15,7 @@ function makeId() {
 }
 
 export function chunkText(text, options = {}) {
-  const size = Math.max(200, Number(options.size || DEFAULT_CHUNK_SIZE));
+  const size = Math.max(1, Number(options.size || DEFAULT_CHUNK_SIZE));
   const overlap = Math.min(Math.max(0, Number(options.overlap ?? DEFAULT_OVERLAP)), size - 1);
   const value = String(text || "");
   const chunks = [];

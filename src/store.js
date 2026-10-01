@@ -36,7 +36,7 @@ async function ensureLoaded() {
       ragChunks: parsed.ragChunks ?? {},
       auditLog: parsed.auditLog ?? [],
       approvals: parsed.approvals,
-    services: parsed.services || {} ?? {}
+    services: parsed.services || {}
     };
   } catch {
     state = emptyState();

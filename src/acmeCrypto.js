@@ -28,7 +28,7 @@ export function createJws({protectedHeader,payload,privateKey}){
   const protected64=b64(JSON.stringify(protectedHeader));
   const payload64=b64(typeof payload==="string"?payload:JSON.stringify(payload));
   const input=Buffer.from(protected64+"."+payload64);
-  const signature=crypto.sign("sha256",input,privateKey);
+  const signature=crypto.sign("sha256",input,{key:privateKey,dsaEncoding:"ieee-p1363"});
   return {protected:protected64,payload:payload64,signature:b64(signature)};
 }
 export function cryptoInfo(){return{accountKeyAlgorithm:"ES256",atRestEncryption:ALGORITHM,masterKeyRequired:true,privateKeyApiExposure:false};}

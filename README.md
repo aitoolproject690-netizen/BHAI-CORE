@@ -32,3 +32,10 @@ Example:
 9. BHAI-CLOUD runtime
 
 Never commit real API keys.
+
+
+## Reliability
+BHAI-CORE now includes provider circuit breakers. Repeated provider failures temporarily open that provider's circuit, while successful requests reset it. The router continues to configured fallback providers when available.
+
+## Development
+Run `npm test` for the test suite and `npm run check` for syntax checks.

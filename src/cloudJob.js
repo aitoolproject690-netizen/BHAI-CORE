@@ -3,8 +3,8 @@ import { checkoutGithubRepository } from "./source.js";
 import { runCloudBuild } from "./cloudBuild.js";
 import fs from "node:fs/promises";
 import crypto from "node:crypto";
-import { createDeployment, setDeploymentStatus } from "./deployment.js";
-import { createServiceFromDeployment } from "./service.js";
+import { createDeployment, setDeploymentStatus, attachDeploymentService, promoteDeployment } from "./deployment.js";
+import { createServiceFromDeployment, stopService } from "./service.js";
 import { createBuildPlan } from "./cloud.js";
 
 function shouldCopySource(sourcePath) {
@@ -54,9 +54,13 @@ export async function executeCloudBuildJob({ ownerId, repository, branch = "main
             env: {},
             healthUrl: null
           });
-          await setDeploymentStatus(deployment.id, ownerId, "active");
+          await attachDeploymentService(deployment.id, ownerId, service.id);
+          await promoteDeployment(deployment.id, ownerId);
           deployment = await createDeploymentSnapshot(deployment, ownerId);
         } catch (error) {
+          if (service?.id) {
+            try { await stopService(service.id, ownerId); } catch {}
+          }
           await setDeploymentStatus(deployment.id, ownerId, "failed");
           throw error;
         }

@@ -149,19 +149,33 @@ const server = http.createServer(async (req, res) => {
 
       const startedAt = Date.now();
       let emitted = false;
+      let emittedChars = 0;
       let retries = 0;
 
       try {
         const result = await withRetry(
-          async () => adapter({
-            ...providerCfg,
-            messages: body.messages,
-            temperature: body.temperature ?? 0.7,
-            onToken: async token => {
-              emitted = true;
-              sendEvent(res, tokenEvent(token));
+          async () => {
+            try {
+              return await adapter({
+                ...providerCfg,
+                messages: body.messages,
+                temperature: body.temperature ?? 0.7,
+                onToken: async token => {
+                  emitted = true;
+                  emittedChars += String(token ?? "").length;
+                  sendEvent(res, tokenEvent(token));
+                }
+              });
+            } catch (error) {
+              if (emitted) {
+                throw Object.assign(
+                  new Error(error?.message || "Streaming failed after output started"),
+                  { status: 400, code: "STREAM_PARTIAL_OUTPUT" }
+                );
+              }
+              throw error;
             }
-          }),
+          },
           {
             retries: Number(process.env.BHAI_PROVIDER_RETRIES ?? 2),
             onRetry: () => { retries += 1; }
@@ -204,7 +218,7 @@ const server = http.createServer(async (req, res) => {
         await recordUsage({
           key: usageKey,
           input: inputChars,
-          output: 0,
+          output: emittedChars,
           failed: true
         });
 

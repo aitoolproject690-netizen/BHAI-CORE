@@ -1,10 +1,11 @@
 import crypto from "node:crypto";
 import { startRuntime, stopRuntime, healthCheck } from "./runtime.js";
 import { getStore, updateStore } from "./store.js";
+import { allocatePort, releasePort } from "./portAllocator.js";
 const services = new Map();
 
 async function persistService(s) {
-  const record = { id:s.id, ownerId:s.ownerId, buildId:s.buildId, command:s.command, cwd:s.cwd, env:s.env, healthUrl:s.healthUrl, status:s.status, restartCount:s.restartCount, pid:null, createdAt:s.createdAt, updatedAt:s.updatedAt };
+  const record = { id:s.id, ownerId:s.ownerId, buildId:s.buildId, command:s.command, cwd:s.cwd, env:s.env, healthUrl:s.healthUrl, port:s.port, status:s.status, restartCount:s.restartCount, pid:null, createdAt:s.createdAt, updatedAt:s.updatedAt };
   await updateStore(store => { store.services ??= {}; store.services[s.id] = record; return store; });
 }
 
@@ -16,10 +17,12 @@ export async function restoreServices() {
 const MAX_RESTARTS = Number(process.env.BHAI_RUNTIME_MAX_RESTARTS || 3);
 const HEALTH_INTERVAL = Number(process.env.BHAI_RUNTIME_HEALTH_INTERVAL_MS || 15000);
 
-export async function createService({ ownerId, buildId, command, cwd, env = {}, healthUrl = null } = {}) {
+export async function createService({ ownerId, buildId, command, cwd, env = {}, healthUrl = null, port } = {}) {
   if (!ownerId || !buildId) throw Object.assign(new Error("ownerId and buildId required"), { code: "SERVICE_IDENTITY_REQUIRED", status: 400 });
   const id = "svc_" + crypto.randomUUID();
-  const service = { id, ownerId, buildId, command, cwd, env, healthUrl, status: "starting", restartCount: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), child: null };
+  const assignedPort = await allocatePort(port ?? env?.PORT);
+  const serviceEnv = { ...env, PORT: String(assignedPort) };
+  const service = { id, ownerId, buildId, command, cwd, env:serviceEnv, healthUrl, port:assignedPort, status: "starting", restartCount: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), child: null };
   services.set(id, service);
   await persistService(service);
   await launch(service);
@@ -55,6 +58,7 @@ export async function stopService(id, ownerId) {
   if (!s || s.ownerId !== ownerId) return null;
   s.status = "stopping";
   await stopRuntime(s.child);
+  await releasePort(s.port);
   s.status = "stopped";
   s.updatedAt = new Date().toISOString();
   await persistService(s);
@@ -80,7 +84,7 @@ export function listServices(ownerId) {
   return [...services.values()].filter(s => s.ownerId === ownerId).map(publicService);
 }
 function publicService(s) {
-  return { id:s.id, ownerId:s.ownerId, buildId:s.buildId, status:s.status, pid:s.pid || null, restartCount:s.restartCount, healthUrl:s.healthUrl, createdAt:s.createdAt, updatedAt:s.updatedAt };
+  return { id:s.id, ownerId:s.ownerId, buildId:s.buildId, status:s.status, pid:s.pid || null, port:s.port, restartCount:s.restartCount, healthUrl:s.healthUrl, createdAt:s.createdAt, updatedAt:s.updatedAt };
 }
 export function serviceInfo() { return { enabled: process.env.BHAI_RUNTIME_ENABLED === "true", maxRestarts: MAX_RESTARTS, healthIntervalMs: HEALTH_INTERVAL, persistentMetadata:true }; }
 
@@ -104,5 +108,5 @@ export async function monitorService(id, ownerId) {
 export async function createServiceFromDeployment({ ownerId, deployment, command, env = {}, healthUrl = null } = {}) {
   if (!deployment?.id || deployment.ownerId !== ownerId || !deployment.path)
     throw Object.assign(new Error("Valid owned deployment required"), { code:"DEPLOYMENT_REQUIRED", status:400 });
-  return createService({ ownerId, buildId: deployment.id, command, cwd: deployment.path, env, healthUrl });
+  return createService({ ownerId, buildId: deployment.id, command, cwd: deployment.path, env, healthUrl, port: env?.PORT });
 }

@@ -10,7 +10,7 @@ import { authorizeTool, getToolPolicy } from "./policy.js";
 import { recordAudit } from "./audit.js";
 import { getApproval } from "./approval.js";
 import { githubRepoList, githubRepoGet, githubFileRead, githubFileWrite, githubRepoCreate } from "./github.js";
-import { createBuildPlan } from "./cloud.js";
+import { createBuildPlan, runBuildPlan } from "./cloud.js";
 
 export const AGENT_TOOLS = Object.freeze([
   { name: "chat", description: "Generate text with configured AI providers.", input: ["messages", "provider", "temperature", "maxAttempts"] },
@@ -28,7 +28,8 @@ export const AGENT_TOOLS = Object.freeze([
   { name: "github_file_read", description: "Read a text file from a GitHub repository.", input: ["repository", "path", "ref"] },
   { name: "github_file_write", description: "Write a text file to a GitHub repository.", input: ["repository", "path", "content", "message", "branch"] },
   { name: "github_repo_create", description: "Create a GitHub repository.", input: ["name", "description", "private"] },
-  { name: "cloud_build_plan", description: "Inspect a GitHub repository and create a deterministic build/test/start plan.", input: ["repository", "branch"] }
+  { name: "cloud_build_plan", description: "Inspect a GitHub repository and create a deterministic build/test/start plan.", input: ["repository", "branch"] },
+  { name: "cloud_build_execute", description: "Execute an approved build/test plan in the configured build workspace.", input: ["plan", "cwd"] }
 ]);
 
 function required(value, name) {
@@ -114,6 +115,8 @@ export async function executeAgentTool(name, input = {}, identity = {}, options 
       return githubFileWrite({ repository: required(input.repository, "repository"), path: required(input.path, "path"), content: required(input.content, "content"), message: input.message, branch: input.branch, sha: input.sha });
     case "github_repo_create":
       return githubRepoCreate({ name: required(input.name, "name"), description: input.description, private: input.private });
+    case "cloud_build_execute":
+      return runBuildPlan(required(input.plan, "plan"), { cwd: required(input.cwd, "cwd") });
     case "cloud_build_plan": {
       const repository = required(input.repository, "repository");
       const repo = await githubRepoGet(repository);

@@ -828,8 +828,8 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(cfg.port, cfg.host, () =>
-  console.log("BHAI-CORE listening on http://" + cfg.host + ":" + cfg.port)
+server.listen(cfg.port, cfg.host, () => {
+  console.log("BHAI-CORE listening on http://" + cfg.host + ":" + cfg.port);
 });
 
 const tlsServer = startTlsServer(server.listeners("request")[0]);

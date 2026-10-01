@@ -6,15 +6,15 @@ const TOOL_POLICIES = Object.freeze({
   image_generate: { risk: "medium", permissions: ["image:write", "agent:write"] },
   voice_transcribe: { risk: "medium", permissions: ["voice:read", "agent:read"] },
   voice_synthesize: { risk: "medium", permissions: ["voice:write", "agent:write"] },
-  models: { risk: "low", permissions: ["models:read", "agent:read"] },
+  models: { risk: "low", permissions: ["models:read"] },
   job_create: { risk: "medium", permissions: ["jobs:write", "agent:write"] },
   job_get: { risk: "low", permissions: ["jobs:read", "agent:read"] },
-  github_repo_list: { risk: "low", permissions: ["github:read", "agent:read"] },
-  github_repo_get: { risk: "low", permissions: ["github:read", "agent:read"] },
-  github_file_read: { risk: "low", permissions: ["github:read", "agent:read"] },
+  github_repo_list: { risk: "low", permissions: ["github:read"] },
+  github_repo_get: { risk: "low", permissions: ["github:read"] },
+  github_file_read: { risk: "low", permissions: ["github:read"] },
   github_file_write: { risk: "high", permissions: ["github:write", "agent:write"] },
   github_repo_create: { risk: "high", permissions: ["github:admin", "agent:write"] },
-  cloud_build_plan: { risk: "low", permissions: ["github:read", "agent:read"] },
+  cloud_build_plan: { risk: "low", permissions: ["github:read"] },
   cloud_build_execute: { risk: "high", permissions: ["cloud:build", "agent:write"] }
 });
 

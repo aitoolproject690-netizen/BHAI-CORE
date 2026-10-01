@@ -120,9 +120,6 @@ export async function ragContext(ownerId, query, limit = 5, options = {}) {
   const results = await searchRag(ownerId, query, limit, options);
   return {
     query: String(query || ""), embedding: embeddingInfo(), results,
-    context: results.map((item, i) => `[Source ${i + 1}: ${item.fileId}, chunk ${item.index}]
-${item.content}`).join("
-
-")
+    context: results.map((item, i) => `[Source ${i + 1}: ${item.fileId}, chunk ${item.index}]\n${item.content}`).join("\\n\\n")
   };
 }

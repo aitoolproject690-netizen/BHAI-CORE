@@ -72,3 +72,11 @@ Provider pricing is intentionally not hard-coded; future billing can attach a co
 - `GET /v1/files/limits` — current file/text limits.
 
 The current search is deterministic text matching. The storage contract is designed so chunking and vector/embedding search can be added later without changing file ownership or API-key boundaries.
+
+
+## RAG
+- `GET /v1/rag/search?q=...` — owner-scoped ranked chunk search.
+- `GET /v1/rag/context?q=...` — returns ranked source chunks plus assembled context for an AI prompt.
+- Files are automatically chunked and indexed when created.
+- Deleting a file removes its RAG index.
+- Current ranking is deterministic keyword scoring; the index can later be replaced with embeddings/vector search.

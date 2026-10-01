@@ -45,7 +45,8 @@ async function ensureLoaded() {
       routes: parsed.routes || {},
       domains: parsed.domains || {},
       autoDeploy: parsed.autoDeploy || {},
-      certificates: parsed.certificates || {}
+      certificates: parsed.certificates || {},
+      dnsRecords: parsed.dnsRecords || {}
     };
   } catch {
     state = emptyState();

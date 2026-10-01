@@ -12,7 +12,8 @@ const emptyState = () => ({
   files: {},
   ragChunks: {},
   auditLog: [],
-  approvals: {}
+  approvals: {},
+    services: {}
 });
 
 let state = emptyState();
@@ -34,7 +35,8 @@ async function ensureLoaded() {
       files: parsed.files ?? {},
       ragChunks: parsed.ragChunks ?? {},
       auditLog: parsed.auditLog ?? [],
-      approvals: parsed.approvals ?? {}
+      approvals: parsed.approvals,
+    services: parsed.services || {} ?? {}
     };
   } catch {
     state = emptyState();

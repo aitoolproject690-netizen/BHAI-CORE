@@ -96,9 +96,6 @@ const server = http.createServer(async (req, res) => {
       return send(res, result.ready ? 200 : 503, result, rid);
     }
 
-    if (!authorized(req))
-      return send(res, 401, { ok: false, error: "Unauthorized" }, rid);
-
     if (url.pathname === "/v1/cloud/webhooks/github" && req.method === "POST") {
       const secret = process.env.BHAI_GITHUB_WEBHOOK_SECRET;
       if (!secret) return send(res, 503, { ok:false, error:"GitHub webhook secret is not configured" }, rid);
@@ -125,6 +122,9 @@ const server = http.createServer(async (req, res) => {
       }
       return send(res, 202, { ok:true, event:"push", repository, branch, commit, triggered:hooks.length }, rid);
     }
+
+    if (!authorized(req))
+      return send(res, 401, { ok: false, error: "Unauthorized" }, rid);
 
     if (url.pathname === "/v1/memory/info" && req.method === "GET")
       return send(res, 200, { ok: true, memory: memoryInfo() }, rid);

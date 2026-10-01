@@ -78,6 +78,23 @@ export async function setServiceRouteStatus(serviceId, status) {
   return changed;
 }
 
+export async function rebindServiceRoutes(fromServiceId, toServiceId, targetPort) {
+  if (!toServiceId) return 0;
+  let changed = 0;
+  await updateStore(store => {
+    for (const route of Object.values(store.routes || {})) {
+      if ((fromServiceId == null || route.serviceId === fromServiceId) && route.ownerId && route.status === "active") {
+        route.serviceId = toServiceId;
+        if (validPort(targetPort)) route.targetPort = Number(targetPort);
+        route.updatedAt = new Date().toISOString();
+        changed++;
+      }
+    }
+    return store;
+  });
+  return changed;
+}
+
 export async function setRouteStatus(id, ownerId, status) {
   if (!ROUTE_STATUSES.has(status))
     throw Object.assign(new Error("Invalid route status"), { code:"ROUTE_STATUS_INVALID", status:400 });
@@ -94,7 +111,7 @@ export async function setRouteStatus(id, ownerId, status) {
 }
 
 export function networkInfo() {
-  return { persistent:true, ownerScoped:true, routing:"hostname_to_service", statuses:[...ROUTE_STATUSES], proxy:"http/https" };
+  return { persistent:true, ownerScoped:true, routing:"hostname_to_service", statuses:[...ROUTE_STATUSES], proxy:"http/https", rollbackRebind:true };
 }
 
 export function proxyRequest(req, res, route) {

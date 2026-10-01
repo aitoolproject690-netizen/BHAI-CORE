@@ -43,3 +43,14 @@ A persistent queue/worker implementation will use this contract without changing
 ## Jobs
 - `POST /v1/jobs` — enqueue an authenticated job; returns HTTP 202.
 - `GET /v1/jobs/:id` — retrieve an authenticated job and its current status.
+
+
+## Streaming chat
+`POST /v1/chat/completions/stream` returns Server-Sent Events and requires `x-bhai-key`.
+
+Event sequence:
+- `start`
+- zero or more `token`
+- `complete` or `error`
+
+Currently streaming adapters are available for OpenAI and Hugging Face's OpenAI-compatible router.

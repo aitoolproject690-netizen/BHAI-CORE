@@ -14,3 +14,8 @@ export function endSSE(res) {
   writeSSE(res, "done", { ok: true });
   res.end();
 }
+
+
+export function sendEvent(res, event) {
+  writeSSE(res, event.type, event);
+}

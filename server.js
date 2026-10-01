@@ -441,6 +441,8 @@ const server = http.createServer(async (req, res) => {
       return hook ? send(res, 200, { ok: true, autoDeploy: hook }, rid) : send(res, 404, { ok: false, error: "Auto-deploy not found" }, rid);
     }
 
+    if (url.pathname === "/v1/cloud/tls/info" && req.method === "GET") return send(res, 200, { ok: true, tls: tlsInfo() }, rid);
+
     if (url.pathname === "/v1/cloud/network/info" && req.method === "GET")
       return send(res, 200, { ok:true, ...networkInfo() }, rid);
 

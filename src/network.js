@@ -58,6 +58,23 @@ export async function findRouteByHostname(hostname) {
   return r ? publicRoute(r) : null;
 }
 
+export async function setServiceRouteStatus(serviceId, status) {
+  if (!ROUTE_STATUSES.has(status))
+    throw Object.assign(new Error("Invalid route status"), { code:"ROUTE_STATUS_INVALID", status:400 });
+  let changed = 0;
+  await updateStore(store => {
+    for (const route of Object.values(store.routes || {})) {
+      if (route.serviceId === serviceId && route.status !== status) {
+        route.status = status;
+        route.updatedAt = new Date().toISOString();
+        changed++;
+      }
+    }
+    return store;
+  });
+  return changed;
+}
+
 export async function setRouteStatus(id, ownerId, status) {
   if (!ROUTE_STATUSES.has(status))
     throw Object.assign(new Error("Invalid route status"), { code:"ROUTE_STATUS_INVALID", status:400 });

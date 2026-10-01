@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 function validateRepository(repository) {
-  if (!/^[^/]+\/[^/]+$/.test(String(repository || ""))) {
+  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(String(repository || ""))) {
     const error = new Error("repository must be owner/name");
     error.code = "INVALID_REPOSITORY";
     error.status = 400;

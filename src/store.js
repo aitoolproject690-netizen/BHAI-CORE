@@ -7,7 +7,8 @@ const emptyState = () => ({
   apiKeys: {},
   usage: {},
   providerUsage: {},
-  jobs: {}
+  jobs: {},
+  files: {}
 });
 
 let state = emptyState();
@@ -25,7 +26,8 @@ async function ensureLoaded() {
       apiKeys: parsed.apiKeys ?? {},
       usage: parsed.usage ?? {},
       providerUsage: parsed.providerUsage ?? {},
-      jobs: parsed.jobs ?? {}
+      jobs: parsed.jobs ?? {},
+      files: parsed.files ?? {}
     };
   } catch {
     state = emptyState();

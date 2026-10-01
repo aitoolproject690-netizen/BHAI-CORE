@@ -34,6 +34,7 @@ import { createService, createServiceFromDeployment, getService, stopService, ch
 import { getDeployment, listDeployments, setDeploymentStatus, deploymentInfo, promoteDeployment, rollbackDeployment, getProductionDeployment } from "./src/deployment.js";
 import { createDomain, getDomain, listDomains, setDomainStatus, domainInfo, attachDomainRoute } from "./src/domain.js";
 import { createCertificate, getCertificate, listCertificates, setCertificateStatus, certificateInfo } from "./src/certificates.js";
+import { createDnsChallenge, getDnsChallenge, listDnsChallenges, setDnsChallengeStatus, verifyDnsChallenge, dnsInfo } from "./src/dns.js";
 import { createAutoDeploy, getAutoDeploy, listAutoDeploys, setAutoDeployStatus, autoDeployInfo, findAutoDeploysByRepository, recordAutoDeployRun, claimWebhookDelivery } from "./src/autodeploy.js";
 import { createRoute, getRoute, listRoutes, setRouteStatus, findRouteByHostname, networkInfo, proxyRequest } from "./src/network.js";
 import { executeCloudBuildJob } from "./src/cloudJob.js";
@@ -478,6 +479,19 @@ const server = http.createServer(async (req, res) => {
       return route ? send(res, 200, { ok:true, route }, rid) : send(res, 404, { ok:false, error:"Route not found" }, rid);
     }
 
+    if (url.pathname === "/v1/cloud/dns/info" && req.method === "GET") return send(res, 200, { ok:true, dns:dnsInfo() }, rid);
+    if (url.pathname === "/v1/cloud/dns/challenges" && req.method === "GET") {
+      const identity = await authenticate(req.headers["x-bhai-key"]); if (!identity) return send(res,401,{ok:false,error:"BHAI key required"},rid);
+      return send(res,200,{ok:true,records:await listDnsChallenges(identity.id)},rid);
+    }
+    if (url.pathname === "/v1/cloud/dns/challenges" && req.method === "POST") {
+      const identity = await authenticate(req.headers["x-bhai-key"]); if (!identity) return send(res,401,{ok:false,error:"BHAI key required"},rid);
+      const body=await readJson(req); const record=await createDnsChallenge({...body,ownerId:identity.id});
+      return send(res,202,{ok:true,record},rid);
+    }
+    const dnsMatch=url.pathname.match(/^\/v1\/cloud\/dns\/challenges\/([^/]+)$/);
+    if(dnsMatch&&req.method==="GET"){const identity=await authenticate(req.headers["x-bhai-key"]);if(!identity)return send(res,401,{ok:false,error:"BHAI key required"},rid);const record=await getDnsChallenge(dnsMatch[1],identity.id);return record?send(res,200,{ok:true,record},rid):send(res,404,{ok:false,error:"DNS record not found"},rid);}
+    if(dnsMatch&&req.method==="POST"){const identity=await authenticate(req.headers["x-bhai-key"]);if(!identity)return send(res,401,{ok:false,error:"BHAI key required"},rid);const body=await readJson(req);if(body.action==="verify"){const result=await verifyDnsChallenge(dnsMatch[1],identity.id);return result?send(res,200,{ok:true,...result},rid):send(res,404,{ok:false,error:"DNS record not found"},rid);}const record=await setDnsChallengeStatus(dnsMatch[1],identity.id,body.status);return record?send(res,200,{ok:true,record},rid):send(res,404,{ok:false,error:"DNS record not found"},rid);}
     if (url.pathname === "/v1/cloud/certificates/info" && req.method === "GET") return send(res, 200, { ok:true, certificates:certificateInfo() }, rid);
     if (url.pathname === "/v1/cloud/certificates" && req.method === "GET") {
       const auth = authenticate(req);

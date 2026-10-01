@@ -56,6 +56,33 @@ export function cosineSimilarity(a, b) {
   return dot / (Math.sqrt(aa) * Math.sqrt(bb));
 }
 
+async function ollamaEmbed(text, options = {}) {
+  const baseUrl = String(options.url || process.env.BHAI_OLLAMA_URL || "http://127.0.0.1:11434").replace(/\\/$/, "");
+  const model = String(options.model || process.env.BHAI_OLLAMA_EMBEDDING_MODEL || "nomic-embed-text");
+  const response = await fetch(baseUrl + "/api/embed", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ model, input: String(text ?? "") }),
+    signal: AbortSignal.timeout(Number(options.timeoutMs || 30000))
+  });
+  if (!response.ok) {
+    const error = new Error("Ollama embedding request failed");
+    error.status = response.status;
+    error.body = await response.text().catch(() => "");
+    throw error;
+  }
+  const data = await response.json();
+  const vector = data.embeddings?.[0];
+  if (!Array.isArray(vector) || !vector.length) throw new Error("Ollama returned no embedding vector");
+  return vector;
+}
+
+async function ollamaEmbedMany(texts, options = {}) {
+  const vectors = [];
+  for (const text of texts) vectors.push(await ollamaEmbed(text, options));
+  return vectors;
+}
+
 export function createEmbeddingProvider(options = {}) {
   const provider = String(options.provider || process.env.BHAI_EMBEDDING_PROVIDER || "local-hash").toLowerCase();
   if (provider === "local-hash") {
@@ -64,6 +91,21 @@ export function createEmbeddingProvider(options = {}) {
       async embed(text) { return embedText(text, options); },
       async embedMany(texts) { return embedMany(texts, options); },
       info: embeddingInfo
+    };
+  }
+  if (provider === "ollama") {
+    const model = String(options.model || process.env.BHAI_OLLAMA_EMBEDDING_MODEL || "nomic-embed-text");
+    return {
+      name: "ollama",
+      async embed(text) { return ollamaEmbed(text, options); },
+      async embedMany(texts) { return ollamaEmbedMany(texts, options); },
+      info: () => ({
+        provider: "ollama",
+        semantic: true,
+        model,
+        url: String(options.url || process.env.BHAI_OLLAMA_URL || "http://127.0.0.1:11434"),
+        replaceable: true
+      })
     };
   }
   throw new Error(`Unsupported embedding provider: ${provider}`);

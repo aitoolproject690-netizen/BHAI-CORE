@@ -17,6 +17,7 @@ import { searchRag, ragContext } from "./src/rag.js";
 import { embeddingInfo } from "./src/embeddings.js";
 import { getModelRegistry, modelCapabilities } from "./src/models.js";
 import { analyzeImage, getVisionCandidates } from "./src/vision.js";
+import { createImageRequest, submitComfyUI, imageProviderInfo } from "./src/image.js";
 import { canAttempt, recordFailure, recordSuccess } from "./src/circuitBreaker.js";
 import { withRetry, classifyError } from "./src/retry.js";
 
@@ -83,6 +84,23 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/v1/models" && req.method === "GET") {
       const probe = url.searchParams.get("probe") === "true";
       return send(res, 200, await getModelRegistry({ probeOllama: probe }), rid);
+    }
+
+    if (url.pathname === "/v1/image/providers" && req.method === "GET")
+      return send(res, 200, { ok: true, providers: imageProviderInfo() }, rid);
+
+    if (url.pathname === "/v1/image/generate" && req.method === "POST") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const body = await readJson(req);
+      const request = createImageRequest(body);
+      if (request.provider !== "comfyui") return send(res, 400, { ok: false, error: "Unsupported image provider" }, rid);
+      const result = await submitComfyUI({
+        url: process.env.COMFYUI_URL,
+        request,
+        workflow: body.workflow
+      });
+      return send(res, 202, { ok: true, ...request, ...result, status: "submitted" }, rid);
     }
 
     if (url.pathname === "/v1/vision/analyze" && req.method === "POST") {

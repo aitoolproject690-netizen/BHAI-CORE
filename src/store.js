@@ -10,7 +10,9 @@ const emptyState = () => ({
   providerUsage: {},
   jobs: {},
   files: {},
-  ragChunks: {}
+  ragChunks: {},
+  auditLog: [],
+  approvals: {}
 });
 
 let state = emptyState();
@@ -30,7 +32,9 @@ async function ensureLoaded() {
       providerUsage: parsed.providerUsage ?? {},
       jobs: parsed.jobs ?? {},
       files: parsed.files ?? {},
-      ragChunks: parsed.ragChunks ?? {}
+      ragChunks: parsed.ragChunks ?? {},
+      auditLog: parsed.auditLog ?? [],
+      approvals: parsed.approvals ?? {}
     };
   } catch {
     state = emptyState();

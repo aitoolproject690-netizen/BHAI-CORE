@@ -8,13 +8,18 @@ const TOOL_POLICIES = Object.freeze({
   voice_synthesize: { risk: "medium", permissions: ["voice:write", "agent:write"] },
   models: { risk: "low", permissions: ["models:read", "agent:read"] },
   job_create: { risk: "medium", permissions: ["jobs:write", "agent:write"] },
-  job_get: { risk: "low", permissions: ["jobs:read", "agent:read"] }
+  job_get: { risk: "low", permissions: ["jobs:read", "agent:read"] },
+  github_repo_list: { risk: "low", permissions: ["github:read", "agent:read"] },
+  github_repo_get: { risk: "low", permissions: ["github:read", "agent:read"] },
+  github_file_read: { risk: "low", permissions: ["github:read", "agent:read"] },
+  github_file_write: { risk: "high", permissions: ["github:write", "agent:write"] },
+  github_repo_create: { risk: "high", permissions: ["github:admin", "agent:write"] }
 });
 
 export const DEFAULT_PERMISSIONS = Object.freeze([
   "agent:read", "agent:write", "files:read", "files:write",
   "vision:read", "image:write", "voice:read", "voice:write",
-  "models:read", "jobs:read", "jobs:write"
+  "models:read", "jobs:read", "jobs:write", "github:read"
 ]);
 
 export function getToolPolicy(name) {

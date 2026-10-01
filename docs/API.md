@@ -96,3 +96,12 @@ The current search is deterministic text matching. The storage contract is desig
 - Current adapters: Ollama, Gemini, OpenAI, Anthropic.
 - Image request body limit is 12 MB; individual image limit defaults to 8 MB.
 - Provider credentials are never returned.
+
+
+## Image generation
+- `GET /v1/image/providers` — reports local image provider availability metadata.
+- `POST /v1/image/generate` — authenticated image-generation submission.
+- Body: `{ "prompt": "...", "provider": "comfyui", "seed": 123 }`.
+- Optional `workflow` may provide a ComfyUI API-format workflow.
+- The default adapter submits to a local ComfyUI server; BHAI-CORE does not pretend to generate an image when no generation runtime is configured.
+- Generation is asynchronous and returns a ComfyUI `prompt_id` with HTTP 202.

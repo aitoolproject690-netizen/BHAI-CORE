@@ -1,0 +1,4 @@
+import test from "node:test"; import assert from "node:assert/strict"; import { resetStoreForTests } from "../src/store.js"; import { createCertificate,setCertificateStatus } from "../src/certificates.js"; import { markCertificateRenewalIfDue,acmeInfo,listAcmeAccounts } from "../src/acme.js";
+test("ACME is disabled safely by default",()=>{assert.equal(acmeInfo().enabled,false);});
+test("renewal marks expiring active certificate",async()=>{resetStoreForTests();const c=await createCertificate({ownerId:"u",domainId:"d",hostname:"a.example.com"});await setCertificateStatus(c.id,"u","active",{expiresAt:new Date(Date.now()+86400000).toISOString()});assert.equal(await markCertificateRenewalIfDue({...c,status:"active",expiresAt:new Date(Date.now()+86400000).toISOString()},"u"),true);});
+test("ACME accounts are owner scoped",async()=>{resetStoreForTests();assert.deepEqual(await listAcmeAccounts("u"),[]);});

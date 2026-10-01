@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createDeployment, getDeployment, listDeployments, setDeploymentStatus, promoteDeployment, getProductionDeployment } from "../src/deployment.js";
+import { createDeployment, getDeployment, listDeployments, setDeploymentStatus, promoteDeployment, rollbackDeployment, getProductionDeployment } from "../src/deployment.js";
 import { resetStoreForTests } from "../src/store.js";
 
 test("deployments are persistent and owner-scoped", async () => {
@@ -49,4 +49,35 @@ test("deployment promotion requires an attached running service", async () => {
     error => error.code === "DEPLOYMENT_SERVICE_MISSING"
   );
   assert.equal(await getProductionDeployment({ ownerId:"user-a", repository:"owner/app", branch:"main" }), null);
+});
+
+
+test("rollback rejects when there is no production deployment", async () => {
+  resetStoreForTests();
+  const deployment = await createDeployment({
+    ownerId: "user-a",
+    repository: "owner/app",
+    branch: "main",
+    buildId: "build-rollback-1",
+    path: "/tmp/deployment"
+  });
+  await assert.rejects(
+    () => rollbackDeployment(deployment.id, "user-a"),
+    error => error.code === "ROLLBACK_NO_PRODUCTION"
+  );
+});
+
+test("rollback rejects the current production deployment", async () => {
+  resetStoreForTests();
+  const deployment = await createDeployment({
+    ownerId: "user-a",
+    repository: "owner/app",
+    branch: "main",
+    buildId: "build-rollback-2",
+    path: "/tmp/deployment"
+  });
+  await assert.rejects(
+    () => rollbackDeployment(deployment.id, "user-a"),
+    error => error.code === "ROLLBACK_NO_PRODUCTION"
+  );
 });

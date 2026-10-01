@@ -11,6 +11,7 @@ import { enqueue, getStoredJob } from "./src/queue.js";
 import { startSSE, sendEvent, endSSE } from "./src/stream.js";
 import { EVENTS, tokenEvent, completeEvent, errorEvent } from "./src/events.js";
 import { providerAdapters } from "./src/providers.js";
+import { storageInfo } from "./src/store.js";
 import { canAttempt, recordFailure, recordSuccess } from "./src/circuitBreaker.js";
 import { withRetry, classifyError } from "./src/retry.js";
 
@@ -61,7 +62,7 @@ const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, "http://" + (req.headers.host || "localhost"));
 
     if (url.pathname === "/health" && req.method === "GET")
-      return send(res, 200, health(), rid);
+      return send(res, 200, { ...health(), storage: storageInfo() }, rid);
 
     if (url.pathname === "/ready" && req.method === "GET") {
       const result = readiness();

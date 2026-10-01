@@ -464,7 +464,8 @@ const server = http.createServer(async (req, res) => {
       const service = await getService(body.serviceId, identity.id);
       if (!service) return send(res, 404, { ok: false, error: "Service not found" }, rid);
       const domain = await createDomain({ ownerId: identity.id, serviceId: body.serviceId, hostname: body.hostname, tls: body.tls });
-      return send(res, 201, { ok: true, domain }, rid);
+      const route = await createRoute({ ownerId: identity.id, serviceId: body.serviceId, hostname: body.hostname, targetPort: service.port });
+      return send(res, 201, { ok: true, domain, route }, rid);
     }
 
     const domainMatch = url.pathname.match(/^\/v1\/cloud\/domains\/([^/]+)$/);

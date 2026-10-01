@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { getStore, updateStore } from "./store.js";
 import { setCertificateStatus } from "./certificates.js";
+import { generateAccountKey, encryptPrivateKey, cryptoInfo } from "./acmeCrypto.js";
 
 function cfg(){return {
   enabled:process.env.BHAI_ACME_ENABLED==="true",
@@ -26,14 +27,16 @@ export async function getAcmeDirectory(){
   return {enabled:true,configured:true,directoryUrl:c.directoryUrl,endpoints:result.body};
 }
 
-export function acmeInfo(){const c=cfg();return {...c,privateKeyStorage:"not implemented",issuance:"staged integration",renewal:"scheduler-ready"};}
+export function acmeInfo(){const c=cfg();return {...c,crypto:cryptoInfo(),privateKeyStorage:"encrypted-at-rest",issuance:"staged integration",renewal:"scheduler-ready"};}
 
 export async function createAcmeAccount({ownerId}={}){
   if(!ownerId) throw Object.assign(new Error("ownerId required"),{code:"ACME_OWNER_REQUIRED",status:400});
   const c=cfg(); if(!c.enabled) throw Object.assign(new Error("ACME is disabled"),{code:"ACME_DISABLED",status:503});
   if(!c.email) throw Object.assign(new Error("ACME email required"),{code:"ACME_EMAIL_REQUIRED",status:400});
   const id="acme_"+crypto.randomUUID(),now=new Date().toISOString();
-  await updateStore(s=>{s.acmeAccounts??={};s.acmeAccounts[id]={id,ownerId,email:c.email,status:"pending",directoryUrl:c.directoryUrl,createdAt:now,updatedAt:now};return s;});
+  const key=generateAccountKey();
+  const encryptedPrivateKey=encryptPrivateKey(key.privateKey);
+  await updateStore(s=>{s.acmeAccounts??={};s.acmeAccounts[id]={id,ownerId,email:c.email,status:"pending",directoryUrl:c.directoryUrl,accountJwk:key.jwk,encryptedPrivateKey,createdAt:now,updatedAt:now};return s;});
   return {id,ownerId,email:c.email,status:"pending",directoryUrl:c.directoryUrl,createdAt:now,updatedAt:now};
 }
 

@@ -21,12 +21,11 @@ test("GitHub write requires explicit write scope", () => {
 
 test("GitHub tools are visible but do not fake execution", async () => {
   assert.ok(listAgentTools().some(item => item.name === "github_file_read"));
-  await assert.rejects(
-    () => executeAgentTool("github_file_read", { repository: "owner/repo", path: "README.md" }, { id: "u1", scopes: ["github:read", "agent:read"] }),
-    error => {
-      assert.equal(error.code, "GITHUB_NOT_CONFIGURED");
-      assert.equal(error.status, 503);
-      return true;
-    }
-  );
+  try {
+    await executeAgentTool("github_file_read", { repository: "owner/repo", path: "README.md" }, { id: "u1", scopes: ["github:read", "agent:read"] });
+    assert.fail("expected GitHub connector configuration error");
+  } catch (error) {
+    assert.equal(error.code, "GITHUB_NOT_CONFIGURED");
+    assert.equal(error.status, 503);
+  }
 });

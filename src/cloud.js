@@ -1,3 +1,5 @@
+import { validateOwnedExecutionPath } from "./workspace.js";
+
 const LIMIT = 300_000;
 
 function packageScripts(pkg) {
@@ -59,7 +61,8 @@ export function createBuildPlan({ repository, branch, repo, files }) {
   };
 }
 
-export async function runBuildPlan(plan, { cwd } = {}) {
+export async function runBuildPlan(plan, { cwd, ownerId } = {}) {
+  cwd = await validateOwnedExecutionPath(cwd, ownerId);
   if (!plan || !plan.runtime) throw new Error("build plan is required");
   const { buildRunnerInfo, runBuildCommand } = await import("./buildRunner.js");
   if (!buildRunnerInfo().enabled) {

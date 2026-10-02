@@ -63,7 +63,8 @@ export async function executeAgentTool(name, input = {}, identity = {}, options 
   }
   await recordAudit({ actorId: identity.id, action: "agent.execute", tool, status: "started", requestId: options.requestId });
 
-  switch (tool) {
+  try {
+    switch (tool) {
     case "chat":
       return generate({
         messages: required(input.messages, "messages"),
@@ -150,5 +151,24 @@ export async function executeAgentTool(name, input = {}, identity = {}, options 
       }
       return createBuildPlan({ repository, branch, repo, files });
     }
+    }
+  } catch (error) {
+    await recordAudit({
+      actorId: identity.id,
+      action: "agent.execute",
+      tool,
+      status: "failed",
+      requestId: options.requestId,
+      metadata: { code: error?.code, status: error?.status, error: error?.message }
+    });
+    throw error;
+  } finally {
+    await recordAudit({
+      actorId: identity.id,
+      action: "agent.execute",
+      tool,
+      status: "completed",
+      requestId: options.requestId
+    });
   }
 }

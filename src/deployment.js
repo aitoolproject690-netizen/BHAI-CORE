@@ -54,6 +54,20 @@ export async function listDeployments(ownerId) {
 export async function setDeploymentStatus(id, ownerId, status) {
   if (!STATUSES.has(status))
     throw Object.assign(new Error("Invalid deployment status"), { code:"DEPLOYMENT_STATUS_INVALID", status:400 });
+  if (status === "active") {
+    const current = await getDeployment(id, ownerId);
+    if (!current) return null;
+    if (!current.serviceId)
+      throw Object.assign(new Error("Deployment has no service"), { code:"DEPLOYMENT_SERVICE_MISSING", status:409 });
+    const service = await getService(current.serviceId, ownerId);
+    if (!service || service.status !== "running")
+      throw Object.assign(new Error("Deployment service is not running"), { code:"DEPLOYMENT_NOT_READY", status:409 });
+    if (service.healthUrl) {
+      const checked = await checkService(current.serviceId, ownerId);
+      if (!checked?.health?.ok)
+        throw Object.assign(new Error("Deployment health check failed"), { code:"DEPLOYMENT_HEALTH_FAILED", status:409 });
+    }
+  }
   let found = false;
   await updateStore(store => {
     const d = store.deployments?.[id];

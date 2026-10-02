@@ -20,3 +20,10 @@ test("build runner does not inherit core secret environment variables", async ()
   assert.equal(result.stdout, "");
   delete process.env.BHAI_CORE_SECRET_TEST;
 });
+
+
+test("build runner terminates commands that exceed the timeout", async () => {
+  const result = await runBuildCommand("sleep 2", { timeoutMs: 1000 });
+  assert.equal(result.timedOut, true);
+  assert.notEqual(result.code, 0);
+});

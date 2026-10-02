@@ -12,6 +12,7 @@ import { recordAudit } from "./audit.js";
 import { getApproval } from "./approval.js";
 import { githubRepoList, githubRepoGet, githubFileRead, githubFileWrite, githubRepoCreate } from "./github.js";
 import { createBuildPlan, runBuildPlan } from "./cloud.js";
+import { createService } from "./service.js";
 
 export const AGENT_TOOLS = Object.freeze([
   { name: "chat", description: "Generate text with configured AI providers.", input: ["messages", "provider", "temperature", "maxAttempts"] },
@@ -30,7 +31,8 @@ export const AGENT_TOOLS = Object.freeze([
   { name: "github_file_write", description: "Write a text file to a GitHub repository.", input: ["repository", "path", "content", "message", "branch"] },
   { name: "github_repo_create", description: "Create a GitHub repository.", input: ["name", "description", "private"] },
   { name: "cloud_build_plan", description: "Inspect a GitHub repository and create a deterministic build/test/start plan.", input: ["repository", "branch"] },
-  { name: "cloud_build_execute", description: "Execute an approved build/test plan in the configured build workspace.", input: ["plan", "cwd"] }
+  { name: "cloud_build_execute", description: "Execute an approved build/test plan in the configured build workspace.", input: ["plan", "cwd"] },
+  { name: "cloud_service_create", description: "Create an approved cloud runtime service for an owned build workspace.", input: ["buildId", "command", "cwd", "env", "healthUrl", "port"] }
 ]);
 
 function required(value, name) {
@@ -119,6 +121,16 @@ export async function executeAgentTool(name, input = {}, identity = {}, options 
       return githubRepoCreate({ name: required(input.name, "name"), description: input.description, private: input.private });
     case "cloud_build_execute":
       return runBuildPlan(required(input.plan, "plan"), { cwd: required(input.cwd, "cwd") });
+    case "cloud_service_create":
+      return createService({
+        ownerId,
+        buildId: required(input.buildId, "buildId"),
+        command: required(input.command, "command"),
+        cwd: required(input.cwd, "cwd"),
+        env: input.env,
+        healthUrl: input.healthUrl,
+        port: input.port
+      });
     case "cloud_build_plan": {
       const repository = required(input.repository, "repository");
       const repo = await githubRepoGet(repository);

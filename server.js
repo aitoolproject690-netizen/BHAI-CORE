@@ -762,14 +762,14 @@ const server = http.createServer(async (req, res) => {
       const providedKey = req.headers["x-bhai-key"];
       if (!await authenticate(providedKey)) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
       const body = await readJson(req);
-      return send(res, 202, await enqueue(body.type || "generic", body.payload || {}), rid);
+      return send(res, 202, await enqueue(body.type || "generic", { ...(body.payload || {}), ownerId: (await authenticate(providedKey)).id }), rid);
     }
 
     const jobMatch = url.pathname.match(/^\/v1\/jobs\/([^/]+)$/);
     if (jobMatch && req.method === "GET") {
       const providedKey = req.headers["x-bhai-key"];
       if (!await authenticate(providedKey)) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
-      const job = await getStoredJob(jobMatch[1]);
+      const job = await getStoredJob(jobMatch[1], (await authenticate(providedKey)).id);
       return job ? send(res, 200, job, rid) : send(res, 404, { ok: false, error: "Job not found" }, rid);
     }
 

@@ -162,7 +162,7 @@ export const providerAdapters = {
   async anthropic({ key, model, messages, temperature = 0.7 }) {
     const data = await jsonFetch("https://api.anthropic.com/v1/messages", {
       method:"POST", headers:{"content-type":"application/json","x-api-key":key,"anthropic-version":"2023-06-01"},
-      body:JSON.stringify({model,max_tokens:2048,temperature,messages:messages.filter(m => m.role !== "system")})
+      body:JSON.stringify({model,max_tokens:2048,temperature,system:messages.filter(m => m.role === "system").map(m => String(m.content ?? "")).filter(Boolean).join("\n"),messages:messages.filter(m => m.role !== "system")})
     });
     const text = data?.content?.map(x => x.text || "").join("") || "";
     if (!text) throw new Error("Anthropic returned no text");

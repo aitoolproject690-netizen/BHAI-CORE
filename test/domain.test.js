@@ -16,7 +16,7 @@ test("domains are owner-scoped and normalize hostname", async () => {
 test("domain activation requires exact verified TXT challenge", async () => {
   resetStoreForTests();
   await updateStore(s => {
-    s.services["svc_1"] = { id:"svc_1", ownerId:"user-a" };
+    s.services["svc_1"] = { id:"svc_1", ownerId:"user-a", status:"running" };
     return s;
   });
   const domain = await createDomain({ ownerId:"user-a", serviceId:"svc_1", hostname:"app.example.com" });

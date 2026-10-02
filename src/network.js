@@ -33,6 +33,8 @@ export async function createRoute({ ownerId, hostname, serviceId, targetHost="12
     throw Object.assign(new Error("Route service ownership mismatch"), { code:"ROUTE_SERVICE_FORBIDDEN", status:403 });
   if (!validHostname(host))
     throw Object.assign(new Error("Invalid route hostname"), { code:"ROUTE_HOST_INVALID", status:400 });
+  if (validPort(service.port) && Number(targetPort) !== Number(service.port))
+    throw Object.assign(new Error("Route target port must match service port"), { code:"ROUTE_TARGET_PORT_MISMATCH", status:409 });
   const upstreamHost = String(targetHost || "127.0.0.1").trim();
   if (!["127.0.0.1", "localhost", "::1"].includes(upstreamHost))
     throw Object.assign(new Error("Route target must be loopback"), { code:"ROUTE_TARGET_INVALID", status:400 });

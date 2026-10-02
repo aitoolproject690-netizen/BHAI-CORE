@@ -23,3 +23,13 @@ test("runtime refuses to spawn when disabled", () => {
 });
 
 test("runtime rejects shell chaining and redirection",()=>{process.env.BHAI_RUNTIME_ENABLED="true";assert.throws(()=>startRuntime({command:"node app.js && whoami",cwd:process.cwd()}),/rejected/);assert.throws(()=>startRuntime({command:"node app.js > out",cwd:process.cwd()}),/rejected/);delete process.env.BHAI_RUNTIME_ENABLED;});
+
+
+test("runtime terminates commands that exceed the timeout", async () => {
+  process.env.BHAI_RUNTIME_ENABLED = "true";
+  const r = startRuntime({ command: "sleep 2", cwd: process.cwd(), timeoutMs: 1000 });
+  const exit = await r.exit;
+  assert.equal(exit.timedOut, true);
+  assert.notEqual(exit.code, 0);
+  delete process.env.BHAI_RUNTIME_ENABLED;
+});

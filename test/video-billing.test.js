@@ -21,3 +21,9 @@ test("billing plans expose stable quotas", () => {
   assert.equal(plans.free.id, "free");
   assert.ok(plans.pro.monthlyRequests > plans.free.monthlyRequests);
 });
+
+import { setBillingPlan } from "../src/billing.js";
+
+test("billing rejects unknown plans", async () => {
+  await assert.rejects(() => setBillingPlan("test-owner", "not-a-plan"), { code: "BILLING_PLAN_INVALID", status: 400 });
+});

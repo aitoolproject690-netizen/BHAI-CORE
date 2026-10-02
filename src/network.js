@@ -119,6 +119,8 @@ export async function rebindServiceRoutes(fromServiceId, toServiceId, targetPort
   if (targetPort != null && !validPort(targetPort))
     throw Object.assign(new Error("Invalid targetPort"), { code:"ROUTE_TARGET_PORT_INVALID", status:400 });
   const resolvedTargetPort = targetPort == null ? Number(targetService.port) : Number(targetPort);
+  if (resolvedTargetPort !== Number(targetService.port))
+    throw Object.assign(new Error("Route target port must match target service port"), { code:"ROUTE_TARGET_PORT_MISMATCH", status:409 });
   let changed = 0;
   await updateStore(store => {
     for (const route of Object.values(store.routes || {})) {

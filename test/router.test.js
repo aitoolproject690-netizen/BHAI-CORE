@@ -150,3 +150,84 @@ test("generate falls back after a provider failure", async () => {
     else process.env.BHAI_PROVIDER_RETRIES = previousRetries;
   }
 });
+
+
+test("generate honors an explicit provider selection", async () => {
+  const { generate } = await import("../src/router.js");
+  const { providerAdapters } = await import("../src/providers.js");
+
+  const previousOrder = process.env.AI_PROVIDER_ORDER;
+  const previousGeminiKey = process.env.GEMINI_API_KEY;
+  const previousOpenaiKey = process.env.OPENAI_API_KEY;
+  const previousGemini = providerAdapters.gemini;
+  const previousOpenai = providerAdapters.openai;
+
+  process.env.AI_PROVIDER_ORDER = "openai,gemini";
+  process.env.GEMINI_API_KEY = "test-gemini-key";
+  process.env.OPENAI_API_KEY = "test-openai-key";
+  providerAdapters.gemini = async () => ({ text: "selected gemini" });
+  providerAdapters.openai = async () => ({ text: "wrong provider" });
+
+  try {
+    const result = await generate({
+      provider: "GEMINI",
+      messages: [{ role: "user", content: "hello" }]
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.provider, "gemini");
+    assert.equal(result.text, "selected gemini");
+  } finally {
+    providerAdapters.gemini = previousGemini;
+    providerAdapters.openai = previousOpenai;
+    if (previousOrder === undefined) delete process.env.AI_PROVIDER_ORDER;
+    else process.env.AI_PROVIDER_ORDER = previousOrder;
+    if (previousGeminiKey === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = previousGeminiKey;
+    if (previousOpenaiKey === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = previousOpenaiKey;
+  }
+});
+
+test("generate reports configured provider failures with sanitized details", async () => {
+  const { generate } = await import("../src/router.js");
+  const { providerAdapters } = await import("../src/providers.js");
+
+  const previousOrder = process.env.AI_PROVIDER_ORDER;
+  const previousKey = process.env.OPENAI_API_KEY;
+  const previousRetries = process.env.BHAI_PROVIDER_RETRIES;
+  const previousAdapter = providerAdapters.openai;
+
+  process.env.AI_PROVIDER_ORDER = "openai";
+  process.env.OPENAI_API_KEY = "test-openai-key";
+  process.env.BHAI_PROVIDER_RETRIES = "0";
+  providerAdapters.openai = async () => {
+    throw Object.assign(
+      new Error("request failed with api_key=secret-value"),
+      { code: "PERMANENT" }
+    );
+  };
+
+  try {
+    await assert.rejects(
+      () => generate({
+        messages: [{ role: "user", content: "hello" }]
+      }),
+      error => {
+        assert.equal(error.message, "All configured AI providers failed");
+        assert.equal(error.details.length, 1);
+        assert.equal(error.details[0].provider, "openai");
+        assert.equal(error.details[0].kind, "permanent");
+        assert.equal(error.details[0].error, "request failed with api_key=[redacted]");
+        return true;
+      }
+    );
+  } finally {
+    providerAdapters.openai = previousAdapter;
+    if (previousOrder === undefined) delete process.env.AI_PROVIDER_ORDER;
+    else process.env.AI_PROVIDER_ORDER = previousOrder;
+    if (previousKey === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = previousKey;
+    if (previousRetries === undefined) delete process.env.BHAI_PROVIDER_RETRIES;
+    else process.env.BHAI_PROVIDER_RETRIES = previousRetries;
+  }
+});

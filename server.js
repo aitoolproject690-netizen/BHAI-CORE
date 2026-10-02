@@ -165,6 +165,12 @@ const server = http.createServer(async (req, res) => {
       }, rid);
     }
 
+    if (url.pathname === "/dashboard" && req.method === "GET") {
+      const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BHAI-CORE API</title><style>body{margin:0;background:#0b1020;color:#eef2ff;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}main{max-width:900px;margin:auto;padding:28px 18px}h1{margin-bottom:6px}p{color:#aab4d0}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:22px}.card{display:block;padding:18px;border:1px solid #27314d;border-radius:16px;background:#121a2d;color:#eef2ff;text-decoration:none}.card b{display:block;margin-bottom:7px}.ok{display:inline-block;padding:6px 10px;border-radius:999px;background:#173d2a;color:#7ee2a8;font-size:13px}.url{color:#7dd3fc;font-size:13px;word-break:break-all}</style></head><body><main><span class="ok">● BHAI-CORE API LIVE</span><h1>API Dashboard</h1><p>Endpoints ko yahan se directly open karke check kar sakte ho.</p><div class="grid"><a class="card" href="/v1/models"><b>🤖 Models</b><span class="url">/v1/models</span></a><a class="card" href="/v1/providers"><b>🔌 Providers</b><span class="url">/v1/providers</span></a><a class="card" href="/health"><b>❤️ Health</b><span class="url">/health</span></a><a class="card" href="/ready"><b>✅ Ready</b><span class="url">/ready</span></a><a class="card" href="/v1"><b>📚 API Index</b><span class="url">/v1</span></a><a class="card" href="/"><b>🌐 Service Status</b><span class="url">/</span></a></div></main></body></html>`;
+      res.writeHead(200, {"content-type":"text/html; charset=utf-8","cache-control":"no-store"});
+      return res.end(html);
+    }
+
     if (url.pathname === "/" && req.method === "GET") {
       return send(res, 200, {
         ok: true,

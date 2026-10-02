@@ -13,3 +13,13 @@ test("image request validates prompt and normalizes provider", () => {
 test("image request rejects empty prompt", () => {
   assert.throws(() => createImageRequest({ prompt: "" }), /prompt is required/);
 });
+
+import { recordImageJobOwnership, getImageJobOwnership } from "../src/image.js";
+import { resetStoreForTests } from "../src/store.js";
+
+test("image job ownership is tenant isolated", async () => {
+  resetStoreForTests();
+  await recordImageJobOwnership({ promptId: "prompt-123", ownerId: "owner-a", requestId: "req-1" });
+  assert.equal((await getImageJobOwnership("prompt-123", "owner-a")).ownerId, "owner-a");
+  assert.equal(await getImageJobOwnership("prompt-123", "owner-b"), null);
+});

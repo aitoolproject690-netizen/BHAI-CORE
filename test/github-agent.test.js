@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { getToolPolicy, authorizeTool } from "../src/policy.js";
-import { listAgentTools, executeAgentTool } from "../src/agent.js";
+import { listAgentTools } from "../src/agent.js";
+import { githubFileRead, githubInfo } from "../src/github.js";
 
 test("GitHub tools are classified by privilege", () => {
   assert.equal(getToolPolicy("github_repo_list").risk, "low");
@@ -19,24 +20,19 @@ test("GitHub write requires explicit write scope", () => {
   assert.doesNotThrow(() => authorizeTool("github_file_write", { id: "u1", scopes: ["github:write", "agent:write"] }));
 });
 
-test("GitHub tools fail closed when the connector is not configured", async () => {
-  assert.ok(listAgentTools().some(item => item.name === "github_file_read"));
+test("GitHub connector fails closed when not configured", async () => {
+  assert.equal(githubInfo().enabled, false);
   const previousToken = process.env.GITHUB_TOKEN;
   delete process.env.GITHUB_TOKEN;
   try {
-    let caught;
-    try {
-      await executeAgentTool(
-        "github_file_read",
-        { repository: "owner/repo", path: "README.md" },
-        { id: "u1", scopes: ["github:read", "agent:read"] }
-      );
-    } catch (error) {
-      caught = error;
-    }
-    assert.ok(caught);
-    assert.equal(caught.code, "GITHUB_NOT_CONFIGURED");
-    assert.equal(caught.status, 503);
+    await assert.rejects(
+      githubFileRead({ repository: "owner/repo", path: "README.md" }),
+      error => {
+        assert.equal(error.code, "GITHUB_NOT_CONFIGURED");
+        assert.equal(error.status, 503);
+        return true;
+      }
+    );
   } finally {
     if (previousToken === undefined) delete process.env.GITHUB_TOKEN;
     else process.env.GITHUB_TOKEN = previousToken;

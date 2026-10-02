@@ -143,6 +143,28 @@ const server = http.createServer(async (req, res) => {
       return send(res, result.ready ? 200 : 503, result, rid);
     }
 
+    if (url.pathname === "/v1" && req.method === "GET") {
+      return send(res, 200, {
+        ok: true,
+        service: "BHAI-CORE API",
+        version: "0.1.0",
+        message: "API is live. Use one of the endpoints below.",
+        endpoints: {
+          models: "/v1/models",
+          providers: "/v1/providers",
+          memory: "/v1/memory/info",
+          embeddings: "/v1/embeddings",
+          chat: "/v1/chat/completions",
+          streamChat: "/v1/chat/completions/stream",
+          files: "/v1/files",
+          ragSearch: "/v1/rag/search",
+          agentTools: "/v1/agent/tools",
+          jobs: "/v1/jobs",
+          keys: "/v1/keys"
+        }
+      }, rid);
+    }
+
     if (url.pathname === "/" && req.method === "GET") {
       return send(res, 200, {
         ok: true,

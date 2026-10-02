@@ -528,29 +528,29 @@ const server = http.createServer(async (req, res) => {
     if(dnsMatch&&req.method==="POST"){const identity=await authenticate(req.headers["x-bhai-key"]);if(!identity)return send(res,401,{ok:false,error:"BHAI key required"},rid);const body=await readJson(req);if(body.action==="verify"){const result=await verifyDnsChallenge(dnsMatch[1],identity.id);return result?send(res,200,{ok:true,...result},rid):send(res,404,{ok:false,error:"DNS record not found"},rid);}const record=await setDnsChallengeStatus(dnsMatch[1],identity.id,body.status);return record?send(res,200,{ok:true,record},rid):send(res,404,{ok:false,error:"DNS record not found"},rid);}
     if (url.pathname === "/v1/cloud/certificates/info" && req.method === "GET") return send(res, 200, { ok:true, certificates:certificateInfo() }, rid);
     if (url.pathname === "/v1/cloud/certificates" && req.method === "GET") {
-      const auth = authenticate(req);
-      if (!auth.ok) return send(res, 401, auth, rid);
-      return send(res, 200, { ok:true, certificates:await listCertificates(auth.keyId) }, rid);
+      const auth = await authenticate(req.headers["x-bhai-key"]);
+      if (!auth) return send(res, 401, { ok:false, error:"BHAI key required" }, rid);
+      return send(res, 200, { ok:true, certificates:await listCertificates(auth.id) }, rid);
     }
     if (url.pathname === "/v1/cloud/certificates" && req.method === "POST") {
-      const auth = authenticate(req);
-      if (!auth.ok) return send(res, 401, auth, rid);
+      const auth = await authenticate(req.headers["x-bhai-key"]);
+      if (!auth) return send(res, 401, { ok:false, error:"BHAI key required" }, rid);
       const body = await readJson(req);
-      const cert = await createCertificate({ ...body, ownerId:auth.keyId });
+      const cert = await createCertificate({ ...body, ownerId:auth.id });
       return send(res, 202, { ok:true, certificate:cert }, rid);
     }
     if (url.pathname.startsWith("/v1/cloud/certificates/") && req.method === "GET") {
       const auth = authenticate(req);
       if (!auth.ok) return send(res, 401, auth, rid);
       const id = url.pathname.split("/").pop();
-      const cert = await getCertificate(id, auth.keyId);
+      const cert = await getCertificate(id, auth.id);
       return cert ? send(res, 200, { ok:true, certificate:cert }, rid) : send(res, 404, { ok:false, error:"Certificate not found" }, rid);
     }
     if (url.pathname.startsWith("/v1/cloud/certificates/") && req.method === "POST") {
       const auth = authenticate(req);
       if (!auth.ok) return send(res, 401, auth, rid);
       const id = url.pathname.split("/").pop(), body=await readJson(req);
-      const cert = await setCertificateStatus(id, auth.keyId, body.status, body.patch||{});
+      const cert = await setCertificateStatus(id, auth.id, body.status, body.patch||{});
       return cert ? send(res, 200, { ok:true, certificate:cert }, rid) : send(res, 404, { ok:false, error:"Certificate not found" }, rid);
     }
 

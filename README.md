@@ -102,7 +102,11 @@ Streaming uses provider-neutral SSE events: start, token, complete, and error. S
 
 ## Persistent storage
 
-The default persistent store is JSON at data/bhai-core-store.json. Set BHAI_STORE_FILE to another path. Storage access is isolated behind one store API, so a future SQLite/PostgreSQL backend can replace the JSON backend without changing the HTTP/API contract.
+The store is backend-pluggable. The default is JSON at data/bhai-core-store.json, which is suitable for local/single-host use. For durable production storage, set BHAI_STORE_BACKEND=postgres and provide DATABASE_URL.
+
+The PostgreSQL backend stores the complete state document in JSONB, uses a transaction plus row lock for updates, enforces the same store size limit, and keeps the HTTP/API contract unchanged. BHAI_STORE_PG_TABLE defaults to bhai_core_store. PostgreSQL is optional: leaving BHAI_STORE_BACKEND unset keeps the existing JSON behavior.
+
+Production deployments should use a durable PostgreSQL instance rather than relying on an ephemeral application filesystem.
 
 ## Custom domains and HTTPS
 

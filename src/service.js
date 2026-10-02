@@ -3,6 +3,7 @@ import { startRuntime, stopRuntime, healthCheck } from "./runtime.js";
 import { getStore, updateStore } from "./store.js";
 import { allocatePort, releasePort } from "./portAllocator.js";
 import { setServiceRouteStatus } from "./network.js";
+import { validateOwnedExecutionPath } from "./workspace.js";
 const services = new Map();
 const SECRET_ENV = /(KEY|TOKEN|SECRET|PASSWORD|PASS|PRIVATE|CREDENTIAL|AUTH)/i;
 
@@ -31,6 +32,7 @@ const HEALTH_INTERVAL = Number(process.env.BHAI_RUNTIME_HEALTH_INTERVAL_MS || 15
 
 export async function createService({ ownerId, buildId, command, cwd, env = {}, healthUrl = null, port } = {}) {
   if (!ownerId || !buildId) throw Object.assign(new Error("ownerId and buildId required"), { code: "SERVICE_IDENTITY_REQUIRED", status: 400 });
+  cwd = await validateOwnedExecutionPath(cwd, ownerId);
   const id = "svc_" + crypto.randomUUID();
   const assignedPort = await allocatePort(port ?? env?.PORT);
   const serviceEnv = { ...env, PORT: String(assignedPort) };

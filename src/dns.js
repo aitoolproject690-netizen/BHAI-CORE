@@ -7,6 +7,10 @@ const TYPES = new Set(["TXT","CNAME"]);
 function pub(r){return {id:r.id,ownerId:r.ownerId,domainId:r.domainId,hostname:r.hostname,type:r.type,name:r.name,value:r.value,status:r.status,createdAt:r.createdAt,updatedAt:r.updatedAt};}
 export async function createDnsChallenge({ownerId,domainId,hostname,type="TXT",name,value,ttl=300}={}) {
   if(!ownerId||!domainId||!hostname||!name||!value) throw Object.assign(new Error("ownerId, domainId, hostname, name and value required"),{code:"DNS_FIELDS_REQUIRED",status:400});
+  const existing = await getStore();
+  const domain = existing.domains?.[domainId];
+  if (!domain || domain.ownerId !== ownerId)
+    throw Object.assign(new Error("DNS challenge domain ownership mismatch"),{code:"DNS_DOMAIN_FORBIDDEN",status:403});
   if(!TYPES.has(type)) throw Object.assign(new Error("Unsupported DNS record type"),{code:"DNS_TYPE_INVALID",status:400});
   if(!Number.isInteger(ttl)||ttl<30||ttl>86400) throw Object.assign(new Error("Invalid DNS TTL"),{code:"DNS_TTL_INVALID",status:400});
   const id="dns_"+crypto.randomUUID(),now=new Date().toISOString();

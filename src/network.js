@@ -171,7 +171,7 @@ export async function setRouteStatus(id, ownerId, status) {
   return found ? getRoute(id, ownerId) : null;
 }
 
-export function networkInfo() {
+export function networkSecurityInfo() {\n  return {\n    targetPolicy: "loopback_only",\n    hopByHopHeadersStripped: true,\n    forwardedCredentialsRemoved: true,\n    proxyTimeoutMs: Number(process.env.BHAI_NETWORK_PROXY_TIMEOUT_MS || 15000)\n  };\n}\n\nexport function networkInfo() {
   return { persistent:true, ownerScoped:true, routing:"hostname_to_service", statuses:[...ROUTE_STATUSES], proxy:"http/https", rollbackRebind:true };
 }
 

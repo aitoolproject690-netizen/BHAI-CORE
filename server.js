@@ -891,7 +891,8 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/v1/chat/completions" && req.method === "POST") {
       const providedKey = req.headers["x-bhai-key"];
       const identity = await authenticate(providedKey);
-      const usageKey = identity?.id || providedKey || "anonymous";
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const usageKey = identity.id;
       const body = await readJson(req);
       await assertBudget(usageKey);
       const result = await generate({

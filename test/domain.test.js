@@ -6,7 +6,7 @@ import { createDnsChallenge, setDnsChallengeStatus } from "../src/dns.js";
 
 test("domains are owner-scoped and normalize hostname", async () => {
   resetStoreForTests();
-  await updateStore(s => { s.services["svc_1"] = { id:"svc_1", ownerId:"user-a" }; return s; });
+  await updateStore(s => { s.services["svc_1"] = { id:"svc_1", ownerId:"user-a", status:"running" }; return s; });
   const domain = await createDomain({ ownerId:"user-a", serviceId:"svc_1", hostname:"APP.Example.COM" });
   assert.equal(domain.hostname, "app.example.com");
   assert.equal((await listDomains("user-a")).length, 1);

@@ -14,6 +14,7 @@ import { githubRepoList, githubRepoGet, githubFileRead, githubFileWrite, githubR
 import { createBuildPlan, runBuildPlan } from "./cloud.js";
 import { createService } from "./service.js";
 import { setDeploymentStatus, promoteDeployment, rollbackDeployment } from "./deployment.js";
+import { validateOwnedExecutionPath } from "./workspace.js";
 
 export const AGENT_TOOLS = Object.freeze([
   { name: "chat", description: "Generate text with configured AI providers.", input: ["messages", "provider", "temperature", "maxAttempts"] },
@@ -134,7 +135,7 @@ export async function executeAgentTool(name, input = {}, identity = {}, options 
         ownerId,
         buildId: required(input.buildId, "buildId"),
         command: required(input.command, "command"),
-        cwd: required(input.cwd, "cwd"),
+        cwd: await validateOwnedExecutionPath(required(input.cwd, "cwd"), ownerId),
         env: input.env,
         healthUrl: input.healthUrl,
         port: input.port

@@ -107,9 +107,9 @@ export async function checkService(id, ownerId) {
     await setServiceRouteStatus(s.id, "disabled");
     s.updatedAt = new Date().toISOString();
     await persistService(s);
-  } else if (health.ok && s.status === "unhealthy") {
-    s.status = "running";
-    await setServiceRouteStatus(s.id, "active");
+  } else if (health.ok) {
+    if (s.status === "unhealthy") s.status = "running";
+    if (s.status === "running") await setServiceRouteStatus(s.id, "active");
     s.updatedAt = new Date().toISOString();
     await persistService(s);
   }

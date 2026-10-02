@@ -9,6 +9,12 @@ function nonNegativeInteger(value, fallback) {
   return Number.isSafeInteger(number) && number >= 0 ? number : fallback;
 }
 
+function normalizeRetries(value, fallback = 2) {
+  const number = Number(value);
+  if (!Number.isSafeInteger(number)) return fallback;
+  return Math.max(0, number);
+}
+
 function positiveFinite(value, fallback) {
   const number = Number(value);
   return Number.isFinite(number) && number > 0 ? number : fallback;
@@ -42,7 +48,7 @@ export function backoffMs(attempt, baseMs = 250, maxMs = 4000) {
 }
 
 export async function withRetry(fn, options = {}) {
-  const retries = nonNegativeInteger(options.retries ?? 2, 2);
+  const retries = normalizeRetries(options.retries ?? 2, 2);
   const baseMs = positiveFinite(options.baseMs ?? 250, 250);
   const maxMs = Math.max(baseMs, positiveFinite(options.maxMs ?? 4000, 4000));
   const onRetry = typeof options.onRetry === "function" ? options.onRetry : null;

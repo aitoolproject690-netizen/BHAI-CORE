@@ -8,6 +8,12 @@ export function isProviderConfigured(name, cfg = config()) {
   return Boolean(cfg.providers[name]?.key && providerAdapters[name]);
 }
 
+export function normalizeMaxAttempts(value, fallback) {
+  const number = Number(value);
+  if (!Number.isSafeInteger(number) || number < 1) return fallback;
+  return Math.min(number, fallback);
+}
+
 export function getProviderStatus() {
   const cfg = config();
   return Object.fromEntries(
@@ -36,7 +42,7 @@ export async function generate({ messages, provider, temperature = 0.7, maxAttem
 
   if (!candidates.length) throw new Error("No AI provider is configured");
 
-  const attempts = Math.min(maxAttempts || candidates.length, candidates.length);
+  const attempts = normalizeMaxAttempts(maxAttempts, candidates.length);
   const errors = [];
 
   for (let i = 0; i < attempts; i++) {

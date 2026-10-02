@@ -7,7 +7,7 @@ const ALLOWED_COMMANDS = new Set(["start"]);
 function validateCommand(command) {
   if (!command || typeof command !== "string") throw Object.assign(new Error("Runtime start command required"), { code: "RUNTIME_COMMAND_REQUIRED", status: 400 });
   if (!ALLOWED_COMMANDS.has("start")) throw new Error("Runtime policy invalid");
-  const blocked = /(rm\s+-rf|mkfs|shutdown|reboot|curl\s+[^|]*\|\s*(sh|bash)|wget\s+[^|]*\|\s*(sh|bash))/i;
+  const blocked = /(rm\s+-rf|mkfs|shutdown|reboot|curl\s+[^|]*\|\s*(sh|bash)|wget\s+[^|]*\|\s*(sh|bash)|(?:;|&&|\|\||`|\$\(|>|<))/i;
   if (blocked.test(command)) throw Object.assign(new Error("Runtime command rejected"), { code: "RUNTIME_COMMAND_REJECTED", status: 400 });
   return command;
 }
@@ -45,7 +45,7 @@ export async function stopRuntime(child, signal = "SIGTERM") {
 }
 
 export function runtimeInfo() {
-  return { enabled: process.env.BHAI_RUNTIME_ENABLED === "true", timeoutMs: DEFAULT_TIMEOUT, maxOutputChars: MAX_OUTPUT };
+  return { enabled: process.env.BHAI_RUNTIME_ENABLED === "true", timeoutMs: DEFAULT_TIMEOUT, maxOutputChars: MAX_OUTPUT, shellPolicy:"single-command-no-shell-chaining" };
 }
 
 export async function healthCheck(url, { timeoutMs = 10000 } = {}) {

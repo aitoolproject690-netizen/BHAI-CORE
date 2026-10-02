@@ -6,6 +6,7 @@ import { getProviderStatus, normalizeMaxAttempts } from "../src/router.js";
 test("provider status exposes all adapters",()=>{const s=getProviderStatus();for(const n of ["gemini","openai","anthropic","huggingface"]){assert.ok(s[n]);assert.equal(typeof s[n].configured,"boolean");assert.equal(typeof s[n].model,"string");}});
 
 import { config } from "../src/config.js";
+import { publicError } from "../src/errors.js";
 
 test("config rejects invalid PORT values", () => {
   const previous = process.env.PORT;
@@ -216,11 +217,8 @@ test("generate reports configured provider failures with sanitized details", asy
         assert.equal(error.message, "All configured AI providers failed");
         assert.equal(error.details.length, 1);
         assert.equal(error.details[0].provider, "openai");
-        assert.equal(error.details.length, 1);
-        assert.equal(error.details[0].provider, "openai");
         assert.equal(error.details[0].kind, "permanent");
         assert.equal(error.details[0].error, "request failed with api_key=secret-value");
-        const { publicError } = await import("../src/errors.js");
         const safe = publicError(error);
         assert.equal(safe.details[0].error, "request failed with api_key=[redacted]");
         return true;

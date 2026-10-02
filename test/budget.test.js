@@ -35,3 +35,17 @@ test("budgetStatus preserves positive integer limits", async () => {
     else process.env.BHAI_STORE_FILE = previous;
   }
 });
+
+test("budgetStatus rejects the current request when it would cross a key limit", async () => {
+  const previous = process.env.BHAI_STORE_FILE;
+  const path = `/tmp/bhai-budget-test-${process.pid}-${Date.now()}-3.json`;
+  process.env.BHAI_STORE_FILE = path;
+  try {
+    const result = await budgetStatus("missing", { maxRequests: 2, maxInputChars: 10 }, { requests: 1, inputChars: 11 });
+    assert.equal(result.exceeded, true);
+    assert.deepEqual(result.requested, { requests: 1, inputChars: 11 });
+  } finally {
+    if (previous === undefined) delete process.env.BHAI_STORE_FILE;
+    else process.env.BHAI_STORE_FILE = previous;
+  }
+});

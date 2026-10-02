@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import http from "node:http";
 import https from "node:https";
 import { getStore, updateStore } from "./store.js";
+import { healthCheck } from "./runtime.js";
 
 const ROUTE_STATUSES = new Set(["active", "disabled"]);
 
@@ -108,6 +109,21 @@ export async function rebindServiceRoutes(fromServiceId, toServiceId, targetPort
 export async function setRouteStatus(id, ownerId, status) {
   if (!ROUTE_STATUSES.has(status))
     throw Object.assign(new Error("Invalid route status"), { code:"ROUTE_STATUS_INVALID", status:400 });
+  if (status === "active") {
+    const store = await getStore();
+    const r = store.routes?.[id];
+    if (!r || r.ownerId !== ownerId) return null;
+    const service = store.services?.[r.serviceId];
+    if (!service || service.ownerId !== ownerId)
+      throw Object.assign(new Error("Route service ownership mismatch"), { code:"ROUTE_SERVICE_FORBIDDEN", status:403 });
+    if (service.status !== "running")
+      throw Object.assign(new Error("Route service is not ready"), { code:"ROUTE_SERVICE_NOT_READY", status:409 });
+    if (service.healthUrl) {
+      const health = await healthCheck(service.healthUrl, { expectedPort: service.port });
+      if (!health.ok)
+        throw Object.assign(new Error("Route service health check failed"), { code:"ROUTE_SERVICE_UNHEALTHY", status:409 });
+    }
+  }
   let found = false;
   await updateStore(store => {
     const r = store.routes?.[id];

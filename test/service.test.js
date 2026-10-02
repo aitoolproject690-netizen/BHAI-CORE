@@ -117,8 +117,12 @@ test("health monitor restart ignores the old runtime exit", async () => {
       healthUrl: "http://127.0.0.1:19001/health",
       port: 19001
     });
+    const beforeRestart = await getStore();
+    const restartTokenBefore = beforeRestart.services[s.id]?.restartToken ?? 0;
     const result = await monitorService(s.id, "owner-monitor-race");
     assert.equal(result.restarted, true);
+    const afterRestart = await getStore();
+    assert.equal(afterRestart.services[s.id].restartToken, restartTokenBefore + 1);
     const current = await getService(s.id, "owner-monitor-race");
     assert.equal(current.status, "running");
     assert.equal(current.restartCount, 1);

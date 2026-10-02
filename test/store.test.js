@@ -36,7 +36,7 @@ async function runStoreProbe(filePath) {
     '  console.log(JSON.stringify({ ok: false, code: error.code, status: error.status }));',
     '  process.exitCode = 0;',
     '}'
-  ].join("\\n");
+  ].join("\n");
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, ["--input-type=module", "--eval", script], {
       cwd: path.resolve("."),
@@ -49,7 +49,7 @@ async function runStoreProbe(filePath) {
     child.on("error", reject);
     child.on("close", code => {
       if (code !== 0) return reject(new Error(stderr || `probe exited with ${code}`));
-      try { resolve(JSON.parse(stdout.trim())); } catch (error) { reject(new Error(`invalid probe output: ${stdout}\\n${stderr}`, { cause: error })); }
+      try { resolve(JSON.parse(stdout.trim())); } catch (error) { reject(new Error(`invalid probe output: ${stdout}\n${stderr}`, { cause: error })); }
     });
   });
 }

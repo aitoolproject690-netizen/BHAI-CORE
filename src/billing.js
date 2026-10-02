@@ -70,6 +70,48 @@ export async function recordBillingUsage(ownerId, delta = {}) {
   return result;
 }
 
+export async function consumeBillingQuota(ownerId, delta = {}) {
+  if (!ownerId) throw new Error("ownerId is required");
+  for (const field of ["requests", "charsIn", "charsOut", "imageJobs", "videoSeconds"]) {
+    if (delta[field] != null && (!Number.isFinite(Number(delta[field])) || Number(delta[field]) < 0)) {
+      throw Object.assign(new Error("Invalid billing usage delta: " + field), { code: "BILLING_USAGE_INVALID", status: 400 });
+    }
+  }
+  let result;
+  const month = monthKey();
+  await updateStore(store => {
+    store.billing ??= {};
+    const current = store.billing[ownerId] || { ownerId, plan: "free", status: "active" };
+    const base = current.month === month
+      ? { ...current }
+      : { ...current, month, requests: 0, charsIn: 0, charsOut: 0, imageJobs: 0, videoSeconds: 0 };
+    const plan = safePlan(base.plan);
+    const limits = PLANS[plan];
+    for (const [field, add, limit] of [
+      ["requests", delta.requests || 0, limits.monthlyRequests],
+      ["charsIn", delta.charsIn || 0, limits.monthlyCharsIn],
+      ["charsOut", delta.charsOut || 0, limits.monthlyCharsOut],
+      ["imageJobs", delta.imageJobs || 0, limits.imageJobs],
+      ["videoSeconds", delta.videoSeconds || 0, limits.videoSeconds]
+    ]) {
+      if (Number(base[field] || 0) + Number(add) > Number(limit)) {
+        throw Object.assign(new Error("Billing quota exceeded: " + field), {
+          code: "BILLING_QUOTA_EXCEEDED", status: 429, field, limit
+        });
+      }
+    }
+    base.requests = Number(base.requests || 0) + (Number(delta.requests) || 0);
+    base.charsIn = Number(base.charsIn || 0) + (Number(delta.charsIn) || 0);
+    base.charsOut = Number(base.charsOut || 0) + (Number(delta.charsOut) || 0);
+    base.imageJobs = Number(base.imageJobs || 0) + (Number(delta.imageJobs) || 0);
+    base.videoSeconds = Number(base.videoSeconds || 0) + (Number(delta.videoSeconds) || 0);
+    store.billing[ownerId] = base;
+    result = { ...base };
+    return store;
+  });
+  return result;
+}
+
 export async function assertBillingQuota(ownerId, delta = {}) {
   const account = await getBillingAccount(ownerId);
   const store = await getStore();

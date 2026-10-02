@@ -1,7 +1,8 @@
 import crypto from "node:crypto";
 import { getStore, updateStore } from "./store.js";
 import { setCertificateStatus } from "./certificates.js";
-import { generateAccountKey, encryptPrivateKey, cryptoInfo } from "./acmeCrypto.js";
+import { generateAccountKey, encryptPrivateKey, decryptPrivateKey, cryptoInfo } from "./acmeCrypto.js";
+import { fetchDirectory, registerAcmeAccount } from "./acmeProtocol.js";
 
 function cfg(){return {
   enabled:process.env.BHAI_ACME_ENABLED==="true",
@@ -40,6 +41,22 @@ export async function createAcmeAccount({ownerId}={}){
   return {id,ownerId,email:c.email,status:"pending",directoryUrl:c.directoryUrl,createdAt:now,updatedAt:now};
 }
 
+export async function registerStoredAcmeAccount({id,ownerId}={}){
+ const s=await getStore(),a=s.acmeAccounts?.[id]; if(!a||a.ownerId!==ownerId)return null;
+ if(a.status==="registered"&&a.accountUrl)return {id:a.id,ownerId:a.ownerId,status:a.status,accountUrl:a.accountUrl};
+ const c=cfg(); if(!c.enabled)throw Object.assign(new Error("ACME is disabled"),{code:"ACME_DISABLED",status:503});
+ if(!c.email)throw Object.assign(new Error("ACME email required"),{code:"ACME_EMAIL_REQUIRED",status:400});
+ const directory=await fetchDirectory(a.directoryUrl||c.directoryUrl);
+ const privateKey=decryptPrivateKey(a.encryptedPrivateKey);
+ try{
+   const result=await registerAcmeAccount({directory,email:a.email,privateKey,jwk:a.accountJwk});
+   await updateStore(s=>{const x=s.acmeAccounts?.[id];if(x){x.accountUrl=result.location;x.status="registered";x.updatedAt=new Date().toISOString();}return s;});
+ }catch(error){
+   await updateStore(s=>{const x=s.acmeAccounts?.[id];if(x){x.status="failed";x.lastError=error.message;x.updatedAt=new Date().toISOString();}return s;});
+   throw error;
+ }
+ return (await listAcmeAccounts(ownerId)).find(x=>x.id===id)||null;
+}
 export async function listAcmeAccounts(ownerId){const s=await getStore();return Object.values(s.acmeAccounts||{}).filter(a=>a.ownerId===ownerId).map(({privateKey,...a})=>a);}
 
 export async function markCertificateRenewalIfDue(cert,ownerId,now=Date.now()){

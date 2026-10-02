@@ -4,6 +4,14 @@ const DEFAULT_TIMEOUT = Number(process.env.BHAI_RUNTIME_START_TIMEOUT_MS || 3000
 const MAX_OUTPUT = Number(process.env.BHAI_RUNTIME_MAX_OUTPUT_CHARS || 50000);
 const ALLOWED_COMMANDS = new Set(["start"]);
 
+function runtimeEnv(extra = {}) {
+  const inherited = {};
+  for (const key of ["PATH", "HOME", "TMPDIR", "LANG", "LC_ALL", "NODE_ENV"]) {
+    if (process.env[key] !== undefined) inherited[key] = process.env[key];
+  }
+  return { ...inherited, ...extra };
+}
+
 function validateCommand(command) {
   if (!command || typeof command !== "string") {
     throw Object.assign(new Error("Runtime start command required"), { code: "RUNTIME_COMMAND_REQUIRED", status: 400 });
@@ -26,7 +34,7 @@ export function startRuntime({ command, cwd, env = {}, timeoutMs = DEFAULT_TIMEO
   }
   const child = spawn("/bin/sh", ["-lc", safeCommand], {
     cwd,
-    env: { ...process.env, ...env },
+    env: runtimeEnv(env),
     detached: true,
     stdio: ["ignore", "pipe", "pipe"]
   });

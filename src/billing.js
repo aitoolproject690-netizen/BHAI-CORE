@@ -9,6 +9,11 @@ const PLANS = Object.freeze({
 
 function monthKey(date = new Date()) { return date.toISOString().slice(0, 7); }
 function safePlan(plan) { return PLANS[String(plan || "free").toLowerCase()] ? String(plan).toLowerCase() : "free"; }
+function requirePlan(plan) {
+  const selected = String(plan || "").toLowerCase();
+  if (!PLANS[selected]) throw Object.assign(new Error("Unknown billing plan"), { code: "BILLING_PLAN_INVALID", status: 400 });
+  return selected;
+}
 
 export function billingPlans() {
   return Object.fromEntries(Object.entries(PLANS).map(([id, plan]) => [id, { id, ...plan }]));
@@ -22,7 +27,7 @@ export async function getBillingAccount(ownerId) {
 }
 
 export async function setBillingPlan(ownerId, plan) {
-  const selected = safePlan(plan);
+  const selected = requirePlan(plan);
   let account;
   await updateStore(store => {
     store.billing ??= {};

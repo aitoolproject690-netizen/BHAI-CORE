@@ -143,7 +143,11 @@ test("cloud build execution rejects a cwd outside the authenticated owner worksp
   assert.ok(await decideApproval(approval.id, identity.id, "approved"));
   await assert.rejects(
     () => executeAgentTool("cloud_build_execute", input, identity, { approvalId: approval.id }),
-    error => error.code === "EXECUTION_PATH_FORBIDDEN" && error.status === 403
+    error => {
+      assert.equal(error.code, "EXECUTION_PATH_FORBIDDEN");
+      assert.equal(error.status, 403);
+      return true;
+    }
   );
 });
 
@@ -169,7 +173,7 @@ test("agent execution writes terminal audit status for success and failure", asy
   const { executeAgentTool } = await import("../src/agent.js");
 
   resetStoreForTests();
-  const identity = { id: "owner-audit", scopes: ["agent:read", "agent:write", "files:read"] };
+  const identity = { id: "owner-audit", scopes: ["agent:read", "agent:write", "files:read", "jobs:write"] };
 
   const created = await executeAgentTool("job_create", { type: "audit-demo", payload: {} }, identity, { requestId: "req-success" });
   assert.equal(created.ownerId, identity.id);

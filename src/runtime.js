@@ -27,7 +27,7 @@ export function startRuntime({ command, cwd, env = {}, timeoutMs = DEFAULT_TIMEO
   const child = spawn("/bin/sh", ["-lc", safeCommand], {
     cwd,
     env: { ...process.env, ...env },
-    detached: false,
+    detached: true,
     stdio: ["ignore", "pipe", "pipe"]
   });
   let stdout = "", stderr = "";
@@ -39,10 +39,8 @@ export function startRuntime({ command, cwd, env = {}, timeoutMs = DEFAULT_TIMEO
   let timedOut = false;
   const timer = setTimeout(() => {
     timedOut = true;
-    child.kill("SIGTERM");
-    setTimeout(() => {
-      if (!child.killed) child.kill("SIGKILL");
-    }, 2000).unref();
+    terminateProcessTree(child, "SIGTERM");
+    setTimeout(() => terminateProcessTree(child, "SIGKILL"), 2000).unref();
   }, timeout);
 
   const ready = new Promise((resolve, reject) => {
@@ -56,10 +54,19 @@ export function startRuntime({ command, cwd, env = {}, timeoutMs = DEFAULT_TIMEO
   return { child, ready, exit, pid: child.pid, command: safeCommand };
 }
 
-export async function stopRuntime(child, signal = "SIGTERM") {
+function terminateProcessTree(child, signal) {
   if (!child || child.killed) return false;
-  child.kill(signal);
+  try {
+    if (child.pid && process.platform !== "win32") process.kill(-child.pid, signal);
+    else child.kill(signal);
+  } catch (error) {
+    if (error.code !== "ESRCH") throw error;
+  }
   return true;
+}
+
+export async function stopRuntime(child, signal = "SIGTERM") {
+  return terminateProcessTree(child, signal);
 }
 
 export function runtimeInfo() {

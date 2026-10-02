@@ -28,6 +28,7 @@ export async function runBuildCommand(command, { cwd, timeoutMs = DEFAULT_TIMEOU
     const child = spawn("/bin/sh", ["-lc", safe], {
       cwd,
       env: buildEnv(env),
+      detached: true,
       stdio: ["ignore", "pipe", "pipe"]
     });
     let stdout = "", stderr = "", truncated = false;
@@ -40,8 +41,8 @@ export async function runBuildCommand(command, { cwd, timeoutMs = DEFAULT_TIMEOU
     child.stdout.on("data", chunk => { stdout = append(stdout, chunk); });
     child.stderr.on("data", chunk => { stderr = append(stderr, chunk); });
     const timer = setTimeout(() => {
-      child.kill("SIGTERM");
-      setTimeout(() => child.kill("SIGKILL"), 2000).unref();
+      terminateProcessTree(child, "SIGTERM");
+      setTimeout(() => terminateProcessTree(child, "SIGKILL"), 2000).unref();
     }, Math.max(1000, Number(timeoutMs) || DEFAULT_TIMEOUT));
     child.on("error", error => { clearTimeout(timer); reject(error); });
     child.on("close", (code, signal) => {
@@ -49,6 +50,17 @@ export async function runBuildCommand(command, { cwd, timeoutMs = DEFAULT_TIMEOU
       resolve({ command: safe, code, signal, stdout, stderr, truncated, ok: code === 0 && !signal });
     });
   });
+}
+
+function terminateProcessTree(child, signal) {
+  if (!child || child.killed) return false;
+  try {
+    if (child.pid && process.platform !== "win32") process.kill(-child.pid, signal);
+    else child.kill(signal);
+  } catch (error) {
+    if (error.code !== "ESRCH") throw error;
+  }
+  return true;
 }
 
 export function buildRunnerInfo() {

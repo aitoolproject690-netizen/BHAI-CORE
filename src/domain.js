@@ -105,6 +105,12 @@ export async function attachDomainRoute(id, ownerId, routeId) {
 
 export async function rebindDomainServices(fromServiceId, toServiceId, ownerId = null) {
   if (!toServiceId) return 0;
+  const snapshot = await getStore();
+  const targetService = snapshot.services?.[toServiceId];
+  if (!targetService)
+    throw Object.assign(new Error("Target domain service not found"), { code:"DOMAIN_SERVICE_NOT_FOUND", status:404 });
+  if (ownerId && targetService.ownerId !== ownerId)
+    throw Object.assign(new Error("Target domain service ownership mismatch"), { code:"DOMAIN_SERVICE_FORBIDDEN", status:403 });
   let changed = 0;
   await updateStore(store => {
     for (const domain of Object.values(store.domains || {})) {

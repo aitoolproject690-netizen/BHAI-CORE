@@ -13,6 +13,7 @@ import { getApproval } from "./approval.js";
 import { githubRepoList, githubRepoGet, githubFileRead, githubFileWrite, githubRepoCreate } from "./github.js";
 import { createBuildPlan, runBuildPlan } from "./cloud.js";
 import { createService } from "./service.js";
+import { setDeploymentStatus, promoteDeployment, rollbackDeployment } from "./deployment.js";
 
 export const AGENT_TOOLS = Object.freeze([
   { name: "chat", description: "Generate text with configured AI providers.", input: ["messages", "provider", "temperature", "maxAttempts"] },
@@ -32,7 +33,8 @@ export const AGENT_TOOLS = Object.freeze([
   { name: "github_repo_create", description: "Create a GitHub repository.", input: ["name", "description", "private"] },
   { name: "cloud_build_plan", description: "Inspect a GitHub repository and create a deterministic build/test/start plan.", input: ["repository", "branch"] },
   { name: "cloud_build_execute", description: "Execute an approved build/test plan in the configured build workspace.", input: ["plan", "cwd"] },
-  { name: "cloud_service_create", description: "Create an approved cloud runtime service for an owned build workspace.", input: ["buildId", "command", "cwd", "env", "healthUrl", "port"] }
+  { name: "cloud_service_create", description: "Create an approved cloud runtime service for an owned build workspace.", input: ["buildId", "command", "cwd", "env", "healthUrl", "port"] },
+  { name: "cloud_deployment_update", description: "Apply an approved deployment status change or production cutover/rollback.", input: ["deploymentId", "action", "status"] }
 ]);
 
 function required(value, name) {
@@ -121,6 +123,12 @@ export async function executeAgentTool(name, input = {}, identity = {}, options 
       return githubRepoCreate({ name: required(input.name, "name"), description: input.description, private: input.private });
     case "cloud_build_execute":
       return runBuildPlan(required(input.plan, "plan"), { cwd: required(input.cwd, "cwd") });
+    case "cloud_deployment_update": {
+      const deploymentId = required(input.deploymentId, "deploymentId");
+      if (input.action === "rollback") return rollbackDeployment(deploymentId, ownerId);
+      if (input.action === "promote") return promoteDeployment(deploymentId, ownerId);
+      return setDeploymentStatus(deploymentId, ownerId, required(input.status, "status"));
+    }
     case "cloud_service_create":
       return createService({
         ownerId,

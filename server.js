@@ -1025,7 +1025,7 @@ const server = http.createServer(async (req, res) => {
       return send(res, 201, { ok: true, ...(await createApiKey(body.name || "app", body.scopes, body.limits)) }, rid);
     }
 
-    if (url.pathname.match(/^\\/v1\\/keys\\/([^/]+)\\/rotate$/) && req.method === "POST") {
+    if (url.pathname.match(/^\/v1\/keys\/([^/]+)\/rotate$/) && req.method === "POST") {
       if (!adminAuthorized(req)) return send(res, 401, { ok: false, error: "Admin authentication required" }, rid);
       const id = url.pathname.split("/")[3];
       const rotated = await rotateApiKey(id);

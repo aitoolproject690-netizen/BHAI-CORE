@@ -59,3 +59,17 @@ test("billing quota consumption is atomic under concurrent requests", async () =
   assert.equal(results.filter(result => result.status === "fulfilled").length, 1);
   assert.equal(results.filter(result => result.status === "rejected" && result.reason?.code === "BILLING_QUOTA_EXCEEDED").length, 1);
 });
+
+
+test("billing quota reservation can be released after provider failure", async () => {
+  resetStoreForTests();
+  await setBillingPlan("refund-user", "free");
+  await consumeBillingQuota("refund-user", { requests: 1, charsIn: 123, imageJobs: 1, videoSeconds: 4 });
+  const { releaseBillingQuota } = await import("../src/billing.js");
+  await releaseBillingQuota("refund-user", { requests: 1, charsIn: 123, imageJobs: 1, videoSeconds: 4 });
+  const store = await (await import("../src/store.js")).getStore();
+  assert.equal(store.billing["refund-user"].requests, 0);
+  assert.equal(store.billing["refund-user"].charsIn, 0);
+  assert.equal(store.billing["refund-user"].imageJobs, 0);
+  assert.equal(store.billing["refund-user"].videoSeconds, 0);
+});

@@ -15,7 +15,7 @@ const emptyState = () => ({
   ragChunks: {},
   auditLog: [],
   approvals: {},
-    services: {},
+  services: {},
   deployments: {},
   servicePorts: {},
   routes: {},
@@ -34,34 +34,62 @@ let writeChain = Promise.resolve();
 async function ensureLoaded() {
   if (loaded) return;
 
+  let raw;
   try {
-    const parsed = JSON.parse(await fs.readFile(file, "utf8"));
-    state = {
-      ...emptyState(),
-      ...parsed,
-      apiKeys: parsed.apiKeys ?? {},
-      usage: parsed.usage ?? {},
-      providerUsage: parsed.providerUsage ?? {},
-      jobs: parsed.jobs ?? {},
-      files: parsed.files ?? {},
-      ragChunks: parsed.ragChunks ?? {},
-      auditLog: parsed.auditLog ?? [],
-      approvals: parsed.approvals,
-    services: parsed.services || {},
-    deployments: parsed.deployments || {},
-      servicePorts: parsed.servicePorts || {},
-      routes: parsed.routes || {},
-      domains: parsed.domains || {},
-      autoDeploy: parsed.autoDeploy || {},
-      certificates: parsed.certificates || {},
-      acmeAccounts: parsed.acmeAccounts || {},
-      acmeOrders: parsed.acmeOrders || {},
-      dnsRecords: parsed.dnsRecords || {}
-    };
-  } catch {
-    state = emptyState();
+    raw = await fs.readFile(file, "utf8");
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      state = emptyState();
+      loaded = true;
+      return;
+    }
+    throw Object.assign(new Error("Persistent store could not be read"), {
+      code: "STORE_READ_FAILED",
+      status: 500,
+      cause: error
+    });
   }
 
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    throw Object.assign(new Error("Persistent store contains invalid JSON"), {
+      code: "STORE_CORRUPT",
+      status: 500,
+      cause: error
+    });
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw Object.assign(new Error("Persistent store must contain a JSON object"), {
+      code: "STORE_CORRUPT",
+      status: 500
+    });
+  }
+
+  state = {
+    ...emptyState(),
+    ...parsed,
+    apiKeys: parsed.apiKeys ?? {},
+    usage: parsed.usage ?? {},
+    providerUsage: parsed.providerUsage ?? {},
+    jobs: parsed.jobs ?? {},
+    files: parsed.files ?? {},
+    ragChunks: parsed.ragChunks ?? {},
+    auditLog: parsed.auditLog ?? [],
+    approvals: parsed.approvals ?? {},
+    services: parsed.services ?? {},
+    deployments: parsed.deployments ?? {},
+    servicePorts: parsed.servicePorts ?? {},
+    routes: parsed.routes ?? {},
+    domains: parsed.domains ?? {},
+    autoDeploy: parsed.autoDeploy ?? {},
+    certificates: parsed.certificates ?? {},
+    acmeAccounts: parsed.acmeAccounts ?? {},
+    acmeOrders: parsed.acmeOrders ?? {},
+    dnsRecords: parsed.dnsRecords ?? {}
+  };
   loaded = true;
 }
 

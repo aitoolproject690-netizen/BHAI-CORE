@@ -122,7 +122,7 @@ export async function executeAgentTool(name, input = {}, identity = {}, options 
     case "github_repo_create":
       return githubRepoCreate({ name: required(input.name, "name"), description: input.description, private: input.private });
     case "cloud_build_execute":
-      return runBuildPlan(required(input.plan, "plan"), { cwd: required(input.cwd, "cwd") });
+      return runBuildPlan(required(input.plan, "plan"), { cwd: required(input.cwd, "cwd"), ownerId });
     case "cloud_deployment_update": {
       const deploymentId = required(input.deploymentId, "deploymentId");
       if (input.action === "rollback") return rollbackDeployment(deploymentId, ownerId);

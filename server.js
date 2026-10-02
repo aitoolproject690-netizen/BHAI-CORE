@@ -44,6 +44,7 @@ import { startAcmeIssuance, completeAcmeIssuance, acmeIssuanceInfo } from "./src
 import { createRenewalScheduler, renewalSchedulerInfo } from "./src/renewalScheduler.js";
 import crypto from "node:crypto";
 import { checkRateLimit, rateLimitInfo } from "./src/rateLimit.js";
+import { readRequestBody } from "./src/requestBody.js";
 
 const cfg = config();
 
@@ -74,17 +75,11 @@ function adminAuthorized(req) {
 }
 
 async function readJsonRaw(req, maxBytes = 2_000_000) {
-  let body = "";
-  for await (const chunk of req) { body += chunk; if (body.length > maxBytes) throw new Error("Request body too large"); }
-  return body;
+  return readRequestBody(req, maxBytes);
 }
 
 async function readJson(req, maxBytes = 2_000_000) {
-  let body = "";
-  for await (const chunk of req) {
-    body += chunk;
-    if (body.length > maxBytes) throw new Error("Request body too large");
-  }
+  const body = await readRequestBody(req, maxBytes);
   return body ? JSON.parse(body) : {};
 }
 
@@ -898,7 +893,7 @@ const server = http.createServer(async (req, res) => {
     return send(res, 404, { ok: false, error: "Not found" }, rid);
   } catch (error) {
     await recordUsage({ key: req.headers["x-bhai-key"] || "anonymous", failed: true });
-    return send(res, error.code === "BUDGET_EXCEEDED" ? 429 : error.code === "PERMISSION_DENIED" ? 403 : 500, {
+    return send(res, error.code === "BUDGET_EXCEEDED" ? 429 : error.code === "PERMISSION_DENIED" ? 403 : error.code === "REQUEST_BODY_TOO_LARGE" ? 413 : 500, {
       ok: false, ...publicError(error), requestId: rid
     }, rid);
   }

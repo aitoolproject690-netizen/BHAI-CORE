@@ -4,12 +4,16 @@ export function env(name, fallback = "") {
 }
 export function config() {
   const port = Number(env("PORT", "8080"));
+  const host = env("HOST", "0.0.0.0");
+  if (!host.trim()) {
+    throw Object.assign(new Error("Invalid HOST configuration"), { code: "CONFIG_HOST_INVALID", status: 500 });
+  }
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     throw Object.assign(new Error("Invalid PORT configuration"), { code: "CONFIG_PORT_INVALID", status: 500 });
   }
   return {
     port,
-    host: env("HOST", "0.0.0.0"),
+    host,
     apiKey: env("BHAI_CORE_API_KEY"),
     providerOrder: env("AI_PROVIDER_ORDER", "ollama,gemini,openai,anthropic,huggingface").split(",").map(s => s.trim().toLowerCase()).filter(Boolean),
     github: {

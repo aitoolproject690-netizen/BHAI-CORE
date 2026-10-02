@@ -207,4 +207,12 @@ test("production cutover updates pointer and traffic bindings together", async (
 });
 
 
-test("failed deployment cannot be promoted", async () => {\n  resetStoreForTests();\n  await updateStore(s => {\n    s.services["svc-failed"] = { id:"svc-failed", ownerId:"user-a", status:"running", port:19001 };\n    s.deployments["dep-failed"] = { id:"dep-failed", ownerId:"user-a", repository:"r", branch:"main", buildId:"b", path:"/tmp", serviceId:"svc-failed", status:"failed" };\n    return s;\n  });\n  await assert.rejects(() => promoteDeployment("dep-failed", "user-a"), error => error.code === "DEPLOYMENT_NOT_DEPLOYABLE");\n});\n
+test("failed deployment cannot be promoted", async () => {
+  resetStoreForTests();
+  await updateStore(s => {
+    s.services["svc-failed"] = { id:"svc-failed", ownerId:"user-a", status:"running", port:19001 };
+    s.deployments["dep-failed"] = { id:"dep-failed", ownerId:"user-a", repository:"r", branch:"main", buildId:"b", path:"/tmp", serviceId:"svc-failed", status:"failed" };
+    return s;
+  });
+  await assert.rejects(() => promoteDeployment("dep-failed", "user-a"), error => error.code === "DEPLOYMENT_NOT_DEPLOYABLE");
+});

@@ -72,9 +72,12 @@ export async function failJob(id, error, retry = false) {
   });
 }
 
-export async function getStoredJob(id) {
+export async function getStoredJob(id, ownerId = null) {
   const store = await getStore();
-  return store.jobs?.[id] ? { ...store.jobs[id] } : null;
+  const job = store.jobs?.[id];
+  if (!job) return null;
+  if (ownerId !== null && job.ownerId !== ownerId) return null;
+  return { ...job };
 }
 
 export function queueInfo() {

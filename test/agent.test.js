@@ -11,3 +11,23 @@ test("agent tool metadata is safe to expose", () => {
   const tools = listAgentTools();
   assert.ok(tools.every(tool => !JSON.stringify(tool).match(/api[_-]?key|secret|token/i)));
 });
+
+test("agent jobs are isolated by authenticated owner", async () => {
+  const { resetStoreForTests } = await import("../src/store.js");
+  const { getStoredJob } = await import("../src/queue.js");
+  const { executeAgentTool } = await import("../src/agent.js");
+
+  resetStoreForTests();
+  const ownerA = { id: "owner-a" };
+  const ownerB = { id: "owner-b" };
+
+  const created = await executeAgentTool("job_create", {
+    type: "demo",
+    payload: { value: 1, ownerId: "attacker-supplied" }
+  }, ownerA);
+
+  assert.equal(created.ownerId, "owner-a");
+  assert.ok(await getStoredJob(created.id, "owner-a"));
+  assert.equal(await executeAgentTool("job_get", { id: created.id }, ownerB), null);
+  assert.ok(await executeAgentTool("job_get", { id: created.id }, ownerA));
+});

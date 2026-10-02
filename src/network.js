@@ -122,7 +122,11 @@ export function networkInfo() {
 export function proxyRequest(req, res, route) {
   return new Promise(resolve => {
     const transport = process.env.BHAI_NETWORK_TLS === "true" ? https : http;
-    const headers = { ...req.headers, host: route.targetHost + ":" + route.targetPort, "x-bhai-route-id": route.id };\n    delete headers["x-bhai-key"];\n    delete headers["x-bhai-admin-key"];\n    delete headers["x-bhai-route-id"];\n    headers["x-bhai-route-id"] = route.id;
+    const headers = { ...req.headers, host: route.targetHost + ":" + route.targetPort, "x-bhai-route-id": route.id };
+    delete headers["x-bhai-key"];
+    delete headers["x-bhai-admin-key"];
+    delete headers["x-bhai-route-id"];
+    headers["x-bhai-route-id"] = route.id;
     const upstream = transport.request({ hostname:route.targetHost, port:route.targetPort, method:req.method, path:req.url, headers, timeout:Number(process.env.BHAI_NETWORK_PROXY_TIMEOUT_MS || 15000) }, response => {
       res.writeHead(response.statusCode || 502, response.headers);
       response.pipe(res);

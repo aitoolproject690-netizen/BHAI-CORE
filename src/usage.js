@@ -21,6 +21,15 @@ function normalizeUsageKey(key) {
   return "key_" + crypto.createHash("sha256").update(value).digest("hex").slice(0, 24);
 }
 
+function redactProviderError(value) {
+  let text = String(value ?? "");
+  text = text.replace(/(bearer\s+)[^\s,;]+/gi, "$1[redacted]");
+  text = text.replace(/(x-bhai-key\s*[:=]\s*)[^\s,;]+/gi, "$1[redacted]");
+  text = text.replace(/(api[_-]?key\s*[:=]\s*)[^\s,;]+/gi, "$1[redacted]");
+  text = text.replace(/\bbhai_[A-Za-z0-9_-]+\b/g, "bhai_[redacted]");
+  return text;
+}
+
 export async function recordUsage({ key = "anonymous", input = 0, output = 0, failed = false }) {
   const usageKey = normalizeUsageKey(key);
   let result;
@@ -56,7 +65,7 @@ export async function recordProviderUsage({
     b.latencyMs += Number(latencyMs) || 0;
     b.lastLatencyMs = Number(latencyMs) || 0;
     b.lastStatus = success ? "success" : "error";
-    b.lastError = success ? null : String(error?.message || error || "Unknown error");
+    b.lastError = success ? null : redactProviderError(error?.message || error || "Unknown error");
     b.lastRequestAt = new Date().toISOString();
     store.providerUsage[provider] = b;
     result = { ...b };

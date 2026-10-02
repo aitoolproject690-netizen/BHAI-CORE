@@ -40,6 +40,7 @@ import { createAcmeOrder, getAcmeOrder, listAcmeOrders, prepareDnsChallenge, set
 import { createAutoDeploy, getAutoDeploy, listAutoDeploys, setAutoDeployStatus, autoDeployInfo, findAutoDeploysByRepository, recordAutoDeployRun, claimWebhookDelivery } from "./src/autodeploy.js";
 import { createRoute, getRoute, listRoutes, setRouteStatus, findRouteByHostname, networkInfo, proxyRequest } from "./src/network.js";
 import { executeCloudBuildJob } from "./src/cloudJob.js";
+import { startAcmeIssuance, completeAcmeIssuance, acmeIssuanceInfo } from "./src/acmeIssuance.js";
 import crypto from "node:crypto";
 
 const cfg = config();
@@ -481,6 +482,18 @@ const server = http.createServer(async (req, res) => {
       return route ? send(res, 200, { ok:true, route }, rid) : send(res, 404, { ok:false, error:"Route not found" }, rid);
     }
 
+    if (url.pathname === "/v1/cloud/acme/issuance/info" && req.method === "GET") return send(res,200,{ok:true,acmeIssuance:acmeIssuanceInfo()},rid);
+    if (url.pathname === "/v1/cloud/acme/issuance/start" && req.method === "POST") {
+      const identity=await authenticate(req.headers["x-bhai-key"]); if(!identity)return send(res,401,{ok:false,error:"BHAI key required"},rid);
+      const body=await readJson(req); const result=await startAcmeIssuance({ownerId:identity.id,certificateId:body.certificateId,accountId:body.accountId});
+      return send(res,202,{ok:true,...result},rid);
+    }
+    const issuanceMatch=url.pathname.match(/^\/v1\/cloud\/acme\/issuance\/([^/]+)\/complete$/);
+    if(issuanceMatch&&req.method==="POST"){
+      const identity=await authenticate(req.headers["x-bhai-key"]); if(!identity)return send(res,401,{ok:false,error:"BHAI key required"},rid);
+      const result=await completeAcmeIssuance({orderId:issuanceMatch[1],ownerId:identity.id});
+      return send(res,result.status==="issued"?200:202,{ok:result.status==="issued",...result},rid);
+    }
     if (url.pathname === "/v1/cloud/acme/orders/info" && req.method === "GET") return send(res,200,{ok:true,acmeOrder:acmeOrderInfo()},rid);
     if (url.pathname === "/v1/cloud/acme/orders" && req.method === "GET") { const identity=await authenticate(req.headers["x-bhai-key"]);if(!identity)return send(res,401,{ok:false,error:"BHAI key required"},rid);return send(res,200,{ok:true,orders:await listAcmeOrders(identity.id)},rid); }
     if (url.pathname === "/v1/cloud/acme/orders" && req.method === "POST") { const identity=await authenticate(req.headers["x-bhai-key"]);if(!identity)return send(res,401,{ok:false,error:"BHAI key required"},rid);const body=await readJson(req);const order=await createAcmeOrder({...body,ownerId:identity.id});return send(res,201,{ok:true,order},rid); }

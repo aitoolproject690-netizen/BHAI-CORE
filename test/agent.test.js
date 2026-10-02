@@ -4,7 +4,7 @@ import { listAgentTools } from "../src/agent.js";
 
 test("agent exposes core tools", () => {
   const names = listAgentTools().map(x => x.name);
-  assert.deepEqual(names, ["chat","rag_search","rag_context","vision_analyze","image_generate","voice_transcribe","voice_synthesize","models","job_create","job_get","github_repo_list","github_repo_get","github_file_read","github_file_write","github_repo_create","cloud_build_plan","cloud_build_execute","cloud_service_create"]);
+  assert.deepEqual(names, ["chat","rag_search","rag_context","vision_analyze","image_generate","voice_transcribe","voice_synthesize","models","job_create","job_get","github_repo_list","github_repo_get","github_file_read","github_file_write","github_repo_create","cloud_build_plan","cloud_build_execute","cloud_service_create","cloud_deployment_update"]);
 });
 
 test("agent tool metadata is safe to expose", () => {
@@ -31,7 +31,6 @@ test("agent jobs are isolated by authenticated owner", async () => {
   assert.equal(await executeAgentTool("job_get", { id: created.id }, ownerB), null);
   assert.ok(await executeAgentTool("job_get", { id: created.id }, ownerA));
 });
-
 
 
 test("expired high-risk approvals cannot be executed", async () => {

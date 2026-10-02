@@ -276,21 +276,6 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true, tool: body.tool, result }, rid);
     }
 
-    if (url.pathname === "/v1/agent/tools" && req.method === "GET") {
-      const identity = await authenticate(req.headers["x-bhai-key"]);
-      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
-      return send(res, 200, { ok: true, tools: listAgentTools() }, rid);
-    }
-
-    if (url.pathname === "/v1/agent/execute" && req.method === "POST") {
-      const identity = await authenticate(req.headers["x-bhai-key"]);
-      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
-      const body = await readJson(req, 16_000_000);
-      if (!body.tool) return send(res, 400, { ok: false, error: "tool is required" }, rid);
-      const result = await executeAgentTool(body.tool, body.input || {}, identity);
-      return send(res, 200, { ok: true, tool: body.tool, result }, rid);
-    }
-
     if (url.pathname === "/v1/providers" && req.method === "GET")
       return send(res, 200, { ok: true, providers: getProviderStatus() }, rid);
 

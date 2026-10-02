@@ -68,6 +68,27 @@ async function ensureLoaded() {
     });
   }
 
+  const collectionNames = [
+    "apiKeys", "usage", "providerUsage", "jobs", "files", "ragChunks",
+    "approvals", "services", "deployments", "servicePorts", "routes",
+    "domains", "autoDeploy", "certificates", "acmeAccounts", "acmeOrders",
+    "dnsRecords"
+  ];
+  for (const name of collectionNames) {
+    if (parsed[name] != null && (!parsed[name] || typeof parsed[name] !== "object" || Array.isArray(parsed[name]))) {
+      throw Object.assign(new Error(`Persistent store field ${name} must be a JSON object`), {
+        code: "STORE_CORRUPT",
+        status: 500
+      });
+    }
+  }
+  if (parsed.auditLog != null && !Array.isArray(parsed.auditLog)) {
+    throw Object.assign(new Error("Persistent store field auditLog must be a JSON array"), {
+      code: "STORE_CORRUPT",
+      status: 500
+    });
+  }
+
   state = {
     ...emptyState(),
     ...parsed,

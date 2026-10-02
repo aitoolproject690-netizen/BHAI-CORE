@@ -17,7 +17,7 @@ function validateCommand(command) {
     throw Object.assign(new Error("Runtime start command required"), { code: "RUNTIME_COMMAND_REQUIRED", status: 400 });
   }
   if (!ALLOWED_COMMANDS.has("start")) throw new Error("Runtime policy invalid");
-  const blocked = /(rm\s+-rf|mkfs|shutdown|reboot|(?:^|[\s|&])(?:sh|bash|dash|zsh)\s+(?:-[a-z]*c\b|-[a-z]*\s+-c\b)|curl\s+[^|]*\|\s*(sh|bash)|wget\s+[^|]*\|\s*(sh|bash)|(?:;|&&|\|\||\`|\$\(|>|<))/i;
+  const blocked = /(rm\s+-rf|mkfs|shutdown|reboot|(?:^|[\s|&])(?:sh|bash|dash|zsh)\s+(?:-[a-z]*c\b|-[a-z]*\s+-c\b)|curl\s+[^|]*\|\s*(sh|bash)|wget\s+[^|]*\|\s*(sh|bash)|(?:;|&&|\|\||`|\$\(|>|<|[\r\n]))/i;
   if (blocked.test(command)) {
     throw Object.assign(new Error("Runtime command rejected"), { code: "RUNTIME_COMMAND_REJECTED", status: 400 });
   }

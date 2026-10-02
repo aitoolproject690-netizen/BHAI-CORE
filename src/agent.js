@@ -102,9 +102,9 @@ export async function executeAgentTool(name, input = {}, identity = {}, options 
     case "models":
       return getModelRegistry({ probeOllama: Boolean(input.probe) });
     case "job_create":
-      return enqueue(input.type || "generic", input.payload || {});
+      return enqueue(input.type || "generic", { ...(input.payload || {}), ownerId });
     case "job_get":
-      return getStoredJob(required(input.id, "id"));
+      return getStoredJob(required(input.id, "id"), ownerId);
     case "github_repo_list":
       return githubRepoList(input);
     case "github_repo_get":

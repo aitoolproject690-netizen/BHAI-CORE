@@ -42,6 +42,7 @@ import { createRoute, getRoute, listRoutes, setRouteStatus, findRouteByHostname,
 import { executeCloudBuildJob } from "./src/cloudJob.js";
 import { startAcmeIssuance, completeAcmeIssuance, acmeIssuanceInfo } from "./src/acmeIssuance.js";
 import crypto from "node:crypto";
+import { checkRateLimit, rateLimitInfo } from "./src/rateLimit.js";
 
 const cfg = config();
 
@@ -82,6 +83,8 @@ async function readJson(req, maxBytes = 2_000_000) {
 
 const server = http.createServer(async (req, res) => {
   const rid = requestId(req);
+  const rate = checkRateLimit(req.headers["x-bhai-key"] || req.socket.remoteAddress || "anonymous");
+  if (!rate.allowed) return send(res,429,{ok:false,error:"Rate limit exceeded",retryAfterMs:rate.retryAfterMs},rid);
 
   try {
     if (req.method === "OPTIONS") {
@@ -103,7 +106,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (url.pathname === "/health" && req.method === "GET")
-      return send(res, 200, { ...health(), storage: storageInfo() }, rid);
+      return send(res, 200, { ...health(), storage: storageInfo(), rateLimit: rateLimitInfo() }, rid);
 
     if (url.pathname === "/ready" && req.method === "GET") {
       const result = readiness();

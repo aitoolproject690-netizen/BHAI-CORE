@@ -34,7 +34,7 @@ export async function createService({ ownerId, buildId, command, cwd, env = {}, 
   const id = "svc_" + crypto.randomUUID();
   const assignedPort = await allocatePort(port ?? env?.PORT);
   const serviceEnv = { ...env, PORT: String(assignedPort) };
-  const service = { id, ownerId, buildId, command, cwd, env:serviceEnv, healthUrl, port:assignedPort, status: "starting", restartCount: 0, restartToken: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), child: null };
+  const service = { id, ownerId, buildId, command, cwd, env:serviceEnv, healthUrl, port:assignedPort, status: "starting", restartCount: 0, restartToken: 0, runtimeToken: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), child: null };
   services.set(id, service);
   try {
     await persistService(service);

@@ -25,7 +25,7 @@ import { listAgentTools, executeAgentTool } from "./src/agent.js";
 import { planAgentRequest, validatePlan, runAgentPlan } from "./src/planner.js";
 import { createConversation, listConversations, getConversation, deleteConversation, appendMessage, getConversationContext, memoryInfo } from "./src/memory.js";
 import { withRetry, classifyError } from "./src/retry.js";
-import { listToolPolicies } from "./src/policy.js";
+import { listToolPolicies, hasPermission } from "./src/policy.js";
 import { recordAudit, listAudit, auditInfo } from "./src/audit.js";
 import { createApproval, getApproval, decideApproval, approvalInfo } from "./src/approval.js";
 import { cloudBuildInfo } from "./src/cloudBuild.js";
@@ -61,6 +61,14 @@ function send(res, status, body, rid) {
 function authorized(req) {
   if (!cfg.apiKey) return true;
   return secretsEqual(req.headers.authorization || "", "Bearer " + cfg.apiKey);
+}
+
+function requireCloudBuild(identity, res, rid) {
+  if (!hasPermission(identity, "cloud:build")) {
+    send(res, 403, { ok:false, error:"Permission denied: cloud:build required", code:"PERMISSION_DENIED" }, rid);
+    return false;
+  }
+  return true;
 }
 
 function secretsEqual(provided, expected) {
@@ -433,6 +441,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (url.pathname === "/v1/cloud/autodeploy" && req.method === "POST") {
+      if (!requireCloudBuild(identity, res, rid)) return;
       const identity = await authenticate(req.headers["x-bhai-key"]);
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
       const body = await readJson(req);
@@ -449,6 +458,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (autoDeployMatch && req.method === "POST") {
+      if (!requireCloudBuild(identity, res, rid)) return;
       const identity = await authenticate(req.headers["x-bhai-key"]);
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
       const body = await readJson(req);
@@ -468,6 +478,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (url.pathname === "/v1/cloud/network/routes" && req.method === "POST") {
+      if (!requireCloudBuild(identity, res, rid)) return;
       const identity = await authenticate(req.headers["x-bhai-key"]);
       if (!identity) return send(res, 401, { ok:false, error:"BHAI key required" }, rid);
       const body = await readJson(req);
@@ -485,6 +496,7 @@ const server = http.createServer(async (req, res) => {
       return route ? send(res, 200, { ok:true, route }, rid) : send(res, 404, { ok:false, error:"Route not found" }, rid);
     }
     if (routeMatch && req.method === "POST") {
+      if (!requireCloudBuild(identity, res, rid)) return;
       const identity = await authenticate(req.headers["x-bhai-key"]);
       if (!identity) return send(res, 401, { ok:false, error:"BHAI key required" }, rid);
       const body = await readJson(req);
@@ -494,12 +506,14 @@ const server = http.createServer(async (req, res) => {
 
     if (url.pathname === "/v1/cloud/acme/issuance/info" && req.method === "GET") return send(res,200,{ok:true,acmeIssuance:acmeIssuanceInfo()},rid);
     if (url.pathname === "/v1/cloud/acme/issuance/start" && req.method === "POST") {
+      if (!requireCloudBuild(identity, res, rid)) return;
       const identity=await authenticate(req.headers["x-bhai-key"]); if(!identity)return send(res,401,{ok:false,error:"BHAI key required"},rid);
       const body=await readJson(req); const result=await startAcmeIssuance({ownerId:identity.id,certificateId:body.certificateId,accountId:body.accountId});
       return send(res,202,{ok:true,...result},rid);
     }
     const issuanceMatch=url.pathname.match(/^\/v1\/cloud\/acme\/issuance\/([^/]+)\/complete$/);
     if(issuanceMatch&&req.method==="POST"){
+      if (!requireCloudBuild(identity, res, rid)) return;
       const identity=await authenticate(req.headers["x-bhai-key"]); if(!identity)return send(res,401,{ok:false,error:"BHAI key required"},rid);
       const result=await completeAcmeIssuance({orderId:issuanceMatch[1],ownerId:identity.id});
       return send(res,result.status==="issued"?200:202,{ok:result.status==="issued",...result},rid);
@@ -507,10 +521,13 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/v1/cloud/acme/orders/info" && req.method === "GET") return send(res,200,{ok:true,acmeOrder:acmeOrderInfo()},rid);
     if (url.pathname === "/v1/cloud/acme/orders" && req.method === "GET") { const identity=await authenticate(req.headers["x-bhai-key"]);if(!identity)return send(res,401,{ok:false,error:"BHAI key required"},rid);return send(res,200,{ok:true,orders:await listAcmeOrders(identity.id)},rid); }
     if (url.pathname === "/v1/cloud/acme/orders" && req.method === "POST") { const identity=await authenticate(req.headers["x-bhai-key"]);if(!identity)return send(res,401,{ok:false,error:"BHAI key required"},rid);const body=await readJson(req);const order=await createAcmeOrder({...body,ownerId:identity.id});return send(res,201,{ok:true,order},rid); }
+      if (!requireCloudBuild(identity, res, rid)) return;
     const acmeOrderMatch=url.pathname.match(/^\/v1\/cloud\/acme\/orders\/([^/]+)$/);
     if(acmeOrderMatch&&req.method==="GET"){const identity=await authenticate(req.headers["x-bhai-key"]);if(!identity)return send(res,401,{ok:false,error:"BHAI key required"},rid);const order=await getAcmeOrder(acmeOrderMatch[1],identity.id);return order?send(res,200,{ok:true,order},rid):send(res,404,{ok:false,error:"ACME order not found"},rid);}
     if(acmeOrderMatch&&req.method==="POST"){const identity=await authenticate(req.headers["x-bhai-key"]);if(!identity)return send(res,401,{ok:false,error:"BHAI key required"},rid);const body=await readJson(req);if(body.action==="prepare_dns")return send(res,202,{ok:true,...await prepareDnsChallenge(acmeOrderMatch[1],identity.id,{recordName:body.recordName,recordValue:body.recordValue})},rid);const order=await setAcmeOrderStatus(acmeOrderMatch[1],identity.id,body.status,body.patch||{});return order?send(res,200,{ok:true,order},rid):send(res,404,{ok:false,error:"ACME order not found"},rid);}
+      if (!requireCloudBuild(identity, res, rid)) return;
     if (url.pathname === "/v1/cloud/acme/accounts/register" && req.method === "POST") {
+      if (!requireCloudBuild(identity, res, rid)) return;
       const identity = await authenticate(req.headers["x-bhai-key"]);
       if (!identity) return send(res,401,{ok:false,error:"BHAI key required"},rid);
       const body=await readJson(req);
@@ -522,13 +539,16 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/v1/cloud/acme/directory" && req.method === "GET") { try{return send(res,200,{ok:true,...await getAcmeDirectory()},rid);}catch(error){return send(res,error.status||502,{ok:false,error:error.message,code:error.code||"ACME_ERROR"},rid);} }
     if (url.pathname === "/v1/cloud/acme/accounts" && req.method === "GET") { const identity=await authenticate(req.headers["x-bhai-key"]);if(!identity)return send(res,401,{ok:false,error:"BHAI key required"},rid);return send(res,200,{ok:true,accounts:await listAcmeAccounts(identity.id)},rid); }
     if (url.pathname === "/v1/cloud/acme/accounts" && req.method === "POST") { const identity=await authenticate(req.headers["x-bhai-key"]);if(!identity)return send(res,401,{ok:false,error:"BHAI key required"},rid);const account=await createAcmeAccount({ownerId:identity.id});return send(res,202,{ok:true,account},rid); }
+      if (!requireCloudBuild(identity, res, rid)) return;
     if (url.pathname === "/v1/cloud/acme/renew" && req.method === "POST") { const identity=await authenticate(req.headers["x-bhai-key"]);if(!identity)return send(res,401,{ok:false,error:"BHAI key required"},rid);return send(res,200,{ok:true,...await renewDueCertificates(identity.id)},rid); }
+      if (!requireCloudBuild(identity, res, rid)) return;
     if (url.pathname === "/v1/cloud/dns/info" && req.method === "GET") return send(res, 200, { ok:true, dns:dnsInfo() }, rid);
     if (url.pathname === "/v1/cloud/dns/challenges" && req.method === "GET") {
       const identity = await authenticate(req.headers["x-bhai-key"]); if (!identity) return send(res,401,{ok:false,error:"BHAI key required"},rid);
       return send(res,200,{ok:true,records:await listDnsChallenges(identity.id)},rid);
     }
     if (url.pathname === "/v1/cloud/dns/challenges" && req.method === "POST") {
+      if (!requireCloudBuild(identity, res, rid)) return;
       const identity = await authenticate(req.headers["x-bhai-key"]); if (!identity) return send(res,401,{ok:false,error:"BHAI key required"},rid);
       const body=await readJson(req); const record=await createDnsChallenge({...body,ownerId:identity.id});
       return send(res,202,{ok:true,record},rid);
@@ -536,6 +556,7 @@ const server = http.createServer(async (req, res) => {
     const dnsMatch=url.pathname.match(/^\/v1\/cloud\/dns\/challenges\/([^/]+)$/);
     if(dnsMatch&&req.method==="GET"){const identity=await authenticate(req.headers["x-bhai-key"]);if(!identity)return send(res,401,{ok:false,error:"BHAI key required"},rid);const record=await getDnsChallenge(dnsMatch[1],identity.id);return record?send(res,200,{ok:true,record},rid):send(res,404,{ok:false,error:"DNS record not found"},rid);}
     if(dnsMatch&&req.method==="POST"){const identity=await authenticate(req.headers["x-bhai-key"]);if(!identity)return send(res,401,{ok:false,error:"BHAI key required"},rid);const body=await readJson(req);if(body.action==="verify"){const result=await verifyDnsChallenge(dnsMatch[1],identity.id);return result?send(res,200,{ok:true,...result},rid):send(res,404,{ok:false,error:"DNS record not found"},rid);}const record=await setDnsChallengeStatus(dnsMatch[1],identity.id,body.status);return record?send(res,200,{ok:true,record},rid):send(res,404,{ok:false,error:"DNS record not found"},rid);}
+      if (!requireCloudBuild(identity, res, rid)) return;
     if (url.pathname === "/v1/cloud/certificates/info" && req.method === "GET") return send(res, 200, { ok:true, certificates:certificateInfo() }, rid);
     if (url.pathname === "/v1/cloud/certificates" && req.method === "GET") {
       const auth = await authenticate(req.headers["x-bhai-key"]);
@@ -543,6 +564,7 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok:true, certificates:await listCertificates(auth.id) }, rid);
     }
     if (url.pathname === "/v1/cloud/certificates" && req.method === "POST") {
+      if (!requireCloudBuild(identity, res, rid)) return;
       const auth = await authenticate(req.headers["x-bhai-key"]);
       if (!auth) return send(res, 401, { ok:false, error:"BHAI key required" }, rid);
       const body = await readJson(req);
@@ -557,6 +579,7 @@ const server = http.createServer(async (req, res) => {
       return cert ? send(res, 200, { ok:true, certificate:cert }, rid) : send(res, 404, { ok:false, error:"Certificate not found" }, rid);
     }
     if (url.pathname.startsWith("/v1/cloud/certificates/") && req.method === "POST") {
+      if (!requireCloudBuild(auth, res, rid)) return;
       const auth = await authenticate(req.headers["x-bhai-key"]);
       if (!auth) return send(res, 401, { ok:false, error:"BHAI key required" }, rid);
       const id = url.pathname.split("/").pop(), body=await readJson(req);
@@ -574,6 +597,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (url.pathname === "/v1/cloud/domains" && req.method === "POST") {
+      if (!requireCloudBuild(identity, res, rid)) return;
       const identity = await authenticate(req.headers["x-bhai-key"]);
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
       const body = await readJson(req);
@@ -595,6 +619,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (domainMatch && req.method === "POST") {
+      if (!requireCloudBuild(identity, res, rid)) return;
       const identity = await authenticate(req.headers["x-bhai-key"]);
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
       const body = await readJson(req);
@@ -614,6 +639,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (url.pathname === "/v1/cloud/services" && req.method === "POST") {
+      if (!requireCloudBuild(identity, res, rid)) return;
       const identity = await authenticate(req.headers["x-bhai-key"]);
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
       const body = await readJson(req);
@@ -629,6 +655,7 @@ const server = http.createServer(async (req, res) => {
       return service ? send(res, 200, { ok: true, service }, rid) : send(res, 404, { ok: false, error: "Service not found" }, rid);
     }
     if (serviceMatch && req.method === "DELETE") {
+      if (!requireCloudBuild(identity, res, rid)) return;
       const identity = await authenticate(req.headers["x-bhai-key"]);
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
       const service = await stopService(serviceMatch[1], identity.id);
@@ -636,6 +663,7 @@ const server = http.createServer(async (req, res) => {
     }
     const monitorMatch = url.pathname.match(/^\/v1\/cloud\/services\/([^/]+)\/monitor$/);
     if (monitorMatch && req.method === "POST") {
+      if (!requireCloudBuild(identity, res, rid)) return;
       const identity = await authenticate(req.headers["x-bhai-key"]);
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
       const result = await monitorService(monitorMatch[1], identity.id);

@@ -20,6 +20,15 @@ Core:
 - GET /v1/usage
 - GET /v1/metrics
 - POST /v1/chat/completions
+- POST /v1/chat/completions/stream
+- GET /v1/keys (admin)
+- POST /v1/keys (admin)
+- POST /v1/keys/:id/rotate (admin)
+- DELETE /v1/keys/:id (admin)
+- GET /v1/keys/:id/usage (admin)
+- GET /v1/usage (admin)
+- GET /v1/metrics (admin)
+- GET /v1/audit (admin)
 
 Cloud/infrastructure routes are available under /v1/cloud/* for builds, deployments, services, domains, DNS, certificates, network, auto-deploy and TLS status. Mutation routes are authenticated and the cloud mutation surface requires the cloud:build permission. High-risk agent/cloud mutations additionally use the approval flow.
 
@@ -37,7 +46,7 @@ content-type: application/json
   "messages": [{"role":"user","content":"Hello bhai"}]
 }
 
-API keys are stored as hashes. Usage telemetry identifies BHAI keys by a non-reversible hash-derived identifier; raw keys are not persisted in usage records. Provider error telemetry is also redacted before persistence.
+API keys are stored as hashes and are shown only at creation/rotation time. Admins can list, revoke, rotate and inspect per-key usage. Optional per-key limits include maxRequests and maxInputChars; a request is rejected before the provider is called when it would cross either limit. Usage telemetry identifies BHAI keys by a non-reversible hash-derived identifier; raw keys are not persisted in usage records. Provider error telemetry is also redacted before persistence.
 
 Admin-only operational endpoints use the x-bhai-admin-key header and are separate from normal user-key authentication.
 
@@ -56,13 +65,40 @@ Admin-only operational endpoints use the x-bhai-admin-key header and are separat
 - Dangerous shell patterns are rejected by build/runtime command validation.
 - Never commit real API keys or other production secrets.
 
+## Quick API examples
+
+Create an API key from the authenticated dashboard or admin API:
+
+```bash
+curl -X POST https://bhai-core.onrender.com/v1/keys \
+  -H 'x-bhai-admin-key: YOUR_ADMIN_KEY' \
+  -H 'content-type: application/json' \
+  -d '{"name":"my-app","limits":{"maxRequests":1000,"maxInputChars":100000}}'
+```
+
+Chat:
+
+```bash
+curl -X POST https://bhai-core.onrender.com/v1/chat/completions \
+  -H 'x-bhai-key: bhai_...' \
+  -H 'content-type: application/json' \
+  -d '{"messages":[{"role":"user","content":"Hello bhai"}]}'
+```
+
+Rotate a key:
+
+```bash
+curl -X POST https://bhai-core.onrender.com/v1/keys/KEY_ID/rotate \
+  -H 'x-bhai-admin-key: YOUR_ADMIN_KEY'
+```
+
 ## Provider routing
 
 The router uses the configured AI_PROVIDER_ORDER and skips providers that are not configured. Provider failures can trigger retries and circuit-breaker protection before the router falls back to another configured provider.
 
 ## Streaming
 
-Streaming uses provider-neutral SSE events: start, token, complete, and error. Streaming requests use the same BHAI key authentication and budget controls.
+Streaming uses provider-neutral SSE events: start, token, complete, and error. Streaming requests use the same BHAI key authentication, projected per-key budget controls, billing quota and provider circuit protection.
 
 ## Persistent storage
 

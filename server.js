@@ -20,7 +20,7 @@ import { getModelRegistry, modelCapabilities } from "./src/models.js";
 import { analyzeImage, getVisionCandidates } from "./src/vision.js";
 import { createImageRequest, submitComfyUI, getComfyUIHistory, imageProviderInfo, recordImageJobOwnership, getImageJobOwnership } from "./src/image.js";
 import { createVideoRequest, planVideo, submitVideoHttp, videoProviderInfo } from "./src/video.js";
-import { billingPlans, getBillingAccount, billingUsage, billingSnapshot, setBillingPlan, assertBillingQuota, consumeBillingQuota, recordBillingUsage } from "./src/billing.js";
+import { billingPlans, getBillingAccount, billingUsage, billingSnapshot, setBillingPlan, assertBillingQuota, consumeBillingQuota, releaseBillingQuota, recordBillingUsage } from "./src/billing.js";
 import { dashboardSnapshot } from "./src/dashboard.js";
 import { createSpeechRequest, transcribeWhisper, createTtsRequest, synthesizePiper, voiceProviderInfo } from "./src/voice.js";
 import { canAttempt, recordFailure, recordSuccess } from "./src/circuitBreaker.js";
@@ -322,9 +322,16 @@ const server = http.createServer(async (req, res) => {
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
       const body = await readJson(req, 16_000_000);
       const request = createSpeechRequest(body);
-      await consumeBillingQuota(identity.id, { requests: 1, charsIn: request.audio.length });
-      if (process.env.WHISPER_ENABLED !== "true") return send(res, 503, { ok: false, error: "Local Whisper is not configured" }, rid);
-      const result = await transcribeWhisper({ audio: request.audio, mimeType: request.mimeType, language: request.language, url: process.env.WHISPER_URL });
+      const billingReservation = { requests: 1, charsIn: request.audio.length };
+      await consumeBillingQuota(identity.id, billingReservation);
+      let result;
+      try {
+        if (process.env.WHISPER_ENABLED !== "true") return send(res, 503, { ok: false, error: "Local Whisper is not configured" }, rid);
+        result = await transcribeWhisper({ audio: request.audio, mimeType: request.mimeType, language: request.language, url: process.env.WHISPER_URL });
+      } catch (error) {
+        await releaseBillingQuota(identity.id, billingReservation);
+        throw error;
+      }
       await recordBillingUsage(identity.id, { charsOut: String(result.text || "").length });
       await recordUsage({ key: identity.id, input: request.audio.length, output: String(result.text || "").length });
       return send(res, 200, { ok: true, ...request, audio: undefined, ...result }, rid);
@@ -335,9 +342,16 @@ const server = http.createServer(async (req, res) => {
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
       const body = await readJson(req);
       const request = createTtsRequest(body);
-      await consumeBillingQuota(identity.id, { requests: 1, charsIn: request.text.length });
-      if (process.env.PIPER_ENABLED !== "true") return send(res, 503, { ok: false, error: "Local Piper is not configured" }, rid);
-      const result = await synthesizePiper({ text: request.text, voice: request.voice, language: request.language, url: process.env.PIPER_URL });
+      const billingReservation = { requests: 1, charsIn: request.text.length };
+      await consumeBillingQuota(identity.id, billingReservation);
+      let result;
+      try {
+        if (process.env.PIPER_ENABLED !== "true") return send(res, 503, { ok: false, error: "Local Piper is not configured" }, rid);
+        result = await synthesizePiper({ text: request.text, voice: request.voice, language: request.language, url: process.env.PIPER_URL });
+      } catch (error) {
+        await releaseBillingQuota(identity.id, billingReservation);
+        throw error;
+      }
       await recordBillingUsage(identity.id, {});
       await recordUsage({ key: identity.id, input: request.text.length });
       return send(res, 200, { ok: true, ...request, ...result }, rid);
@@ -361,13 +375,20 @@ const server = http.createServer(async (req, res) => {
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
       const body = await readJson(req);
       const request = createImageRequest(body);
-      await consumeBillingQuota(identity.id, { requests: 1, imageJobs: 1 });
       if (request.provider !== "comfyui") return send(res, 400, { ok: false, error: "Unsupported image provider" }, rid);
-      const result = await submitComfyUI({
-        url: process.env.COMFYUI_URL,
-        request,
-        workflow: body.workflow
-      });
+      const billingReservation = { requests: 1, imageJobs: 1 };
+      await consumeBillingQuota(identity.id, billingReservation);
+      let result;
+      try {
+        result = await submitComfyUI({
+          url: process.env.COMFYUI_URL,
+          request,
+          workflow: body.workflow
+        });
+      } catch (error) {
+        await releaseBillingQuota(identity.id, billingReservation);
+        throw error;
+      }
       await recordImageJobOwnership({ promptId: result.promptId, ownerId: identity.id, requestId: rid });
       await recordBillingUsage(identity.id, {});
       await recordUsage({ key: identity.id, input: JSON.stringify(body).length });
@@ -385,15 +406,22 @@ const server = http.createServer(async (req, res) => {
       if (!selected) return send(res, 503, { ok: false, error: "No configured vision-capable model" }, rid);
       const providerCfg = cfg.providers[selected.provider];
       const imageInput = typeof body.image === "string" ? body.image : (body.image?.data || body.image?.base64 || "");
-      await consumeBillingQuota(identity.id, { requests: 1, charsIn: String(body.prompt || "").length + String(imageInput).length });
-      const result = await analyzeImage({
-        provider: selected.provider,
-        model: body.model || selected.model,
-        key: providerCfg.key,
-        url: providerCfg.url,
-        prompt: body.prompt,
-        image: body.image
-      });
+      const billingReservation = { requests: 1, charsIn: String(body.prompt || "").length + String(imageInput).length };
+      await consumeBillingQuota(identity.id, billingReservation);
+      let result;
+      try {
+        result = await analyzeImage({
+          provider: selected.provider,
+          model: body.model || selected.model,
+          key: providerCfg.key,
+          url: providerCfg.url,
+          prompt: body.prompt,
+          image: body.image
+        });
+      } catch (error) {
+        await releaseBillingQuota(identity.id, billingReservation);
+        throw error;
+      }
       await recordBillingUsage(identity.id, { charsOut: String(result.text || "").length });
       await recordUsage({ key: identity.id, input: String(body.prompt || "").length + String(imageInput).length, output: String(result.text || "").length });
       return send(res, 200, { ok: true, ...result }, rid);
@@ -414,9 +442,16 @@ const server = http.createServer(async (req, res) => {
       const identity = await authenticate(req.headers["x-bhai-key"]);
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
       const request = createVideoRequest(await readJson(req));
-      await consumeBillingQuota(identity.id, { requests: 1, videoSeconds: request.durationSeconds });
       if (request.provider !== "http") return send(res, 400, { ok: false, error: "Unsupported video provider" }, rid);
-      const result = await submitVideoHttp({ url: process.env.VIDEO_API_URL, apiKey: process.env.VIDEO_API_KEY, request });
+      const billingReservation = { requests: 1, videoSeconds: request.durationSeconds };
+      await consumeBillingQuota(identity.id, billingReservation);
+      let result;
+      try {
+        result = await submitVideoHttp({ url: process.env.VIDEO_API_URL, apiKey: process.env.VIDEO_API_KEY, request });
+      } catch (error) {
+        await releaseBillingQuota(identity.id, billingReservation);
+        throw error;
+      }
       await recordBillingUsage(identity.id, {});
       await recordUsage({ key: identity.id, input: JSON.stringify(request).length });
       return send(res, 202, { ok: true, ...request, ...result }, rid);
@@ -1004,13 +1039,20 @@ const server = http.createServer(async (req, res) => {
       const body = await readJson(req);
       const inputChars = JSON.stringify(body).length;
       await assertBudget(usageKey);
-      await consumeBillingQuota(usageKey, { requests: 1, charsIn: inputChars });
-      const result = await generate({
-        messages: body.messages,
-        provider: body.provider,
-        temperature: body.temperature,
-        maxAttempts: body.max_attempts
-      });
+      const billingReservation = { requests: 1, charsIn: inputChars };
+      await consumeBillingQuota(usageKey, billingReservation);
+      let result;
+      try {
+        result = await generate({
+          messages: body.messages,
+          provider: body.provider,
+          temperature: body.temperature,
+          maxAttempts: body.max_attempts
+        });
+      } catch (error) {
+        await releaseBillingQuota(usageKey, billingReservation);
+        throw error;
+      }
       await recordUsage({
         key: usageKey,
         input: inputChars,

@@ -100,12 +100,16 @@ async function persist(snapshot) {
   if (size > maxBytes) throw Object.assign(new Error("Persistent store size limit exceeded"), { code:"STORE_SIZE_LIMIT", status:507, size, maxBytes });
   await fs.mkdir(path.dirname(file), { recursive: true });
   const tmp = `${file}.${process.pid}.${crypto.randomUUID()}.tmp`;
-  await fs.writeFile(tmp, serialized, { encoding:"utf8", mode:0o600 });
-  if (backupEnabled) {
-    try { await fs.copyFile(file, `${file}.bak`); } catch (error) { if (error.code !== "ENOENT") throw error; }
+  try {
+    await fs.writeFile(tmp, serialized, { encoding:"utf8", mode:0o600 });
+    if (backupEnabled) {
+      try { await fs.copyFile(file, `${file}.bak`); } catch (error) { if (error.code !== "ENOENT") throw error; }
+    }
+    await fs.rename(tmp, file);
+    try { await fs.chmod(file, 0o600); } catch {}
+  } finally {
+    try { await fs.unlink(tmp); } catch (error) { if (error.code !== "ENOENT") throw error; }
   }
-  await fs.rename(tmp, file);
-  try { await fs.chmod(file, 0o600); } catch {}
 }
 
 export async function getStore() {

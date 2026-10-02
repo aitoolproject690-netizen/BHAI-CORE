@@ -50,7 +50,7 @@ export async function executeAgentTool(name, input = {}, identity = {}, options 
   if (policy.risk === "high") {
     const approval = options.approvalId ? await getApproval(options.approvalId, identity.id) : null;
     const approvalInputHash = crypto.createHash("sha256").update(JSON.stringify(input ?? {})).digest("hex");
-    if (!approval || approval.tool !== tool || approval.status !== "approved" || approval.inputHash !== approvalInputHash) {
+    if (!approval || approval.tool !== tool || approval.status !== "approved" || approval.inputHash !== approvalInputHash || !approval.expiresAt || Date.parse(approval.expiresAt) <= Date.now()) {
       const error = new Error("Approved action required for tool " + tool);
       error.code = "APPROVAL_REQUIRED"; error.status = 428;
       throw error;

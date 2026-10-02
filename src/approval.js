@@ -1,6 +1,10 @@
 import crypto from "node:crypto";
 import { getStore, updateStore } from "./store.js";
 
+function inputHash(input) {
+  return crypto.createHash("sha256").update(JSON.stringify(input ?? {})).digest("hex");
+}
+
 const APPROVAL_TTL_MS = Number(process.env.BHAI_APPROVAL_TTL_MS || 10 * 60 * 1000);
 
 export async function createApproval({ actorId, tool, input, requestId } = {}) {
@@ -10,6 +14,7 @@ export async function createApproval({ actorId, tool, input, requestId } = {}) {
     actorId,
     tool,
     input,
+    inputHash: inputHash(input),
     requestId,
     status: "pending",
     createdAt: new Date(now).toISOString(),

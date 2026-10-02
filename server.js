@@ -138,7 +138,16 @@ const server = http.createServer(async (req, res) => {
       if (!deliveryId) return send(res, 400, { ok:false, error:"Missing GitHub delivery id" }, rid);
       const claim = await claimWebhookDelivery(deliveryId);
       if (!claim.accepted) return send(res, 202, { ok:true, duplicate:true, deliveryId }, rid);
-      const body = JSON.parse(raw);
+      let body;
+      try {
+        body = JSON.parse(raw);
+      } catch (error) {
+        throw Object.assign(new Error("Invalid JSON webhook body"), {
+          code: "REQUEST_BODY_INVALID_JSON",
+          status: 400,
+          cause: error
+        });
+      }
       const repository = body.repository?.full_name;
       const branch = String(body.ref || "").replace(/^refs\/heads\//, "");
       const commit = body.after || null;

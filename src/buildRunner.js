@@ -13,7 +13,7 @@ function buildEnv(extra = {}) {
 
 function shellCommand(command) {
   if (typeof command !== "string" || !command.trim()) throw new Error("command is required");
-  if (/\b(?:rm\s+-rf|mkfs|shutdown|reboot|curl\s+.*\|\s*(?:sh|bash)|wget\s+.*\|\s*(?:sh|bash))\b|(?:;|&&|\|\||`|\$\(|>|<)/i.test(command)) {
+  if (/\b(?:rm\s+-rf|mkfs|shutdown|reboot|curl\s+.*\|\s*(?:sh|bash)|wget\s+.*\|\s*(?:sh|bash))\b|(?:^|[\s|&])(?:sh|bash|dash|zsh)\s+(?:-[a-z]*c\b|-[a-z]*\s+-c\b)|(?:;|&&|\|\||`|\$\(|>|<)/i.test(command)) {
     const error = new Error("Command rejected by build safety policy");
     error.code = "BUILD_COMMAND_REJECTED";
     error.status = 403;

@@ -76,7 +76,11 @@ test("health-gated service routes start disabled until readiness", async () => {
 });
 
 
-test("route rebind requires owner context", async () => {\n  await assert.rejects(() => rebindServiceRoutes("svc-from", "svc-target", 3300), error => error.code === "ROUTE_OWNER_REQUIRED");\n});\n\ntest("route rebind validates target service ownership and port", async () => {
+test("route rebind requires owner context", async () => {
+  await assert.rejects(() => rebindServiceRoutes("svc-from", "svc-target", 3300), error => error.code === "ROUTE_OWNER_REQUIRED");
+});
+
+test("route rebind validates target service ownership and port", async () => {
   resetStoreForTests();
   await updateStore(s => {
     s.services["svc-from"] = { id:"svc-from", ownerId:"owner-a", status:"running", port:3200 };

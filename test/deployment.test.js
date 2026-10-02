@@ -205,3 +205,6 @@ test("production cutover updates pointer and traffic bindings together", async (
     delete process.env.BHAI_RUNTIME_ENABLED;
   }
 });
+
+
+test("failed deployment cannot be promoted", async () => {\n  resetStoreForTests();\n  await updateStore(s => {\n    s.services["svc-failed"] = { id:"svc-failed", ownerId:"user-a", status:"running", port:19001 };\n    s.deployments["dep-failed"] = { id:"dep-failed", ownerId:"user-a", repository:"r", branch:"main", buildId:"b", path:"/tmp", serviceId:"svc-failed", status:"failed" };\n    return s;\n  });\n  await assert.rejects(() => promoteDeployment("dep-failed", "user-a"), error => error.code === "DEPLOYMENT_NOT_DEPLOYABLE");\n});\n

@@ -55,7 +55,7 @@ export async function verifyOrderDnsChallenge(orderId,ownerId){
 }
 export async function setAcmeOrderStatus(id,ownerId,status,patch={}){
  if(!ORDER_STATUSES.has(status))throw Object.assign(new Error("Invalid ACME order status"),{code:"ACME_ORDER_STATUS_INVALID",status:400});
- let found=false;await updateStore(s=>{const o=s.acmeOrders?.[id];if(!o||o.ownerId!==ownerId)return s;o.status=status;Object.assign(o,patch);o.updatedAt=new Date().toISOString();found=true;return s;});
+ const safePatch = {};\n const allowed = ["authorizationUrl","challengeUrl","challengeToken","expiresAt","lastError"];\n for (const key of allowed) { if (Object.prototype.hasOwnProperty.call(patch || {}, key)) safePatch[key] = patch[key]; }\n let found=false;await updateStore(s=>{const o=s.acmeOrders?.[id];if(!o||o.ownerId!==ownerId)return s;o.status=status;Object.assign(o,safePatch);o.updatedAt=new Date().toISOString();found=true;return s;});
  return found?getAcmeOrder(id,ownerId):null;
 }
 export function acmeOrderInfo(){return{statuses:[...ORDER_STATUSES],challengeStatuses:[...CHALLENGE_STATUSES],realIssuance:"not enabled in this layer",privateKeyExposure:false};}

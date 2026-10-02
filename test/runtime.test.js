@@ -21,3 +21,5 @@ test("runtime refuses to spawn when disabled", () => {
   assert.throws(() => startRuntime({ command: "printf should-not-run", cwd: process.cwd() }), /Cloud runtime is disabled/);
   process.env.BHAI_RUNTIME_ENABLED = previous;
 });
+
+test("runtime rejects shell chaining and redirection",()=>{process.env.BHAI_RUNTIME_ENABLED="true";assert.throws(()=>startRuntime({command:"node app.js && whoami",cwd:process.cwd()}),/rejected/);assert.throws(()=>startRuntime({command:"node app.js > out",cwd:process.cwd()}),/rejected/);delete process.env.BHAI_RUNTIME_ENABLED;});

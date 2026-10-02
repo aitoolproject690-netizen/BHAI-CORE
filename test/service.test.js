@@ -79,7 +79,7 @@ test("health monitor restart ignores the old runtime exit", async () => {
     buildId: "build-monitor-race",
     command: "sleep 5",
     cwd: process.cwd(),
-    healthUrl: "http://127.0.0.1/health"
+    healthUrl: null
   });
   const result = await monitorService(s.id, "owner-monitor-race");
   assert.equal(result.restarted, true);

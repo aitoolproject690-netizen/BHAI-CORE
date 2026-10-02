@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createDeployment, getDeployment, listDeployments, setDeploymentStatus, promoteDeployment, rollbackDeployment, getProductionDeployment } from "../src/deployment.js";
-import { resetStoreForTests } from "../src/store.js";
+import { resetStoreForTests, updateStore } from "../src/store.js";
 
 test("deployments are persistent and owner-scoped", async () => {
   resetStoreForTests();
@@ -80,4 +80,13 @@ test("rollback rejects the current production deployment", async () => {
     () => rollbackDeployment(deployment.id, "user-a"),
     error => error.code === "ROLLBACK_NO_PRODUCTION"
   );
+});
+
+
+test("deployment service attachment is owner scoped", async () => {
+  resetStoreForTests();
+  const deployment = await createDeployment({ ownerId:"user-a", repository:"owner/app", buildId:"build-attach", path:"/tmp/deployment" });
+  await updateStore(s => { s.services["svc-other"] = { id:"svc-other", ownerId:"user-b" }; return s; });
+  const { attachDeploymentService } = await import("../src/deployment.js");
+  await assert.rejects(() => attachDeploymentService(deployment.id, "user-a", "svc-other"), error => error.code === "DEPLOYMENT_SERVICE_FORBIDDEN");
 });

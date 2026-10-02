@@ -57,3 +57,13 @@ test("RAG tokenization supports Hindi text", async () => {
   const results = await searchRag("hindi-user", "हिंदी फाइल");
   assert.equal(results[0].fileId, file.id);
 });
+
+import { embedText } from "../src/embeddings.js";
+
+test("local embeddings include Unicode tokens", () => {
+  const hindi = embedText("हिंदी");
+  const latin = embedText("english");
+  assert.ok(hindi.some(value => value !== 0));
+  assert.ok(latin.some(value => value !== 0));
+  assert.notDeepEqual(hindi, new Array(hindi.length).fill(0));
+});

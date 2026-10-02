@@ -597,7 +597,7 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/v1/cloud/domains" && req.method === "POST") {
       const identity = await authenticate(req.headers["x-bhai-key"]);
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
-      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      if (!requireCloudBuild(identity, res, rid)) return;
       const body = await readJson(req);
       const service = await getService(body.serviceId, identity.id);
       if (!service) return send(res, 404, { ok: false, error: "Service not found" }, rid);
@@ -619,7 +619,7 @@ const server = http.createServer(async (req, res) => {
     if (domainMatch && req.method === "POST") {
       const identity = await authenticate(req.headers["x-bhai-key"]);
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
-      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      if (!requireCloudBuild(identity, res, rid)) return;
       const body = await readJson(req);
       const domain = await setDomainStatus(domainMatch[1], identity.id, body.status);
       if (!domain) return send(res, 404, { ok: false, error: "Domain not found" }, rid);
@@ -639,7 +639,7 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/v1/cloud/services" && req.method === "POST") {
       const identity = await authenticate(req.headers["x-bhai-key"]);
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
-      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      if (!requireCloudBuild(identity, res, rid)) return;
       const body = await readJson(req);
       const result = await executeAgentTool("cloud_service_create", body, identity, { approvalId: body.approvalId, requestId: rid });
       return send(res, 201, { ok: true, service: result }, rid);
@@ -655,7 +655,7 @@ const server = http.createServer(async (req, res) => {
     if (serviceMatch && req.method === "DELETE") {
       const identity = await authenticate(req.headers["x-bhai-key"]);
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
-      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      if (!requireCloudBuild(identity, res, rid)) return;
       const service = await stopService(serviceMatch[1], identity.id);
       return service ? send(res, 200, { ok: true, service }, rid) : send(res, 404, { ok: false, error: "Service not found" }, rid);
     }
@@ -663,7 +663,7 @@ const server = http.createServer(async (req, res) => {
     if (monitorMatch && req.method === "POST") {
       const identity = await authenticate(req.headers["x-bhai-key"]);
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
-      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      if (!requireCloudBuild(identity, res, rid)) return;
       const result = await monitorService(monitorMatch[1], identity.id);
       return result ? send(res, 200, { ok: true, ...result }, rid) : send(res, 404, { ok: false, error: "Service not found" }, rid);
     }

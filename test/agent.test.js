@@ -161,3 +161,28 @@ test("cloud service creation rejects a cwd outside the authenticated owner works
     error => error.code === "EXECUTION_PATH_FORBIDDEN" && error.status === 403
   );
 });
+
+
+test("agent execution writes terminal audit status for success and failure", async () => {
+  const { resetStoreForTests } = await import("../src/store.js");
+  const { listAudit } = await import("../src/audit.js");
+  const { executeAgentTool } = await import("../src/agent.js");
+
+  resetStoreForTests();
+  const identity = { id: "owner-audit", scopes: ["agent:read", "agent:write", "files:read"] };
+
+  const created = await executeAgentTool("job_create", { type: "audit-demo", payload: {} }, identity, { requestId: "req-success" });
+  assert.equal(created.ownerId, identity.id);
+
+  await assert.rejects(
+    () => executeAgentTool("rag_search", {}, identity, { requestId: "req-failure" }),
+    /query is required/
+  );
+
+  const events = await listAudit({ actorId: identity.id, limit: 10 });
+  const terminal = events.filter(event => event.action === "agent.execute" && ["completed", "failed"].includes(event.status));
+  assert.equal(terminal.length, 2);
+  assert.ok(terminal.some(event => event.requestId === "req-success" && event.status === "completed"));
+  assert.ok(terminal.some(event => event.requestId === "req-failure" && event.status === "failed"));
+  assert.ok(terminal.every(event => event.metadata === undefined || !/bhai_|AIza|sk-/.test(event.metadata)));
+});

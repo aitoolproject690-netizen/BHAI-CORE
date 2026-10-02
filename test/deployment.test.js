@@ -84,6 +84,22 @@ test("rollback rejects the current production deployment", async () => {
 });
 
 
+test("deployment activation requires a ready service", async () => {
+  resetStoreForTests();
+  await updateStore(s => {
+    s.services["svc-not-ready"] = { id:"svc-not-ready", ownerId:"user-a", status:"stopped" };
+    return s;
+  });
+  const deployment = await createDeployment({
+    ownerId:"user-a", repository:"owner/app", branch:"main",
+    buildId:"build-not-ready", path:"/tmp/deployment", serviceId:"svc-not-ready"
+  });
+  await assert.rejects(
+    () => setDeploymentStatus(deployment.id, "user-a", "active"),
+    error => error.code === "DEPLOYMENT_NOT_READY"
+  );
+});
+
 test("deployment creation validates service owner", async () => {
   resetStoreForTests();
   await updateStore(s => {

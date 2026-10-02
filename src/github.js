@@ -45,8 +45,10 @@ async function githubFetch(path, options = {}) {
 
 function repoPath(repository) {
   const value = String(repository || "").trim();
-  if (!/^[^/\s]+\/[^/\s]+$/.test(value)) throw new Error("repository must be owner/name");
-  return value.split("/").map(encodeURIComponent).join("/");
+  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(value)) throw new Error("repository must be owner/name");
+  const parts = value.split("/");
+  if (parts.some(part => part === "." || part === "..")) throw new Error("repository path traversal is not allowed");
+  return parts.map(encodeURIComponent).join("/");
 }
 
 function pathPart(value) {

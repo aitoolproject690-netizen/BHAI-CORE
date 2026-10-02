@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createRoute, findRouteByHostname, listRoutes, setRouteStatus, networkInfo, rebindServiceRoutes } from "../src/network.js";
+import { createRoute, findRouteByHostname, listRoutes, setRouteStatus, networkInfo, rebindServiceRoutes, stripHopByHopHeaders } from "../src/network.js";
 import { resetStoreForTests, updateStore } from "../src/store.js";
 
 test("network route is owner scoped and hostname normalized", async () => {
@@ -129,4 +129,22 @@ test("route rebind uses target service port when targetPort is omitted", async (
   });
   assert.equal(await rebindServiceRoutes("svc-from", "svc-target", undefined, "owner-a"), 1);
   assert.equal((await findRouteByHostname("default-port.example.com")).targetPort, 3300);
+});
+
+
+test("proxy strips hop-by-hop and connection-nominated headers", () => {
+  const headers = stripHopByHopHeaders({
+    connection: "keep-alive, x-private-hop",
+    "keep-alive": "timeout=5",
+    "x-private-hop": "secret",
+    "proxy-authorization": "Basic secret",
+    "content-type": "application/json",
+    "x-forwarded-for": "127.0.0.1"
+  });
+  assert.equal(headers.connection, undefined);
+  assert.equal(headers["keep-alive"], undefined);
+  assert.equal(headers["x-private-hop"], undefined);
+  assert.equal(headers["proxy-authorization"], undefined);
+  assert.equal(headers["content-type"], "application/json");
+  assert.equal(headers["x-forwarded-for"], "127.0.0.1");
 });

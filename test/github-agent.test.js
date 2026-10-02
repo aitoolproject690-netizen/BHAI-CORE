@@ -24,14 +24,19 @@ test("GitHub tools fail closed when the connector is not configured", async () =
   const previousToken = process.env.GITHUB_TOKEN;
   delete process.env.GITHUB_TOKEN;
   try {
-    await assert.rejects(
-      () => executeAgentTool(
+    let caught;
+    try {
+      await executeAgentTool(
         "github_file_read",
         { repository: "owner/repo", path: "README.md" },
         { id: "u1", scopes: ["github:read", "agent:read"] }
-      ),
-      { code: "GITHUB_NOT_CONFIGURED", status: 503 }
-    );
+      );
+    } catch (error) {
+      caught = error;
+    }
+    assert.ok(caught);
+    assert.equal(caught.code, "GITHUB_NOT_CONFIGURED");
+    assert.equal(caught.status, 503);
   } finally {
     if (previousToken === undefined) delete process.env.GITHUB_TOKEN;
     else process.env.GITHUB_TOKEN = previousToken;

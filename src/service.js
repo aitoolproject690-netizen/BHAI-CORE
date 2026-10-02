@@ -53,6 +53,7 @@ export async function createService({ ownerId, buildId, command, cwd, env = {}, 
   return publicService(service);
 }
 async function launch(service) {
+  const runtimeToken = ++service.runtimeToken;
   const runtime = startRuntime({ command: service.command, cwd: service.cwd, env: service.env });
   service.child = runtime.child;
   service.pid = runtime.pid;
@@ -62,7 +63,7 @@ async function launch(service) {
   // Services with a health URL remain unrouted until readiness succeeds.
   if (!service.healthUrl) await setServiceRouteStatus(service.id, "active");
   runtime.exit.then(async result => {
-    if (!services.has(service.id)) return;
+    if (!services.has(service.id) || service.runtimeToken !== runtimeToken) return;
     if (service.status === "stopping" || service.status === "stopped") { service.status = "stopped"; await setServiceRouteStatus(service.id, "disabled"); service.updatedAt = new Date().toISOString(); await persistService(service); return; }
     service.status = result.code === 0 ? "stopped" : "crashed";
     service.updatedAt = new Date().toISOString();
@@ -87,6 +88,7 @@ export async function stopService(id, ownerId) {
   if (!s || s.ownerId !== ownerId) return null;
   s.status = "stopping";
   s.restartToken++;
+  s.runtimeToken++;
   await stopRuntime(s.child);
   await releasePort(s.port);
   await setServiceRouteStatus(s.id, "disabled");

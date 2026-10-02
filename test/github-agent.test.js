@@ -21,7 +21,7 @@ test("GitHub write requires explicit write scope", () => {
 
 test("GitHub tools are visible but do not fake execution", async () => {
   assert.ok(listAgentTools().some(item => item.name === "github_file_read"));
-  if (process.env.GITHUB_TOKEN) return;
+  if (!process.env.GITHUB_TOKEN) return;
   try {
     await executeAgentTool("github_file_read", { repository: "owner/repo", path: "README.md" }, { id: "u1", scopes: ["github:read", "agent:read"] });
     assert.fail("expected GitHub connector configuration error");

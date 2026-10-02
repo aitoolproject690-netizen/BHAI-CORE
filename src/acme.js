@@ -64,11 +64,21 @@ export async function getAcmeAccountSecrets(id,ownerId){
 export async function listAcmeAccounts(ownerId){const s=await getStore();return Object.values(s.acmeAccounts||{}).filter(a=>a.ownerId===ownerId).map(({privateKey,encryptedPrivateKey,accountJwk,...a})=>({...a,accountJwkPresent:Boolean(accountJwk)}));}
 
 export async function markCertificateRenewalIfDue(cert,ownerId,now=Date.now()){
-  if(!cert?.expiresAt)return false; const due=Date.parse(cert.expiresAt)-now <= cfg().renewBeforeDays*86400000;
-  if(due && cert.status==="active"){await setCertificateStatus(cert.id,ownerId,"renewing");return true;} return false;
+  if(!cert?.expiresAt)return false;
+  const expiresAt=Date.parse(cert.expiresAt); if(!Number.isFinite(expiresAt))return false;
+  const due=expiresAt-now <= cfg().renewBeforeDays*86400000;
+  if(due && cert.status==="active"){await setCertificateStatus(cert.id,ownerId,"renewing");return true;}
+  return false;
 }
 export async function renewDueCertificates(ownerId,now=Date.now()){
   const s=await getStore(); const certs=Object.values(s.certificates||{}).filter(c=>c.ownerId===ownerId);
-  let changed=0; for(const c of certs) if(await markCertificateRenewalIfDue(c,ownerId,now))changed++;
-  return {checked:certs.length,markedRenewing:changed};
+  let changed=0,expired=0;
+  for(const c of certs){
+    const expiresAt=Date.parse(c.expiresAt||"");
+    if(Number.isFinite(expiresAt)&&expiresAt<=now&&!["expired","revoked"].includes(c.status)){
+      await setCertificateStatus(c.id,ownerId,"expired",{lastError:"Certificate expired"}); expired++; continue;
+    }
+    if(await markCertificateRenewalIfDue(c,ownerId,now))changed++;
+  }
+  return {checked:certs.length,markedRenewing:changed,markedExpired:expired};
 }

@@ -322,11 +322,11 @@ const server = http.createServer(async (req, res) => {
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
       const body = await readJson(req, 16_000_000);
       const request = createSpeechRequest(body);
+      if (process.env.WHISPER_ENABLED !== "true") return send(res, 503, { ok: false, error: "Local Whisper is not configured" }, rid);
       const billingReservation = { requests: 1, charsIn: request.audio.length };
       await consumeBillingQuota(identity.id, billingReservation);
       let result;
       try {
-        if (process.env.WHISPER_ENABLED !== "true") return send(res, 503, { ok: false, error: "Local Whisper is not configured" }, rid);
         result = await transcribeWhisper({ audio: request.audio, mimeType: request.mimeType, language: request.language, url: process.env.WHISPER_URL });
       } catch (error) {
         await releaseBillingQuota(identity.id, billingReservation);
@@ -342,11 +342,11 @@ const server = http.createServer(async (req, res) => {
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
       const body = await readJson(req);
       const request = createTtsRequest(body);
+      if (process.env.PIPER_ENABLED !== "true") return send(res, 503, { ok: false, error: "Local Piper is not configured" }, rid);
       const billingReservation = { requests: 1, charsIn: request.text.length };
       await consumeBillingQuota(identity.id, billingReservation);
       let result;
       try {
-        if (process.env.PIPER_ENABLED !== "true") return send(res, 503, { ok: false, error: "Local Piper is not configured" }, rid);
         result = await synthesizePiper({ text: request.text, voice: request.voice, language: request.language, url: process.env.PIPER_URL });
       } catch (error) {
         await releaseBillingQuota(identity.id, billingReservation);

@@ -141,14 +141,13 @@ test("cloud build execution rejects a cwd outside the authenticated owner worksp
   const input = { plan: { runtime: "node", commands: { test: "printf safe" } }, cwd: process.cwd() };
   const approval = await createApproval({ actorId: identity.id, tool: "cloud_build_execute", input });
   assert.ok(await decideApproval(approval.id, identity.id, "approved"));
-  await assert.rejects(
-    () => executeAgentTool("cloud_build_execute", input, identity, { approvalId: approval.id }),
-    error => {
-      assert.equal(error.code, "EXECUTION_PATH_FORBIDDEN");
-      assert.equal(error.status, 403);
-      return true;
-    }
-  );
+  try {
+    await executeAgentTool("cloud_build_execute", input, identity, { approvalId: approval.id });
+    assert.fail("expected owner-scoped workspace rejection");
+  } catch (error) {
+    assert.equal(error.code, "EXECUTION_PATH_FORBIDDEN");
+    assert.equal(error.status, 403);
+  }
 });
 
 test("cloud service creation rejects a cwd outside the authenticated owner workspace", async () => {

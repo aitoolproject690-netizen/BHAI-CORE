@@ -760,16 +760,18 @@ const server = http.createServer(async (req, res) => {
 
     if (url.pathname === "/v1/jobs" && req.method === "POST") {
       const providedKey = req.headers["x-bhai-key"];
-      if (!await authenticate(providedKey)) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const identity = await authenticate(providedKey);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
       const body = await readJson(req);
-      return send(res, 202, await enqueue(body.type || "generic", { ...(body.payload || {}), ownerId: (await authenticate(providedKey)).id }), rid);
+      return send(res, 202, await enqueue(body.type || "generic", { ...(body.payload || {}), ownerId: identity.id }), rid);
     }
 
     const jobMatch = url.pathname.match(/^\/v1\/jobs\/([^/]+)$/);
     if (jobMatch && req.method === "GET") {
       const providedKey = req.headers["x-bhai-key"];
-      if (!await authenticate(providedKey)) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
-      const job = await getStoredJob(jobMatch[1], (await authenticate(providedKey)).id);
+      const identity = await authenticate(providedKey);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const job = await getStoredJob(jobMatch[1], identity.id);
       return job ? send(res, 200, job, rid) : send(res, 404, { ok: false, error: "Job not found" }, rid);
     }
 

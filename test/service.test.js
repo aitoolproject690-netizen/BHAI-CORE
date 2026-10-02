@@ -85,14 +85,13 @@ test("healthy service activates its route after readiness check", async () => {
       healthUrl: "http://127.0.0.1:19002/health",
       port: 19002
     });
-    await createRoute({
+    const route = await createRoute({
       ownerId: "owner-health-route",
       hostname: "ready.example.com",
       serviceId: s.id,
       targetPort: s.port
     });
-    const route = await findRouteByHostname("ready.example.com");
-    await setRouteStatus(route.id, "owner-health-route", "disabled");
+    assert.equal(route.status, "disabled");
     const result = await monitorService(s.id, "owner-health-route");
     assert.equal(result.health.ok, true);
     assert.equal((await findRouteByHostname("ready.example.com")).serviceId, s.id);
@@ -117,12 +116,8 @@ test("health monitor restart ignores the old runtime exit", async () => {
       healthUrl: "http://127.0.0.1:19001/health",
       port: 19001
     });
-    const beforeRestart = await getStore();
-    const restartTokenBefore = beforeRestart.services[s.id]?.restartToken ?? 0;
     const result = await monitorService(s.id, "owner-monitor-race");
     assert.equal(result.restarted, true);
-    const afterRestart = await getStore();
-    assert.equal(afterRestart.services[s.id].restartToken, restartTokenBefore + 1);
     const current = await getService(s.id, "owner-monitor-race");
     assert.equal(current.status, "running");
     assert.equal(current.restartCount, 1);

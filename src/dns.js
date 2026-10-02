@@ -33,7 +33,15 @@ export async function verifyDnsChallenge(id,ownerId){
   try { if(r.type==="TXT") values=(await dns.resolveTxt(r.name)).flat(); else values=await dns.resolveCname(r.name); }
   catch(error){await setDnsChallengeStatus(id,ownerId,"failed");return {verified:false,reason:"DNS_LOOKUP_FAILED",error:error.code||"DNS_ERROR"};}
   const verified=values.includes(r.value);
-  await setDnsChallengeStatus(id,ownerId,verified?"verified":"pending");
-  return {verified,record:pub(r),observed:values.slice(0,20)};
+  await updateStore(store => {
+    const current = store.dnsRecords?.[id];
+    if (current && current.ownerId === ownerId) {
+      current.status = verified ? "verified" : "pending";
+      current.updatedAt = new Date().toISOString();
+    }
+    return store;
+  });
+  const updated = await getDnsChallenge(id, ownerId);
+  return {verified,record:updated,observed:values.slice(0,20)};
 }
 export function dnsInfo(){return{persistent:true,ownerScoped:true,recordTypes:[...TYPES],statuses:[...STATUSES],verification:"live DNS lookup",provider:"provider-neutral"};}

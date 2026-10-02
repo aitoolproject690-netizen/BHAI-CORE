@@ -12,6 +12,13 @@ test("build runner rejects obviously destructive commands", async () => {
   await assert.rejects(() => runBuildCommand("rm -rf /"), /Command rejected/);
 });
 
+test("build runner rejects newline command chaining", async () => {
+  await assert.rejects(
+    () => runBuildCommand("printf 'safe'\nrm -rf /"),
+    /Command rejected/
+  );
+});
+
 
 test("build runner does not inherit core secret environment variables", async () => {
   process.env.BHAI_CORE_SECRET_TEST = "must-not-leak";

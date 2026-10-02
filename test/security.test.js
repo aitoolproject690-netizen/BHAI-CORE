@@ -22,3 +22,15 @@ test("approval lifecycle is owner scoped", async () => {
   assert.equal(approved.status, "approved");
   assert.equal((await decideApproval(created.id, "u1", "rejected")), null);
 });
+
+import { Readable } from "node:stream";
+import { readRequestBody } from "../src/requestBody.js";
+
+test("request body limit counts UTF-8 bytes", async () => {
+  const req = Readable.from(["😀"]);
+  await assert.rejects(
+    () => readRequestBody(req, 3),
+    error => error.code === "REQUEST_BODY_TOO_LARGE" && error.status === 413
+  );
+  assert.equal(await readRequestBody(Readable.from(["😀"]), 4), "😀");
+});

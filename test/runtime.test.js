@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { startRuntime } from "../src/runtime.js";
+import { startRuntime, healthCheck } from "../src/runtime.js";
 process.env.BHAI_RUNTIME_ENABLED = "true";
 
 test("runtime starts a bounded validated command", async () => {
@@ -44,4 +44,10 @@ test("runtime does not inherit core secret environment variables", async () => {
   assert.equal(exit.stdout, "");
   delete process.env.BHAI_CORE_SECRET_TEST;
   delete process.env.BHAI_RUNTIME_ENABLED;
+});
+
+
+test("health checks reject non-local targets", async () => {
+  await assert.rejects(() => healthCheck("http://example.com/health"), /local service/);
+  await assert.rejects(() => healthCheck("http://127.0.0.1:9999/health", { expectedPort: 3000 }), /service port/);
 });

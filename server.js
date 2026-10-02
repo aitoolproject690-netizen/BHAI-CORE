@@ -166,7 +166,43 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (url.pathname === "/dashboard" && req.method === "GET") {
-      const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BHAI-CORE API</title><style>body{margin:0;background:#0b1020;color:#eef2ff;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}main{max-width:900px;margin:auto;padding:28px 18px}h1{margin-bottom:6px}p{color:#aab4d0}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:22px}.card{display:block;padding:18px;border:1px solid #27314d;border-radius:16px;background:#121a2d;color:#eef2ff;text-decoration:none}.card b{display:block;margin-bottom:7px}.ok{display:inline-block;padding:6px 10px;border-radius:999px;background:#173d2a;color:#7ee2a8;font-size:13px}.url{color:#7dd3fc;font-size:13px;word-break:break-all}</style></head><body><main><span class="ok">● BHAI-CORE API LIVE</span><h1>API Dashboard</h1><p>Endpoints ko yahan se directly open karke check kar sakte ho.</p><div class="grid"><a class="card" href="/v1/models"><b>🤖 Models</b><span class="url">/v1/models</span></a><a class="card" href="/v1/providers"><b>🔌 Providers</b><span class="url">/v1/providers</span></a><a class="card" href="/health"><b>❤️ Health</b><span class="url">/health</span></a><a class="card" href="/ready"><b>✅ Ready</b><span class="url">/ready</span></a><a class="card" href="/v1"><b>📚 API Index</b><span class="url">/v1</span></a><a class="card" href="/"><b>🌐 Service Status</b><span class="url">/</span></a></div></main></body></html>`;
+      const providerStatus = getProviderStatus();
+      const providerCards = Object.entries(providerStatus)
+        .map(([name, info]) => {
+          const state = info.configured ? "READY" : "NOT CONFIGURED";
+          return '<div class="provider"><div><b>' + name.toUpperCase() + '</b><span class="pill ' + (info.configured ? 'ready' : '') + '">' + state + '</span></div><small>' + String(info.model || 'no model') + '</small></div>';
+        }).join("");
+      const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BHAI-CORE</title><style>
+      *{box-sizing:border-box}body{margin:0;background:#080d18;color:#eef2ff;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+      main{max-width:980px;margin:auto;padding:24px 16px 40px}.top{display:flex;justify-content:space-between;align-items:center;gap:12px}.brand{font-size:26px;font-weight:800}.live{color:#7ee2a8;font-size:13px}
+      h1{font-size:34px;margin:24px 0 6px}p{color:#9da9c4;margin-top:0}.section{margin-top:24px}.section h2{font-size:18px;margin:0 0 12px}
+      .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}.card,.provider{display:block;padding:17px;border:1px solid #24304a;border-radius:16px;background:#10182a;color:#eef2ff;text-decoration:none}.card:hover{border-color:#49638f}
+      .card b{display:block;margin-bottom:7px}.url,small{color:#8fa0bf;font-size:13px;word-break:break-all}.provider>div{display:flex;justify-content:space-between;align-items:center;gap:8px}
+      .pill{font-size:10px;padding:5px 8px;border-radius:999px;background:#2d2330;color:#ffb5b5}.pill.ready{background:#173d2a;color:#7ee2a8}
+      .note{margin-top:18px;padding:14px;border-radius:14px;background:#111c31;border:1px solid #273753;color:#b8c4dd;font-size:13px;line-height:1.5}
+      </style></head><body><main><div class="top"><div class="brand">🤖 BHAI-CORE</div><div class="live">● LIVE</div></div>
+      <h1>API Dashboard</h1><p>Core service, AI providers aur available modules ek jagah.</p>
+      <div class="section"><h2>AI Providers</h2><div class="grid">${providerCards}</div></div>
+      <div class="section"><h2>Core</h2><div class="grid">
+      <a class="card" href="/v1/models"><b>🤖 Models</b><span class="url">Configured model registry</span></a>
+      <a class="card" href="/v1/providers"><b>🔌 Providers</b><span class="url">Provider status</span></a>
+      <a class="card" href="/health"><b>❤️ Health</b><span class="url">Service health</span></a>
+      <a class="card" href="/ready"><b>✅ Ready</b><span class="url">Readiness check</span></a>
+      <a class="card" href="/v1"><b>📚 API Index</b><span class="url">All major API routes</span></a>
+      <a class="card" href="/"><b>🌐 Status</b><span class="url">Root service status</span></a>
+      </div></div>
+      <div class="section"><h2>Engine Modules</h2><div class="grid">
+      <div class="card"><b>💬 Chat + Streaming</b><span class="url">Provider router + SSE</span></div>
+      <div class="card"><b>🧠 RAG + Memory</b><span class="url">Files, embeddings, conversations</span></div>
+      <div class="card"><b>🛠️ Agent</b><span class="url">Tools, approvals, audit</span></div>
+      <div class="card"><b>🖼️ Image</b><span class="url">ComfyUI adapter</span></div>
+      <div class="card"><b>🎬 Video</b><span class="url">External video adapter</span></div>
+      <div class="card"><b>🎙️ Voice + Vision</b><span class="url">Local Whisper/Piper + vision providers</span></div>
+      <div class="card"><b>🐙 GitHub + Cloud</b><span class="url">Repository/build/deployment tools</span></div>
+      <div class="card"><b>💳 Billing</b><span class="url">Plans, quota and usage foundation</span></div>
+      </div></div>
+      <div class="note">🔐 Chat, keys aur mutation APIs authentication ke peeche hain. Provider key configure hone ke baad Models me provider dikhne lagega. Dashboard khud koi secret expose nahi karta.</div>
+      </main></body></html>`;
       res.writeHead(200, {"content-type":"text/html; charset=utf-8","cache-control":"no-store"});
       return res.end(html);
     }

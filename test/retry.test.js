@@ -28,3 +28,27 @@ test("retries transient failures and then succeeds", async () => {
   assert.equal(attempts, 3);
   assert.equal(retriesSeen, 2);
 });
+
+test("invalid retry counts fall back safely without creating extra retries", async () => {
+  let attempts = 0;
+  await assert.rejects(
+    () => withRetry(async () => {
+      attempts += 1;
+      throw Object.assign(new Error("temporary"), { status: 503 });
+    }, { retries: -5, baseMs: 1, maxMs: 2 }),
+    /temporary/
+  );
+  assert.equal(attempts, 1);
+});
+
+test("invalid backoff values are normalized", async () => {
+  let attempts = 0;
+  const result = await withRetry(async () => {
+    attempts += 1;
+    if (attempts === 1) throw Object.assign(new Error("temporary"), { status: 503 });
+    return "ok";
+  }, { retries: 1, baseMs: -1, maxMs: 0 });
+
+  assert.equal(result, "ok");
+  assert.equal(attempts, 2);
+});

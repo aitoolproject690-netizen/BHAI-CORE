@@ -64,3 +64,19 @@ export function imageProviderInfo() {
     }
   };
 }
+
+export async function getComfyUIHistory({ url, promptId }) {
+  const id = String(promptId || "").trim();
+  if (!id || !/^[A-Za-z0-9_-]+$/.test(id)) throw new Error("Invalid image job id");
+  const response = await fetch(cleanUrl(url) + "/history/" + encodeURIComponent(id), {
+    signal: AbortSignal.timeout(15000)
+  });
+  const text = await response.text();
+  let data; try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
+  if (!response.ok) {
+    const error = new Error(data?.error?.message || data?.error || data?.raw || "ComfyUI history request failed");
+    error.status = response.status;
+    throw error;
+  }
+  return { provider: "comfyui", promptId: id, history: data };
+}

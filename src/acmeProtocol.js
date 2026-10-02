@@ -10,6 +10,34 @@ export async function createAcmeOrder({directory,accountKey,accountUrl,identifie
 export function parseAuthorization(body){const challenge=Array.isArray(body?.challenges)?body.challenges.find(c=>c.type==="dns-01"):null;return{status:body?.status||null,identifier:body?.identifier?.value||null,expires:body?.expires||null,challenge:challenge?{type:challenge.type,url:challenge.url,token:challenge.token,status:challenge.status}:null};}
 export function authorizationChallengeValue({token,jwk}){if(!token||!jwk)throw new Error("token and jwk required");return dns01KeyAuthorization(token,jwk);}
 export async function getAcmeResource({url,accountKey,accountUrl,directory}){const result=await signedPost({url,payload:"",privateKey:accountKey.privateKey,jwk:accountKey.jwk,kid:accountUrl,directory});return result.body;}
+export async function pollAcmeAuthorization({url,accountKey,accountUrl,directory,pollMs=5000,timeoutMs=120000}){
+ const started=Date.now(); let last=null;
+ while(Date.now()-started<=timeoutMs){
+   last=await getAcmeResource({url,accountKey,accountUrl,directory});
+   const status=String(last?.status||"").toLowerCase();
+   if(status==="valid") return last;
+   if(status==="invalid"||status==="deactivated"||status==="revoked") throw Object.assign(new Error("ACME authorization became "+status),{code:"ACME_AUTHORIZATION_"+status.toUpperCase(),status:409,body:last});
+   await new Promise(resolve=>setTimeout(resolve,Math.max(0,pollMs)));
+ }
+ throw Object.assign(new Error("ACME authorization polling timed out"),{code:"ACME_AUTHORIZATION_TIMEOUT",status:504,body:last});
+}
+export async function finalizeAcmeOrder({url,csr,accountKey,accountUrl,directory}){return signedPost({url,payload:{csr},privateKey:accountKey.privateKey,jwk:accountKey.jwk,kid:accountUrl,directory});}
+export async function pollAcmeOrder({url,accountKey,accountUrl,directory,pollMs=5000,timeoutMs=120000}){
+ const started=Date.now(); let last=null;
+ while(Date.now()-started<=timeoutMs){
+   last=await getAcmeResource({url,accountKey,accountUrl,directory});
+   const status=String(last?.status||"").toLowerCase();
+   if(status==="valid") return last;
+   if(status==="invalid") throw Object.assign(new Error("ACME order became invalid"),{code:"ACME_ORDER_INVALID",status:409,body:last});
+   await new Promise(resolve=>setTimeout(resolve,Math.max(0,pollMs)));
+ }
+ throw Object.assign(new Error("ACME order polling timed out"),{code:"ACME_ORDER_TIMEOUT",status:504,body:last});
+}
+export async function downloadAcmeCertificate({url,accountKey,accountUrl,directory}){
+ const body=await getAcmeResource({url,accountKey,accountUrl,directory});
+ if(typeof body!=="string"||!body.includes("BEGIN CERTIFICATE")) throw Object.assign(new Error("ACME certificate response was not PEM"),{code:"ACME_CERTIFICATE_PEM_INVALID",status:502,body});
+ return body;
+}
 export async function triggerAcmeChallenge({url,accountKey,accountUrl,directory}){return signedPost({url,payload:{},privateKey:accountKey.privateKey,jwk:accountKey.jwk,kid:accountUrl,directory});}
 export async function registerAcmeAccount({directory,email,privateKey,jwk}){const payload={termsOfServiceAgreed:true,contact:["mailto:"+email]};const result=await signedPost({url:directory.newAccount,payload,privateKey,jwk,directory});const location=result.headers.get("location");if(!location)throw Object.assign(new Error("ACME account response missing Location"),{code:"ACME_ACCOUNT_LOCATION_MISSING",status:502});return {location,body:result.body};}
 export function dns01KeyAuthorization(token,jwk){return b64(crypto.createHash("sha256").update(token+"."+jwkThumbprint(jwk)).digest());}

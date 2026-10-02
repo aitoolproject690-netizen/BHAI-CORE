@@ -44,7 +44,7 @@ test("service persistence redacts secret environment values", async () => {
     buildId: "build-secret",
     command: "sleep 5",
     cwd: process.cwd(),
-    env: { API_TOKEN: "super-secret", PORT: "0", PUBLIC_MODE: "true" }
+    env: { API_TOKEN: "super-secret", PUBLIC_MODE: "true" }
   });
   await stopService(s.id, "owner-secret");
   const store = await getStore();

@@ -59,7 +59,11 @@ test("domain can persist its ingress route binding", async () => {
 });
 
 
-test("domain rebind requires owner context", async () => {\n  await assert.rejects(() => rebindDomainServices("svc-from", "svc-target"), error => error.code === "DOMAIN_OWNER_REQUIRED");\n});\n\ntest("domain rebind validates target service ownership", async () => {
+test("domain rebind requires owner context", async () => {
+  await assert.rejects(() => rebindDomainServices("svc-from", "svc-target"), error => error.code === "DOMAIN_OWNER_REQUIRED");
+});
+
+test("domain rebind validates target service ownership", async () => {
   resetStoreForTests();
   await updateStore(s => {
     s.services["svc-from"] = { id:"svc-from", ownerId:"owner-a", status:"running" };

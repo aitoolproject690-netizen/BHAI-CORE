@@ -615,8 +615,8 @@ const server = http.createServer(async (req, res) => {
       const identity = await authenticate(req.headers["x-bhai-key"]);
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
       const body = await readJson(req);
-      const service = await createService({ ownerId: identity.id, buildId: body.buildId, command: body.command, cwd: body.cwd, env: body.env, healthUrl: body.healthUrl });
-      return send(res, 201, { ok: true, service }, rid);
+      const result = await executeAgentTool("cloud_service_create", body, identity, { approvalId: body.approvalId, requestId: rid });
+      return send(res, 201, { ok: true, service: result }, rid);
     }
 
     const serviceMatch = url.pathname.match(/^\/v1\/cloud\/services\/([^/]+)$/);

@@ -23,7 +23,7 @@ export function getProviderStatus() {
         name,
         {
           configured: isProviderConfigured(name, cfg),
-          model: cfg.providers[name].model,
+          model: String(cfg.providers[name]?.model ?? ""),
           enabled: cfg.providerOrder.includes(name),
           breaker: breakerState(name)
         }

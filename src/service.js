@@ -4,9 +4,16 @@ import { getStore, updateStore } from "./store.js";
 import { allocatePort, releasePort } from "./portAllocator.js";
 import { setServiceRouteStatus } from "./network.js";
 const services = new Map();
+const SECRET_ENV = /(KEY|TOKEN|SECRET|PASSWORD|PASS|PRIVATE|CREDENTIAL|AUTH)/i;
+
+function persistedEnv(env = {}) {
+  return Object.fromEntries(
+    Object.entries(env).map(([key, value]) => [key, SECRET_ENV.test(key) ? "[REDACTED]" : String(value)])
+  );
+}
 
 async function persistService(s) {
-  const record = { id:s.id, ownerId:s.ownerId, buildId:s.buildId, command:s.command, cwd:s.cwd, env:s.env, healthUrl:s.healthUrl, port:s.port, status:s.status, restartCount:s.restartCount, pid:null, createdAt:s.createdAt, updatedAt:s.updatedAt };
+  const record = { id:s.id, ownerId:s.ownerId, buildId:s.buildId, command:s.command, cwd:s.cwd, env:persistedEnv(s.env), healthUrl:s.healthUrl, port:s.port, status:s.status, restartCount:s.restartCount, pid:null, createdAt:s.createdAt, updatedAt:s.updatedAt };
   await updateStore(store => { store.services ??= {}; store.services[s.id] = record; return store; });
 }
 

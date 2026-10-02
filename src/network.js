@@ -10,7 +10,7 @@ const HOP_BY_HOP_HEADERS = new Set([
   "te", "trailer", "transfer-encoding", "upgrade"
 ]);
 
-function stripHopByHopHeaders(headers = {}) {
+export function stripHopByHopHeaders(headers = {}) {
   const connectionTokens = String(headers.connection || "")
     .split(",")
     .map(value => value.trim().toLowerCase())

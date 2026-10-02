@@ -123,6 +123,10 @@ test("route rebind validates target service ownership and port", async () => {
     () => rebindServiceRoutes("svc-from", "svc-target", 70000, "owner-a"),
     error => error.code === "ROUTE_TARGET_PORT_INVALID"
   );
+  await assert.rejects(
+    () => rebindServiceRoutes("svc-from", "svc-target", 3301, "owner-a"),
+    error => error.code === "ROUTE_TARGET_PORT_MISMATCH"
+  );
   assert.equal(await rebindServiceRoutes("svc-from", "svc-target", 3300, "owner-a"), 1);
   assert.equal((await findRouteByHostname("app.example.com")).targetPort, 3300);
 });

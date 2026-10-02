@@ -93,8 +93,8 @@ test("generate routes through a configured adapter and records the result", asyn
     assert.equal(result.retries, 0);
 
     const store = await getStore();
-    assert.equal(store.usage.provider.openai.requests, 1);
-    assert.equal(store.usage.provider.openai.failures, 0);
+    assert.equal(store.providerUsage.openai.requests, 1);
+    assert.equal(store.providerUsage.openai.failures, 0);
   } finally {
     providerAdapters.openai = previousAdapter;
     if (previousOrder === undefined) delete process.env.AI_PROVIDER_ORDER;

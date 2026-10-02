@@ -21,7 +21,7 @@ async function context(orderId,ownerId){
 export async function startAcmeIssuance({ownerId,certificateId,accountId}={}){
  const cert=await getCertificate(certificateId,ownerId); if(!cert)throw Object.assign(new Error("Certificate not found"),{code:"ACME_CERTIFICATE_NOT_FOUND",status:404});
  const account=await getAcmeAccountSecrets(accountId,ownerId); if(!account?.privateKey||account.status!=="registered")throw Object.assign(new Error("Registered ACME account required"),{code:"ACME_ACCOUNT_REQUIRED",status:409});
- if(!await getCertificateSecrets(certificateId,ownerId)) await prepareCertificateKey(certificateId,ownerId);
+ if(!(await getCertificateSecrets(certificateId,ownerId))?.privateKey) await prepareCertificateKey(certificateId,ownerId);
  const local=await createLocalOrder({ownerId,certificateId,hostname:cert.hostname,challenge:cert.challenge});
  const directory=await fetchDirectory(account.directoryUrl);
  const remote=await protocolCreateOrder({directory,accountKey:{privateKey:account.privateKey,jwk:account.accountJwk},accountUrl:account.accountUrl,identifiers:[cert.hostname]});

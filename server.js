@@ -143,6 +143,16 @@ const server = http.createServer(async (req, res) => {
       return send(res, result.ready ? 200 : 503, result, rid);
     }
 
+    if (url.pathname === "/" && req.method === "GET") {
+      return send(res, 200, {
+        ok: true,
+        service: "BHAI-CORE",
+        status: "live",
+        version: "0.1.0",
+        endpoints: { health: "/health", ready: "/ready", api: "/v1" }
+      }, rid);
+    }
+
     if (url.pathname === "/v1/cloud/webhooks/github" && req.method === "POST") {
       const secret = process.env.BHAI_GITHUB_WEBHOOK_SECRET;
       if (!secret) return send(res, 503, { ok:false, error:"GitHub webhook secret is not configured" }, rid);

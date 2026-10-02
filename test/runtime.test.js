@@ -36,10 +36,12 @@ test("runtime terminates commands that exceed the timeout", async () => {
 
 
 test("runtime does not inherit core secret environment variables", async () => {
+  process.env.BHAI_RUNTIME_ENABLED = "true";
   process.env.BHAI_CORE_SECRET_TEST = "must-not-leak";
   const r = startRuntime({ command: "printf \"%s\" \"$BHAI_CORE_SECRET_TEST\"", cwd: process.cwd() });
   const exit = await r.exit;
   assert.equal(exit.code, 0);
   assert.equal(exit.stdout, "");
   delete process.env.BHAI_CORE_SECRET_TEST;
+  delete process.env.BHAI_RUNTIME_ENABLED;
 });

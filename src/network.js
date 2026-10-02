@@ -26,6 +26,10 @@ export async function createRoute({ ownerId, hostname, serviceId, targetHost="12
   const host = normalizeHost(hostname);
   if (!ownerId || !host || !serviceId || !validPort(targetPort))
     throw Object.assign(new Error("ownerId, hostname, serviceId and valid targetPort required"), { code:"ROUTE_FIELDS_REQUIRED", status:400 });
+  const store = await getStore();
+  const service = store.services?.[serviceId];
+  if (!service || service.ownerId !== ownerId)
+    throw Object.assign(new Error("Route service ownership mismatch"), { code:"ROUTE_SERVICE_FORBIDDEN", status:403 });
   if (!validHostname(host))
     throw Object.assign(new Error("Invalid route hostname"), { code:"ROUTE_HOST_INVALID", status:400 });
   const upstreamHost = String(targetHost || "127.0.0.1").trim();

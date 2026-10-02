@@ -57,7 +57,7 @@ export async function registerStoredAcmeAccount({id,ownerId}={}){
  }
  return (await listAcmeAccounts(ownerId)).find(x=>x.id===id)||null;
 }
-export async function listAcmeAccounts(ownerId){const s=await getStore();return Object.values(s.acmeAccounts||{}).filter(a=>a.ownerId===ownerId).map(({privateKey,...a})=>a);}
+export async function listAcmeAccounts(ownerId){const s=await getStore();return Object.values(s.acmeAccounts||{}).filter(a=>a.ownerId===ownerId).map(({privateKey,encryptedPrivateKey,accountJwk,...a})=>({...a,accountJwkPresent:Boolean(accountJwk)}));}
 
 export async function markCertificateRenewalIfDue(cert,ownerId,now=Date.now()){
   if(!cert?.expiresAt)return false; const due=Date.parse(cert.expiresAt)-now <= cfg().renewBeforeDays*86400000;

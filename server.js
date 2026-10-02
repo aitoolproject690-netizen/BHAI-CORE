@@ -62,9 +62,15 @@ function authorized(req) {
   return (req.headers.authorization || "") === "Bearer " + cfg.apiKey;
 }
 
+function secretsEqual(provided, expected) {
+  if (typeof provided !== "string" || typeof expected !== "string" || !expected) return false;
+  const left = Buffer.from(provided);
+  const right = Buffer.from(expected);
+  return left.length === right.length && crypto.timingSafeEqual(left, right);
+}
+
 function adminAuthorized(req) {
-  const expected = process.env.BHAI_CORE_ADMIN_KEY;
-  return Boolean(expected && req.headers["x-bhai-admin-key"] === expected);
+  return secretsEqual(req.headers["x-bhai-admin-key"], process.env.BHAI_CORE_ADMIN_KEY);
 }
 
 async function readJsonRaw(req, maxBytes = 2_000_000) {

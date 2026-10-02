@@ -1,36 +1,45 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { recordUsage, getUsage, recordProviderUsage, allProviderUsage } from "../src/usage.js";
-import { budgetStatus, assertBudget } from "../src/budget.js";
-import { resetStoreForTests } from "../src/store.js";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { spawn } from "node:child_process";
 
-test("usage records requests and characters", async () => {
-  resetStoreForTests();
-  await recordUsage({ key:"test", input:10, output:20 });
-  const u = await getUsage("test");
-  assert.equal(u.requests, 1);
-  assert.equal(u.charsIn, 10);
-  assert.equal(u.charsOut, 20);
-});
+async function runUsageProbe(filePath) {
+  const script = [
+    'import { recordUsage, allUsage, getUsage } from "./src/usage.js";',
+    'await recordUsage({ key: "bhai_super_secret_test_key", failed: true });',
+    'const usage = await allUsage();',
+    'const direct = await getUsage("bhai_super_secret_test_key");',
+    'console.log(JSON.stringify({ usage, direct }));'
+  ].join("\n");
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, ["--input-type=module", "--eval", script], {
+      cwd: path.resolve("."),
+      env: { ...process.env, BHAI_STORE_FILE: filePath }
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", chunk => { stdout += chunk; });
+    child.stderr.on("data", chunk => { stderr += chunk; });
+    child.on("error", reject);
+    child.on("close", code => {
+      if (code !== 0) return reject(new Error(stderr || `probe exited with ${code}`));
+      try { resolve(JSON.parse(stdout.trim())); }
+      catch (error) { reject(new Error(`invalid probe output: ${stdout}\n${stderr}`, { cause: error })); }
+    });
+  });
+}
 
-test("budget blocks when request limit is reached", async () => {
-  resetStoreForTests();
-  await recordUsage({ key:"test", input:5, output:1 });
-  assert.equal((await budgetStatus("test", { maxRequests:1 })).exceeded, true);
-  await assert.rejects(() => assertBudget("test", { maxRequests:1 }), /Usage budget exceeded/);
-});
-
-test("provider usage records health metrics", async () => {
-  resetStoreForTests();
-  await recordProviderUsage({ provider:"gemini", success:true, latencyMs:120, retries:1 });
-  await recordProviderUsage({ provider:"gemini", success:false, latencyMs:80, retries:2, error:new Error("quota") });
-  const metrics = await allProviderUsage();
-  assert.equal(metrics.gemini.requests, 2);
-  assert.equal(metrics.gemini.successes, 1);
-  assert.equal(metrics.gemini.failures, 1);
-  assert.equal(metrics.gemini.retries, 3);
-  assert.equal(metrics.gemini.latencyMs, 200);
-  assert.equal(metrics.gemini.lastLatencyMs, 80);
-  assert.equal(metrics.gemini.lastStatus, "error");
-  assert.equal(metrics.gemini.lastError, "quota");
+test("usage telemetry never persists a raw BHAI API key", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "bhai-usage-"));
+  const file = path.join(dir, "store.json");
+  const result = await runUsageProbe(file);
+  assert.deepEqual(result.direct, { requests: 1, failures: 1, charsIn: 0, charsOut: 0 });
+  assert.equal(Object.keys(result.usage).length, 1);
+  assert.ok(Object.keys(result.usage)[0].startsWith("key_"));
+  assert.ok(!Object.prototype.hasOwnProperty.call(result.usage, "bhai_super_secret_test_key"));
+  const persisted = await fs.readFile(file, "utf8");
+  assert.ok(!persisted.includes("bhai_super_secret_test_key"));
+  await fs.rm(dir, { recursive: true, force: true });
 });

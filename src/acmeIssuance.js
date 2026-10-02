@@ -50,7 +50,10 @@ export async function completeAcmeIssuance({orderId,ownerId}={}){
  await finalizeAcmeOrder({url:orderRemote.finalize,csr,accountKey:{privateKey:x.account.privateKey,jwk:x.account.accountJwk},accountUrl:x.account.accountUrl,directory:x.directory});
  const finalOrder=await pollAcmeOrder({url:x.order.orderUrl,accountKey:{privateKey:x.account.privateKey,jwk:x.account.accountJwk},accountUrl:x.account.accountUrl,directory:x.directory,pollMs:Number(process.env.BHAI_ACME_POLL_MS||5000),timeoutMs:Number(process.env.BHAI_ACME_TIMEOUT_MS||120000)});
  const pem=await downloadAcmeCertificate({url:finalOrder.certificate,accountKey:{privateKey:x.account.privateKey,jwk:x.account.accountJwk},accountUrl:x.account.accountUrl,directory:x.directory});
- await updateStore(s=>{const c=s.certificates?.[x.cert.id];const o=s.acmeOrders?.[orderId];if(c){c.certificatePem=pem;c.status="active";c.expiresAt=finalOrder.expires||c.expiresAt;c.lastError=null;c.updatedAt=new Date().toISOString();}if(o){o.status="valid";o.remoteStatus=finalOrder.status;o.updatedAt=new Date().toISOString();}return s;});
+ const x509=new crypto.X509Certificate(pem);
+ if(!x509.subject.includes("CN="+x.cert.hostname) && !x509.subjectAltName?.split(/,\s*/).some(v=>v.replace(/^DNS:/,"")===x.cert.hostname)) throw Object.assign(new Error("Issued certificate hostname mismatch"),{code:"ACME_CERTIFICATE_HOSTNAME_MISMATCH",status:502});
+ const expiresAt=new Date(x509.validTo).toISOString();
+ await updateStore(s=>{const c=s.certificates?.[x.cert.id];const o=s.acmeOrders?.[orderId];if(c){c.certificatePem=pem;c.status="active";c.expiresAt=expiresAt;c.lastError=null;c.updatedAt=new Date().toISOString();}if(o){o.status="valid";o.remoteStatus=finalOrder.status;o.updatedAt=new Date().toISOString();}return s;});
  return {status:"issued",order:await getAcmeOrder(orderId,ownerId),certificate:await getCertificate(x.cert.id,ownerId)};
 }
 export function acmeIssuanceInfo(){return{enabled:"ACME controlled by BHAI_ACME_ENABLED",dnsProviderMutation:false,flow:["account","newOrder","authorization","dns-01","challenge","authorization-poll","finalize","order-poll","certificate-download"],privateKeyEncryptedAtRest:true};}

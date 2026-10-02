@@ -7,7 +7,7 @@ test("renewal sweep marks due and expired certificates", async () => {
   resetStoreForTests(); const now=Date.now();
   await updateStore(s=>{s.certificates={
     due:{id:"due",ownerId:"u1",status:"active",expiresAt:new Date(now+86400000).toISOString()},
-    fresh:{id:"fresh",ownerId:"u1",status:"active",expiresAt:new Date(now+864000000).toISOString()},
+    fresh:{id:"fresh",ownerId:"u1",status:"active",expiresAt:new Date(now+5184000000).toISOString()},
     old:{id:"old",ownerId:"u2",status:"active",expiresAt:new Date(now-1000).toISOString()}
   };return s;});
   const result=await runRenewalSweep(now);

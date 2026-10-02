@@ -83,3 +83,59 @@ test("domain rebind validates target service ownership", async () => {
   assert.equal(await rebindDomainServices("svc-from", "svc-target", "owner-a"), 1);
   assert.equal((await getDomain("dom-1", "owner-a")).serviceId, "svc-target");
 });
+
+
+test("domain creation rejects hostname already used by a route before persisting", async () => {
+  resetStoreForTests();
+  await updateStore(s => {
+    s.services["svc-domain-conflict"] = {
+      id: "svc-domain-conflict",
+      ownerId: "owner-domain",
+      status: "running",
+      port: 3210
+    };
+    s.routes["route-domain-conflict"] = {
+      id: "route-domain-conflict",
+      ownerId: "owner-domain",
+      hostname: "taken.example.com",
+      serviceId: "svc-domain-conflict",
+      targetHost: "127.0.0.1",
+      targetPort: 3210,
+      status: "active"
+    };
+    return s;
+  });
+  await assert.rejects(
+    () => createDomain({
+      ownerId: "owner-domain",
+      serviceId: "svc-domain-conflict",
+      hostname: "TAKEN.EXAMPLE.COM"
+    }),
+    error => error.code === "DOMAIN_HOST_CONFLICT"
+  );
+  const store = await getStore();
+  assert.equal(Object.keys(store.domains || {}).length, 0);
+});
+
+test("domain creation rejects a service with an invalid port", async () => {
+  resetStoreForTests();
+  await updateStore(s => {
+    s.services["svc-domain-invalid-port"] = {
+      id: "svc-domain-invalid-port",
+      ownerId: "owner-domain",
+      status: "running",
+      port: 70000
+    };
+    return s;
+  });
+  await assert.rejects(
+    () => createDomain({
+      ownerId: "owner-domain",
+      serviceId: "svc-domain-invalid-port",
+      hostname: "invalid-port.example.com"
+    }),
+    error => error.code === "DOMAIN_SERVICE_PORT_INVALID"
+  );
+  const store = await getStore();
+  assert.equal(Object.keys(store.domains || {}).length, 0);
+});

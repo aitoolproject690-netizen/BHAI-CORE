@@ -204,6 +204,10 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (url.pathname === "/dashboard" && req.method === "GET") {
+      if (cfg.masterAuth.enabled && !authenticateSession(req, cfg.masterAuth.username)) {
+        res.writeHead(302, { location: "/login", "cache-control": "no-store" });
+        return res.end();
+      }
       const providerStatus = getProviderStatus();
       const providerCards = Object.entries(providerStatus)
         .map(([name, info]) => {

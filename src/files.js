@@ -46,7 +46,15 @@ export async function createTextFile({ ownerId, name, text, mimeType = "text/pla
     store.files[id] = item;
     return store;
   });
-  await indexFile(item);
+  try {
+    await indexFile(item);
+  } catch (error) {
+    await updateStore(store => {
+      if (store.files?.[id]?.ownerId === ownerId) delete store.files[id];
+      return store;
+    });
+    throw error;
+  }
   const { text: _, ...metadata } = item;
   return metadata;
 }

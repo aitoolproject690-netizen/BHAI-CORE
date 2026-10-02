@@ -35,3 +35,20 @@ test("stopping a service disables its route", async () => {
   await stopService(s.id, "owner-route");
   assert.equal(await findRouteByHostname("app.route-test.com"), null);
 });
+
+
+test("service persistence redacts secret environment values", async () => {
+  resetStoreForTests();
+  const s = await createService({
+    ownerId: "owner-secret",
+    buildId: "build-secret",
+    command: "sleep 5",
+    cwd: process.cwd(),
+    env: { API_TOKEN: "super-secret", PORT: "0", PUBLIC_MODE: "true" }
+  });
+  await stopService(s.id, "owner-secret");
+  const store = await getStore();
+  assert.equal(store.services[s.id].env.API_TOKEN, "[REDACTED]");
+  assert.equal(store.services[s.id].env.PUBLIC_MODE, "true");
+  assert.notEqual(store.services[s.id].env.API_TOKEN, "super-secret");
+});

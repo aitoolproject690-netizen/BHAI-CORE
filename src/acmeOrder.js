@@ -3,7 +3,7 @@ import { getStore, updateStore } from "./store.js";
 import { createDnsChallenge } from "./dns.js";
 import { getCertificate } from "./certificates.js";
 import { verifyDnsChallenge } from "./dns.js";
-import { dns01KeyAuthorization } from "./acmeProtocol.js";
+import { dns01KeyAuthorization, parseAuthorization } from "./acmeProtocol.js";
 
 const ORDER_STATUSES=new Set(["pending","ready","processing","valid","invalid","failed"]);
 const CHALLENGE_STATUSES=new Set(["pending","published","verified","failed"]);
@@ -34,6 +34,18 @@ export async function prepareDnsChallenge(orderId,ownerId,{recordName,recordValu
  return {order:await getAcmeOrder(orderId,ownerId),record};
 }
 
+export async function attachAuthorization(orderId,ownerId,{authorizationUrl,challengeUrl,token,expiresAt}={}){
+ const s=await getStore(),o=s.acmeOrders?.[orderId]; if(!o||o.ownerId!==ownerId)return null;
+ if(!authorizationUrl||!challengeUrl||!token)throw Object.assign(new Error("ACME authorization challenge fields required"),{code:"ACME_AUTHORIZATION_FIELDS_REQUIRED",status:400});
+ await updateStore(s=>{const x=s.acmeOrders?.[orderId];if(x){x.authorizationUrl=authorizationUrl;x.challengeUrl=challengeUrl;x.challengeToken=token;x.expiresAt=expiresAt||x.expiresAt;x.updatedAt=new Date().toISOString();}return s;});
+ return getAcmeOrder(orderId,ownerId);
+}
+export async function applyAuthorization(orderId,ownerId,authorization){
+ const parsed=parseAuthorization(authorization); if(parsed.status==="invalid") throw Object.assign(new Error("ACME authorization invalid"),{code:"ACME_AUTHORIZATION_INVALID",status:409});
+ if(parsed.identifier && parsed.identifier!== (await getAcmeOrder(orderId,ownerId))?.hostname) throw Object.assign(new Error("ACME authorization hostname mismatch"),{code:"ACME_AUTHORIZATION_HOSTNAME_MISMATCH",status:409});
+ if(!parsed.challenge) throw Object.assign(new Error("DNS-01 challenge missing"),{code:"ACME_DNS_CHALLENGE_MISSING",status:409});
+ return attachAuthorization(orderId,ownerId,{authorizationUrl:authorization.url||null,challengeUrl:parsed.challenge.url,token:parsed.challenge.token,expiresAt:parsed.expires});
+}
 export async function verifyOrderDnsChallenge(orderId,ownerId){
  const s=await getStore(),o=s.acmeOrders?.[orderId]; if(!o||o.ownerId!==ownerId)return null;
  if(!o.challengeId)throw Object.assign(new Error("DNS challenge not prepared"),{code:"ACME_DNS_CHALLENGE_MISSING",status:409});

@@ -49,6 +49,7 @@ import crypto from "node:crypto";
 import { checkRateLimit, rateLimitInfo } from "./src/rateLimit.js";
 import { readRequestBody } from "./src/requestBody.js";
 import { authenticateMaster } from "./src/masterAuth.js";
+import { sessionCookie, clearSessionCookie, authenticateSession } from "./src/dashboardAuth.js";
 
 const cfg = config();
 
@@ -87,7 +88,9 @@ function secretsEqual(provided, expected) {
 
 function adminAuthorized(req) {
   if (secretsEqual(req.headers["x-bhai-admin-key"], process.env.BHAI_CORE_ADMIN_KEY)) return true;
-  return cfg.masterAuth.enabled && authenticateMaster(req, cfg.masterAuth.username, process.env.BHAI_CORE_PASSWORD);
+  if (!cfg.masterAuth.enabled) return false;
+  return authenticateMaster(req, cfg.masterAuth.username, process.env.BHAI_CORE_PASSWORD)
+    || authenticateSession(req, cfg.masterAuth.username);
 }
 
 async function readJsonRaw(req, maxBytes = 2_000_000) {
@@ -166,6 +169,40 @@ const server = http.createServer(async (req, res) => {
       }, rid);
     }
 
+    if (url.pathname === "/login" && req.method === "GET") {
+      if (!cfg.masterAuth.enabled) return send(res, 503, { ok:false, error:"Master authentication is not configured" }, rid);
+      if (authenticateSession(req, cfg.masterAuth.username)) {
+        res.writeHead(302, { location: "/dashboard", "cache-control": "no-store" });
+        return res.end();
+      }
+      const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BHAI-CORE Login</title><style>
+      *{box-sizing:border-box}body{margin:0;min-height:100vh;background:#080d18;color:#eef2ff;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;display:grid;place-items:center;padding:20px}
+      .box{width:min(440px,100%);padding:24px;border:1px solid #24304a;border-radius:18px;background:#10182a;box-shadow:0 18px 60px #0005}.brand{font-size:25px;font-weight:800;margin-bottom:8px}p{color:#9da9c4;line-height:1.5}
+      input,button{width:100%;padding:13px;margin-top:10px;border-radius:10px;border:1px solid #33415f;background:#0b1221;color:#eef2ff;font:inherit}button{cursor:pointer;background:#173d2a;border-color:#285c43}.error{color:#ffb5b5;margin-top:12px;min-height:20px}
+      </style></head><body><main class="box"><div class="brand">🤖 BHAI-CORE</div><h1>Master Login</h1><p>Dashboard access ke liye master username aur password enter karo.</p>
+      <form id="login"><input id="u" autocomplete="username" placeholder="Username" required><input id="p" type="password" autocomplete="current-password" placeholder="Password" required><button>Login</button><div id="e" class="error"></div></form>
+      <script>document.getElementById("login").onsubmit=async(e)=>{e.preventDefault();const out=document.getElementById("e");out.textContent="Signing in…";try{const r=await fetch("/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({username:document.getElementById("u").value,password:document.getElementById("p").value})});const d=await r.json();if(!r.ok)throw new Error(d.error||"Login failed");location.href="/dashboard"}catch(err){out.textContent=String(err.message||err)}};</script></main></body></html>`;
+      res.writeHead(200, {"content-type":"text/html; charset=utf-8","cache-control":"no-store"});
+      return res.end(html);
+    }
+
+    if (url.pathname === "/login" && req.method === "POST") {
+      if (!cfg.masterAuth.enabled) return send(res, 503, { ok:false, error:"Master authentication is not configured" }, rid);
+      const body = await readJson(req, 100_000);
+      const username = String(body.username || "");
+      const password = String(body.password || "");
+      const basic = "Basic " + Buffer.from(username + ":" + password, "utf8").toString("base64");
+      const valid = authenticateMaster({ headers: { authorization: basic } }, cfg.masterAuth.username, process.env.BHAI_CORE_PASSWORD);
+      if (!valid) return send(res, 401, { ok:false, error:"Invalid username or password" }, rid);
+      res.writeHead(200, {"content-type":"application/json; charset=utf-8","cache-control":"no-store","set-cookie":sessionCookie(cfg.masterAuth.username),"x-request-id":rid});
+      return res.end(JSON.stringify({ok:true}));
+    }
+
+    if (url.pathname === "/logout" && req.method === "POST") {
+      res.writeHead(200, {"content-type":"application/json; charset=utf-8","cache-control":"no-store","set-cookie":clearSessionCookie(),"x-request-id":rid});
+      return res.end(JSON.stringify({ok:true}));
+    }
+
     if (url.pathname === "/dashboard" && req.method === "GET") {
       const providerStatus = getProviderStatus();
       const providerCards = Object.entries(providerStatus)
@@ -186,7 +223,7 @@ const server = http.createServer(async (req, res) => {
       .note{margin-top:18px;padding:14px;border-radius:14px;background:#111c31;border:1px solid #273753;color:#b8c4dd;font-size:13px;line-height:1.5}
       </style></head><body><main><div class="top"><div class="brand">🤖 BHAI-CORE</div><div class="live">● LIVE</div></div>
       <h1>API Dashboard</h1><p>Core service, AI providers aur API keys ek jagah.</p>
-      <div class="section"><h2>🔐 Master Access → API Key</h2><div class="panel"><p>Apne master username/password se ek BHAI API key create karo. Password page par store nahi hota.</p><div class="row"><input id="u" placeholder="Username" autocomplete="username"><input id="p" placeholder="Password" type="password" autocomplete="current-password"><input id="n" placeholder="Key name" value="my-app"></div><button id="create">Create API Key</button><pre id="out"></pre></div></div>
+      <div class="section"><h2>🔐 Master Access → API Key</h2><div class="panel"><p>Dashboard session authenticated hai. Master password browser mein store nahi hota.</p><div class="row"><input id="n" placeholder="Key name" value="my-app"></div><button id="create">Create API Key</button><button id="logout" style="margin-top:10px;background:#2d2330;border-color:#563746">Logout</button><pre id="out"></pre></div></div>
       <div class="section"><h2>AI Providers</h2><div class="grid">${providerCards}</div></div>
       <div class="section"><h2>Core</h2><div class="grid">
       <a class="card" href="/v1/models"><b>🤖 Models</b><span class="url">Configured model registry</span></a>
@@ -207,8 +244,7 @@ const server = http.createServer(async (req, res) => {
       </div></div>
       <div class="note">🔒 Master credentials are only used for the request. The generated API key is shown once; save it securely. Provider keys are never displayed here.</div>
       <script>
-      document.getElementById("create").onclick=async()=>{const u=document.getElementById("u").value,p=document.getElementById("p").value,n=document.getElementById("n").value||"my-app",out=document.getElementById("out");out.textContent="Creating…";try{const r=await fetch("/v1/keys",{method:"POST",headers:{"content-type":"application/json","authorization":"Basic "+btoa(u+":"+p)},body:JSON.stringify({name:n})});const d=await r.json();out.textContent=r.ok?"API KEY (save now):\n"+d.key+"\n\nKey ID: "+d.id:JSON.stringify(d,null,2)}catch(e){out.textContent=String(e)}};
-      </script></main></body></html>`;
+      document.getElementById("create").onclick=async()=>{const n=document.getElementById("n").value||"my-app",out=document.getElementById("out");out.textContent="Creating…";try{const r=await fetch("/v1/keys",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({name:n})});const d=await r.json();if(r.status===401){location.href="/login";return}out.textContent=r.ok?"API KEY (save now):\n"+d.key+"\n\nKey ID: "+d.id:JSON.stringify(d,null,2)}catch(e){out.textContent=String(e)}};document.getElementById("logout").onclick=async()=>{await fetch("/logout",{method:"POST"});location.href="/login"};</script></main></body></html>`;
       res.writeHead(200, {"content-type":"text/html; charset=utf-8","cache-control":"no-store"});
       return res.end(html);
     }

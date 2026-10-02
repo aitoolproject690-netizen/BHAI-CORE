@@ -58,6 +58,7 @@ async function openAICompatibleStream(url, headers, body, onToken, timeoutMs = 6
         }
       } catch {}
     }
+  }
   const finalText = decoder.decode();
   buffer += finalText;
   if (buffer.trim()) {

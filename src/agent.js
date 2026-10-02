@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { searchRag, ragContext } from "./rag.js";
 import { analyzeImage, getVisionCandidates } from "./vision.js";
 import { createImageRequest, submitComfyUI } from "./image.js";
@@ -48,7 +49,8 @@ export async function executeAgentTool(name, input = {}, identity = {}, options 
   const policy = authorizeTool(tool, identity);
   if (policy.risk === "high") {
     const approval = options.approvalId ? await getApproval(options.approvalId, identity.id) : null;
-    if (!approval || approval.tool !== tool || approval.status !== "approved") {
+    const approvalInputHash = crypto.createHash("sha256").update(JSON.stringify(input ?? {})).digest("hex");
+    if (!approval || approval.tool !== tool || approval.status !== "approved" || approval.inputHash !== approvalInputHash) {
       const error = new Error("Approved action required for tool " + tool);
       error.code = "APPROVAL_REQUIRED"; error.status = 428;
       throw error;

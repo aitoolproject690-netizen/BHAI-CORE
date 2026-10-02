@@ -48,6 +48,7 @@ import { createRenewalScheduler, renewalSchedulerInfo } from "./src/renewalSched
 import crypto from "node:crypto";
 import { checkRateLimit, rateLimitInfo } from "./src/rateLimit.js";
 import { readRequestBody } from "./src/requestBody.js";
+import { authenticateMaster } from "./src/masterAuth.js";
 
 const cfg = config();
 
@@ -180,6 +181,11 @@ const server = http.createServer(async (req, res) => {
         });
       }
       return send(res, 202, { ok:true, event:"push", repository, branch, commit, triggered:hooks.length }, rid);
+    }
+
+    if (cfg.masterAuth.enabled && !authenticateMaster(req, cfg.masterAuth.username, process.env.BHAI_CORE_PASSWORD)) {
+      res.setHeader("www-authenticate", 'Basic realm="BHAI-CORE"');
+      return send(res, 401, { ok: false, error: "Master username/password required" }, rid);
     }
 
     if (!authorized(req))

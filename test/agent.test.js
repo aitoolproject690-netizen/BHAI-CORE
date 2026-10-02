@@ -110,3 +110,24 @@ test("cloud service creation requires an approved exact input", async () => {
     error => error.code === "APPROVAL_REQUIRED" && error.status === 428
   );
 });
+
+
+test("deployment mutations require cloud build permission and exact approval", async () => {
+  const { resetStoreForTests } = await import("../src/store.js");
+  const { createApproval, decideApproval } = await import("../src/approval.js");
+  const { executeAgentTool } = await import("../src/agent.js");
+  resetStoreForTests();
+  const denied = { id: "owner-no-deploy", scopes: ["agent:read", "agent:write"] };
+  await assert.rejects(
+    () => executeAgentTool("cloud_deployment_update", { deploymentId: "dep-1", action: "promote" }, denied),
+    error => error.code === "PERMISSION_DENIED" && error.status === 403
+  );
+  const identity = { id: "owner-deploy", scopes: ["cloud:build", "agent:write"] };
+  const input = { deploymentId: "dep-1", action: "rollback" };
+  const approval = await createApproval({ actorId: identity.id, tool: "cloud_deployment_update", input });
+  assert.ok(await decideApproval(approval.id, identity.id, "approved"));
+  await assert.rejects(
+    () => executeAgentTool("cloud_deployment_update", { ...input, deploymentId: "dep-2" }, identity, { approvalId: approval.id }),
+    error => error.code === "APPROVAL_REQUIRED" && error.status === 428
+  );
+});

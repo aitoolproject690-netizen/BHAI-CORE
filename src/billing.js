@@ -47,6 +47,11 @@ export async function setBillingPlan(ownerId, plan) {
 
 export async function recordBillingUsage(ownerId, delta = {}) {
   if (!ownerId) throw new Error("ownerId is required");
+  for (const field of ["requests", "charsIn", "charsOut", "imageJobs", "videoSeconds"]) {
+    if (delta[field] != null && (!Number.isFinite(Number(delta[field])) || Number(delta[field]) < 0)) {
+      throw Object.assign(new Error("Invalid billing usage delta: " + field), { code: "BILLING_USAGE_INVALID", status: 400 });
+    }
+  }
   let result;
   const month = monthKey();
   await updateStore(store => {

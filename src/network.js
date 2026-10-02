@@ -86,6 +86,8 @@ export async function setServiceRouteStatus(serviceId, status) {
 
 export async function rebindServiceRoutes(fromServiceId, toServiceId, targetPort, ownerId = null) {
   if (!toServiceId) return 0;
+  if (!ownerId)
+    throw Object.assign(new Error("Route rebind owner is required"), { code:"ROUTE_OWNER_REQUIRED", status:400 });
   const snapshot = await getStore();
   const targetService = snapshot.services?.[toServiceId];
   if (!targetService)

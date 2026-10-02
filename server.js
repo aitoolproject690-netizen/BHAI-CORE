@@ -35,7 +35,7 @@ import { getDeployment, listDeployments, setDeploymentStatus, deploymentInfo, pr
 import { createDomain, getDomain, listDomains, setDomainStatus, domainInfo, attachDomainRoute } from "./src/domain.js";
 import { createCertificate, getCertificate, listCertificates, setCertificateStatus, certificateInfo } from "./src/certificates.js";
 import { createDnsChallenge, getDnsChallenge, listDnsChallenges, setDnsChallengeStatus, verifyDnsChallenge, dnsInfo } from "./src/dns.js";
-import { getAcmeDirectory, acmeInfo, createAcmeAccount, listAcmeAccounts, renewDueCertificates } from "./src/acme.js";
+import { getAcmeDirectory, acmeInfo, createAcmeAccount, listAcmeAccounts, registerStoredAcmeAccount, renewDueCertificates } from "./src/acme.js";
 import { createAcmeOrder, getAcmeOrder, listAcmeOrders, prepareDnsChallenge, setAcmeOrderStatus, acmeOrderInfo } from "./src/acmeOrder.js";
 import { createAutoDeploy, getAutoDeploy, listAutoDeploys, setAutoDeployStatus, autoDeployInfo, findAutoDeploysByRepository, recordAutoDeployRun, claimWebhookDelivery } from "./src/autodeploy.js";
 import { createRoute, getRoute, listRoutes, setRouteStatus, findRouteByHostname, networkInfo, proxyRequest } from "./src/network.js";
@@ -487,6 +487,14 @@ const server = http.createServer(async (req, res) => {
     const acmeOrderMatch=url.pathname.match(/^\/v1\/cloud\/acme\/orders\/([^/]+)$/);
     if(acmeOrderMatch&&req.method==="GET"){const identity=await authenticate(req.headers["x-bhai-key"]);if(!identity)return send(res,401,{ok:false,error:"BHAI key required"},rid);const order=await getAcmeOrder(acmeOrderMatch[1],identity.id);return order?send(res,200,{ok:true,order},rid):send(res,404,{ok:false,error:"ACME order not found"},rid);}
     if(acmeOrderMatch&&req.method==="POST"){const identity=await authenticate(req.headers["x-bhai-key"]);if(!identity)return send(res,401,{ok:false,error:"BHAI key required"},rid);const body=await readJson(req);if(body.action==="prepare_dns")return send(res,202,{ok:true,...await prepareDnsChallenge(acmeOrderMatch[1],identity.id,{recordName:body.recordName,recordValue:body.recordValue})},rid);const order=await setAcmeOrderStatus(acmeOrderMatch[1],identity.id,body.status,body.patch||{});return order?send(res,200,{ok:true,order},rid):send(res,404,{ok:false,error:"ACME order not found"},rid);}
+    if (url.pathname === "/v1/cloud/acme/accounts/register" && req.method === "POST") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res,401,{ok:false,error:"BHAI key required"},rid);
+      const body=await readJson(req);
+      const account=await registerStoredAcmeAccount({id:body.id,ownerId:identity.id});
+      return account ? send(res,200,{ok:true,account},rid) : send(res,404,{ok:false,error:"ACME account not found"},rid);
+    }
+
     if (url.pathname === "/v1/cloud/acme/info" && req.method === "GET") return send(res,200,{ok:true,acme:acmeInfo()},rid);
     if (url.pathname === "/v1/cloud/acme/directory" && req.method === "GET") { try{return send(res,200,{ok:true,...await getAcmeDirectory()},rid);}catch(error){return send(res,error.status||502,{ok:false,error:error.message,code:error.code||"ACME_ERROR"},rid);} }
     if (url.pathname === "/v1/cloud/acme/accounts" && req.method === "GET") { const identity=await authenticate(req.headers["x-bhai-key"]);if(!identity)return send(res,401,{ok:false,error:"BHAI key required"},rid);return send(res,200,{ok:true,accounts:await listAcmeAccounts(identity.id)},rid); }

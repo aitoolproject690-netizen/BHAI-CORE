@@ -39,7 +39,7 @@ test("domain activation requires exact verified TXT challenge", async () => {
 
 test("domain status is validated", async () => {
   resetStoreForTests();
-  await updateStore(s => { s.services["svc_1"] = { id:"svc_1", ownerId:"user-a" }; return s; });
+  await updateStore(s => { s.services["svc_1"] = { id:"svc_1", ownerId:"user-a", status:"running" }; return s; });
   const domain = await createDomain({ ownerId:"user-a", serviceId:"svc_1", hostname:"app.example.com" });
   const dns = await createDnsChallenge({ ownerId:"user-a", domainId:domain.id, hostname:domain.hostname, name:"_acme-challenge."+domain.hostname, value:"verified-token" });
   await updateStore(s => { s.dnsRecords[dns.id].status = "verified"; return s; });

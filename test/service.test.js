@@ -36,7 +36,6 @@ test("stopping a service disables its route", async () => {
   assert.equal(await findRouteByHostname("app.route-test.com"), null);
 });
 
-
 test("crashed service keeps its allocated port for restart", async () => {
   resetStoreForTests();
   const s = await createService({
@@ -74,17 +73,29 @@ test("service persistence redacts secret environment values", async () => {
 
 test("health monitor restart ignores the old runtime exit", async () => {
   resetStoreForTests();
-  const s = await createService({
-    ownerId: "owner-monitor-race",
-    buildId: "build-monitor-race",
-    command: "sleep 5",
-    cwd: process.cwd(),
-    healthUrl: null
-  });
-  const result = await monitorService(s.id, "owner-monitor-race");
-  assert.equal(result.restarted, true);
-  const current = await getService(s.id, "owner-monitor-race");
-  assert.equal(current.status, "running");
-  assert.equal(current.restartCount, 1);
-  await stopService(s.id, "owner-monitor-race");
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({ ok: false, status: 503 });
+  let s;
+  try {
+    s = await createService({
+      ownerId: "owner-monitor-race",
+      buildId: "build-monitor-race",
+      command: "sleep 5",
+      cwd: process.cwd(),
+      healthUrl: "http://127.0.0.1:19001/health",
+      port: 19001
+    });
+    const result = await monitorService(s.id, "owner-monitor-race");
+    assert.equal(result.restarted, true);
+    const current = await getService(s.id, "owner-monitor-race");
+    assert.equal(current.status, "running");
+    assert.equal(current.restartCount, 1);
+    await new Promise(r => setTimeout(r, 50));
+    const afterOldExit = await getService(s.id, "owner-monitor-race");
+    assert.equal(afterOldExit.status, "running");
+    assert.equal(afterOldExit.restartCount, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (s) await stopService(s.id, "owner-monitor-race").catch(() => {});
+  }
 });

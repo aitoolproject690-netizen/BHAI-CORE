@@ -1,12 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createDomain, getDomain, listDomains, setDomainStatus, attachDomainRoute, rebindDomainServices } from "../src/domain.js";
-import { resetStoreForTests, updateStore } from "../src/store.js";
+import { getStore, resetStoreForTests, updateStore } from "../src/store.js";
 import { createDnsChallenge, setDnsChallengeStatus } from "../src/dns.js";
 
 test("domains are owner-scoped and normalize hostname", async () => {
   resetStoreForTests();
-  await updateStore(s => { s.services["svc_1"] = { id:"svc_1", ownerId:"user-a", status:"running" }; return s; });
+  await updateStore(s => { s.services["svc_1"] = { id:"svc_1", ownerId:"user-a", status:"running", port:3211 }; return s; });
   const domain = await createDomain({ ownerId:"user-a", serviceId:"svc_1", hostname:"APP.Example.COM" });
   assert.equal(domain.hostname, "app.example.com");
   assert.equal((await listDomains("user-a")).length, 1);
@@ -16,7 +16,7 @@ test("domains are owner-scoped and normalize hostname", async () => {
 test("domain activation requires exact verified TXT challenge", async () => {
   resetStoreForTests();
   await updateStore(s => {
-    s.services["svc_1"] = { id:"svc_1", ownerId:"user-a", status:"running" };
+    s.services["svc_1"] = { id:"svc_1", ownerId:"user-a", status:"running", port:3211 };
     return s;
   });
   const domain = await createDomain({ ownerId:"user-a", serviceId:"svc_1", hostname:"app.example.com" });
@@ -39,7 +39,7 @@ test("domain activation requires exact verified TXT challenge", async () => {
 
 test("domain status is validated", async () => {
   resetStoreForTests();
-  await updateStore(s => { s.services["svc_1"] = { id:"svc_1", ownerId:"user-a", status:"running" }; return s; });
+  await updateStore(s => { s.services["svc_1"] = { id:"svc_1", ownerId:"user-a", status:"running", port:3211 }; return s; });
   const domain = await createDomain({ ownerId:"user-a", serviceId:"svc_1", hostname:"app.example.com" });
   const dns = await createDnsChallenge({ ownerId:"user-a", domainId:domain.id, hostname:domain.hostname, name:"_acme-challenge."+domain.hostname, value:"verified-token" });
   await updateStore(s => { s.dnsRecords[dns.id].status = "verified"; return s; });
@@ -51,7 +51,7 @@ test("domain status is validated", async () => {
 
 test("domain can persist its ingress route binding", async () => {
   resetStoreForTests();
-  await updateStore(s => { s.services["svc_1"] = { id:"svc_1", ownerId:"user-a" }; s.routes["rte_1"] = { id:"rte_1", ownerId:"user-a", serviceId:"svc_1" }; return s; });
+  await updateStore(s => { s.services["svc_1"] = { id:"svc_1", ownerId:"user-a", port:3211 }; s.routes["rte_1"] = { id:"rte_1", ownerId:"user-a", serviceId:"svc_1" }; return s; });
   const domain = await createDomain({ ownerId:"user-a", serviceId:"svc_1", hostname:"app.example.com" });
   const linked = await attachDomainRoute(domain.id, "user-a", "rte_1");
   assert.equal(linked.routeId, "rte_1");

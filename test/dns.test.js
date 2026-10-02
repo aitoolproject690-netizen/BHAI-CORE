@@ -33,4 +33,12 @@ test("DNS challenge records must belong to the domain hostname", async () => {
   assert.equal(record.name, "_acme-challenge.app.example.com");
 });
 
-test("DNS verified status requires live verification", async () => {\n  resetStoreForTests();\n  await updateStore(s => {\n    s.domains["d1"] = { id:"d1", ownerId:"u1", hostname:"app.example.com" };\n    return s;\n  });\n  const record = await createDnsChallenge({ ownerId:"u1", domainId:"d1", hostname:"app.example.com", name:"_acme-challenge.app.example.com", value:"token" });\n  await assert.rejects(() => setDnsChallengeStatus(record.id, "u1", "verified"), error => error.code === "DNS_VERIFICATION_REQUIRED");\n});\n
+test("DNS verified status requires live verification", async () => {
+  resetStoreForTests();
+  await updateStore(s => {
+    s.domains["d1"] = { id:"d1", ownerId:"u1", hostname:"app.example.com" };
+    return s;
+  });
+  const record = await createDnsChallenge({ ownerId:"u1", domainId:"d1", hostname:"app.example.com", name:"_acme-challenge.app.example.com", value:"token" });
+  await assert.rejects(() => setDnsChallengeStatus(record.id, "u1", "verified"), error => error.code === "DNS_VERIFICATION_REQUIRED");
+});

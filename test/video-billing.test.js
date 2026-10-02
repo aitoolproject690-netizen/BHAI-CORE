@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createVideoRequest, planVideo } from "../src/video.js";
-import { billingPlans } from "../src/billing.js";
+import { billingPlans, setBillingPlan, recordBillingUsage, consumeBillingQuota } from "../src/billing.js";
+import { resetStoreForTests } from "../src/store.js";
 
 test("video engine validates and builds a timeline", () => {
   const request = createVideoRequest({
@@ -22,7 +23,6 @@ test("billing plans expose stable quotas", () => {
   assert.ok(plans.pro.monthlyRequests > plans.free.monthlyRequests);
 });
 
-import { setBillingPlan } from "../src/billing.js";
 
 test("billing rejects unknown plans", async () => {
   await assert.rejects(() => setBillingPlan("test-owner", "not-a-plan"), { code: "BILLING_PLAN_INVALID", status: 400 });
@@ -41,14 +41,12 @@ test("vision request validator accepts supported image data", () => {
   assert.equal(result.image.mimeType, "image/jpeg");
 });
 
-import { recordBillingUsage } from "../src/billing.js";
 
 test("billing rejects negative or non-finite usage deltas", async () => {
   await assert.rejects(() => recordBillingUsage("billing-test", { requests: -1 }), { code: "BILLING_USAGE_INVALID", status: 400 });
   await assert.rejects(() => recordBillingUsage("billing-test", { charsIn: Number.NaN }), { code: "BILLING_USAGE_INVALID", status: 400 });
 });
 
-import { consumeBillingQuota, setBillingPlan } from "../src/billing.js";
 
 test("billing quota consumption is atomic under concurrent requests", async () => {
   resetStoreForTests();

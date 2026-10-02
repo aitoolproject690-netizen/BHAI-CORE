@@ -1212,7 +1212,7 @@ document.getElementById("refreshKeys").onclick=loadKeys;loadKeys();</script></ma
       const usageKey = identity.id;
       const body = await readJson(req);
       const inputChars = JSON.stringify(body).length;
-      await assertBudget(usageKey, identity.limits);
+      await assertBudget(usageKey, identity.limits, { requests: 1, inputChars });
       const billingReservation = { requests: 1, charsIn: inputChars };
       await consumeBillingQuota(usageKey, billingReservation);
       let result;

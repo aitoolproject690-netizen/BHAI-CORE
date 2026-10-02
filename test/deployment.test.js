@@ -22,11 +22,16 @@ test("deployments are persistent and owner-scoped", async () => {
 
 test("deployment status accepts only supported values", async () => {
   resetStoreForTests();
+  await updateStore(s => {
+    s.services["svc-status"] = { id:"svc-status", ownerId:"user-a", status:"running" };
+    return s;
+  });
   const deployment = await createDeployment({
     ownerId: "user-a",
     repository: "owner/app",
     buildId: "build-2",
-    path: "/tmp/deployment"
+    path: "/tmp/deployment",
+    serviceId: "svc-status"
   });
   const active = await setDeploymentStatus(deployment.id, "user-a", "active");
   assert.equal(active.status, "active");

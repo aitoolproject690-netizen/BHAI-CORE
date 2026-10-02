@@ -63,6 +63,12 @@ export async function setDomainStatus(id, ownerId, status) {
 
 export async function attachDomainRoute(id, ownerId, routeId) {
   if (!routeId) return null;
+  const store = await getStore();
+  const domain = store.domains?.[id];
+  const route = store.routes?.[routeId];
+  if (!domain || domain.ownerId !== ownerId) return null;
+  if (!route || route.ownerId !== ownerId || route.serviceId !== domain.serviceId)
+    throw Object.assign(new Error("Domain route ownership or service mismatch"), { code:"DOMAIN_ROUTE_FORBIDDEN", status:403 });
   let found = false;
   await updateStore(store => {
     const d = store.domains?.[id];

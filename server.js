@@ -59,7 +59,7 @@ function send(res, status, body, rid) {
 
 function authorized(req) {
   if (!cfg.apiKey) return true;
-  return (req.headers.authorization || "") === "Bearer " + cfg.apiKey;
+  return secretsEqual(req.headers.authorization || "", "Bearer " + cfg.apiKey);
 }
 
 function secretsEqual(provided, expected) {

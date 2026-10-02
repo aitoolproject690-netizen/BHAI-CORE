@@ -8,6 +8,11 @@ export function config() {
   if (!host.trim()) {
     throw Object.assign(new Error("Invalid HOST configuration"), { code: "CONFIG_HOST_INVALID", status: 500 });
   }
+  const providerOrder = env("AI_PROVIDER_ORDER", "ollama,gemini,openai,anthropic,huggingface").split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+  const supportedProviders = new Set(["ollama", "gemini", "openai", "anthropic", "huggingface"]);
+  if (!providerOrder.length || providerOrder.some(name => !supportedProviders.has(name))) {
+    throw Object.assign(new Error("Invalid AI_PROVIDER_ORDER configuration"), { code: "CONFIG_PROVIDER_ORDER_INVALID", status: 500 });
+  }
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     throw Object.assign(new Error("Invalid PORT configuration"), { code: "CONFIG_PORT_INVALID", status: 500 });
   }
@@ -15,7 +20,7 @@ export function config() {
     port,
     host,
     apiKey: env("BHAI_CORE_API_KEY"),
-    providerOrder: env("AI_PROVIDER_ORDER", "ollama,gemini,openai,anthropic,huggingface").split(",").map(s => s.trim().toLowerCase()).filter(Boolean),
+    providerOrder,
     github: {
       token: env("GITHUB_TOKEN"),
       url: env("GITHUB_API_URL", "https://api.github.com")

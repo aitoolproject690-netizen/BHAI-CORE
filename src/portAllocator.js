@@ -19,8 +19,8 @@ export async function allocatePort(preferredPort) {
     store.servicePorts ??= {};
     const used = new Set(Object.values(store.servicePorts).map(Number));
     if (preferred != null) {
-      if (!Number.isInteger(preferred) || preferred < 1 || preferred > 65535)
-        throw Object.assign(new Error("Invalid service port"), { code:"PORT_INVALID", status:400 });
+      if (!Number.isInteger(preferred) || preferred < start || preferred > end)
+        throw Object.assign(new Error("Preferred service port is outside configured range"), { code:"PORT_OUT_OF_RANGE", status:400 });
       if (used.has(preferred))
         throw Object.assign(new Error("Service port already allocated"), { code:"PORT_IN_USE", status:409 });
       allocated = preferred;

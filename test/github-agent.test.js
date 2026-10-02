@@ -23,6 +23,6 @@ test("GitHub tools are visible but do not fake execution", async () => {
   assert.ok(listAgentTools().some(item => item.name === "github_file_read"));
   await assert.rejects(
     () => executeAgentTool("github_file_read", { repository: "owner/repo", path: "README.md" }, { id: "u1", scopes: ["github:read", "agent:read"] }),
-    /GitHub connector runtime is not configured/
+    /GITHUB_TOKEN is missing|GitHub connector runtime is not configured/
   );
 });

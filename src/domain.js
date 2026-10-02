@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { getStore, updateStore } from "./store.js";
 import { listDnsChallenges } from "./dns.js";
+import { healthCheck } from "./runtime.js";
 
 const STATUSES = new Set(["pending", "active", "disabled"]);
 const TLS_MODES = new Set(["managed", "manual"]);
@@ -61,6 +62,14 @@ export async function setDomainStatus(id, ownerId, status) {
       r.type === "TXT"
     );
     if (!verified) throw Object.assign(new Error("Domain DNS verification required before activation"), { code:"DOMAIN_DNS_NOT_VERIFIED", status:409 });
+    const service = store.services?.[domain.serviceId];
+    if (!service || service.ownerId !== ownerId || service.status !== "running")
+      throw Object.assign(new Error("Domain service is not ready"), { code:"DOMAIN_SERVICE_NOT_READY", status:409 });
+    if (service.healthUrl) {
+      const health = await healthCheck(service.healthUrl, { expectedPort: service.port });
+      if (!health.ok)
+        throw Object.assign(new Error("Domain service health check failed"), { code:"DOMAIN_SERVICE_UNHEALTHY", status:409 });
+    }
   }
   let found = false;
   await updateStore(store => {

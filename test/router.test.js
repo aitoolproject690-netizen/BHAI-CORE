@@ -24,3 +24,20 @@ test("normalizeMaxAttempts safely handles invalid limits", () => {
   assert.equal(normalizeMaxAttempts(2, 4), 2);
   assert.equal(normalizeMaxAttempts(99, 4), 4);
 });
+
+
+test("isProviderConfigured requires a callable adapter", async () => {
+  const { isProviderConfigured } = await import("../src/router.js");
+  const { providerAdapters } = await import("../src/providers.js");
+  const { config } = await import("../src/config.js");
+  const cfg = config();
+  const previous = providerAdapters.__invalid;
+  providerAdapters.__invalid = { notCallable: true };
+  cfg.providers.__invalid = { key: "test", model: "test" };
+  try {
+    assert.equal(isProviderConfigured("__invalid", cfg), false);
+  } finally {
+    if (previous === undefined) delete providerAdapters.__invalid;
+    else providerAdapters.__invalid = previous;
+  }
+});

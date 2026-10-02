@@ -107,6 +107,9 @@ test("production cutover updates pointer and traffic bindings together", async (
     await attachDeploymentService(newDeployment.id, "user-a", newService.id);
 
     await updateStore(s => {
+      s.production ??= {};
+      s.routes ??= {};
+      s.domains ??= {};
       s.production[`user-a:owner/app:main`] = oldDeployment.id;
       s.deployments[oldDeployment.id].status = "active";
       s.routes["route-cutover"] = {

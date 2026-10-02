@@ -89,7 +89,7 @@ async function geminiChatStream({ key, model, messages, temperature = 0.7, onTok
         : { text: String(part?.text ?? "") })
       : [{ text: String(m.content ?? "") }]
   }));
-  const body = { contents, generationConfig: { temperature } };
+  const body = { contents };
   if (system) body.systemInstruction = { parts: [{ text: system }] };
   const response = await fetch(
     "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) +
@@ -199,7 +199,7 @@ export const providerAdapters = {
   async gemini({ key, model, messages, temperature = 0.7 }) {
     const system = messages.filter(m => m.role === "system").map(m => String(m.content ?? "")).filter(Boolean).join("\n");
     const contents = messages.filter(m => m.role !== "system").map(m => ({ role: m.role === "assistant" ? "model" : "user", parts: Array.isArray(m.content) ? m.content.map(part => part?.type === "image" ? { inlineData: { mimeType: part.mimeType, data: part.data } } : { text: String(part?.text ?? "") }) : [{ text: String(m.content ?? "") }] }));
-    const body = { contents, generationConfig: { temperature } };
+    const body = { contents };
     if (system) body.systemInstruction = { parts: [{ text: system }] };
     const data = await jsonFetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent?key=" + encodeURIComponent(key), {
       method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify(body)

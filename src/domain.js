@@ -105,6 +105,8 @@ export async function attachDomainRoute(id, ownerId, routeId) {
 
 export async function rebindDomainServices(fromServiceId, toServiceId, ownerId = null) {
   if (!toServiceId) return 0;
+  if (!ownerId)
+    throw Object.assign(new Error("Domain rebind owner is required"), { code:"DOMAIN_OWNER_REQUIRED", status:400 });
   const snapshot = await getStore();
   const targetService = snapshot.services?.[toServiceId];
   if (!targetService)

@@ -5,7 +5,7 @@ import { resetStoreForTests, updateStore } from "../src/store.js";
 
 test("network route is owner scoped and hostname normalized", async () => {
   resetStoreForTests();
-  await updateStore(s => { s.services["svc-1"] = { id:"svc-1", ownerId:"owner-net" }; return s; });
+  await updateStore(s => { s.services["svc-1"] = { id:"svc-1", ownerId:"owner-net", status:"running" }; return s; });
   const route = await createRoute({ ownerId:"owner-net", hostname:"APP.Example.COM", serviceId:"svc-1", targetPort:3210 });
   assert.equal(route.hostname, "app.example.com");
   assert.equal(route.targetPort, 3210);
@@ -15,7 +15,7 @@ test("network route is owner scoped and hostname normalized", async () => {
 
 test("network route rejects duplicate hostname and invalid ports", async () => {
   resetStoreForTests();
-  await updateStore(s => { s.services["svc-1"] = { id:"svc-1", ownerId:"owner-net" }; s.services["svc-2"] = { id:"svc-2", ownerId:"owner-net" }; return s; });
+  await updateStore(s => { s.services["svc-1"] = { id:"svc-1", ownerId:"owner-net" }; s.services["svc-2"] = { id:"svc-2", ownerId:"owner-net", status:"running" }; return s; });
   await createRoute({ ownerId:"owner-net", hostname:"app.example.com", serviceId:"svc-1", targetPort:3210 });
   await assert.rejects(() => createRoute({ ownerId:"owner-net", hostname:"app.example.com", serviceId:"svc-2", targetPort:3211 }), /Hostname already routed/);
   await assert.rejects(() => createRoute({ ownerId:"owner-net", hostname:"bad", serviceId:"svc-2", targetPort:3211 }), /Invalid route hostname/);

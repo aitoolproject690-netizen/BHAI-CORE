@@ -31,3 +31,24 @@ test("agent jobs are isolated by authenticated owner", async () => {
   assert.equal(await executeAgentTool("job_get", { id: created.id }, ownerB), null);
   assert.ok(await executeAgentTool("job_get", { id: created.id }, ownerA));
 });
+
+
+test("approved high-risk agent actions are bound to the approved input", async () => {
+  const { resetStoreForTests } = await import("../src/store.js");
+  const { createApproval, decideApproval } = await import("../src/approval.js");
+  const { executeAgentTool } = await import("../src/agent.js");
+
+  resetStoreForTests();
+  const identity = { id: "owner-approval", scopes: ["*"] };
+  const approval = await createApproval({
+    actorId: identity.id,
+    tool: "github_repo_create",
+    input: { name: "approved-repo", private: true }
+  });
+  assert.ok(await decideApproval(approval.id, identity.id, "approved"));
+
+  await assert.rejects(
+    () => executeAgentTool("github_repo_create", { name: "different-repo", private: true }, identity, { approvalId: approval.id }),
+    error => error.code === "APPROVAL_REQUIRED" && error.status === 428
+  );
+});

@@ -33,8 +33,8 @@ test("deployment status accepts only supported values", async () => {
     path: "/tmp/deployment",
     serviceId: "svc-status"
   });
-  const active = await setDeploymentStatus(deployment.id, "user-a", "active");
-  assert.equal(active.status, "active");
+  const ready = await setDeploymentStatus(deployment.id, "user-a", "ready");
+  assert.equal(ready.status, "ready");
   await assert.rejects(
     () => setDeploymentStatus(deployment.id, "user-a", "running"),
     error => error.code === "DEPLOYMENT_STATUS_INVALID"

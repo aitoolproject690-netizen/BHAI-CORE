@@ -30,12 +30,19 @@ export async function revokeApiKey(id) {
   return found;
 }
 
+function hashesEqual(left, right) {
+  if (typeof left !== "string" || typeof right !== "string") return false;
+  const a = Buffer.from(left, "hex");
+  const b = Buffer.from(right, "hex");
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
 export async function authenticate(value) {
   if (!value) return null;
   const digest = hash(value);
   const store = await getStore();
   for (const item of Object.values(store.apiKeys)) {
-    if (item.active && item.hash === digest) return { id: item.id, name: item.name, scopes: item.scopes };
+    if (item.active && hashesEqual(item.hash, digest)) return { id: item.id, name: item.name, scopes: item.scopes };
   }
   return null;
 }

@@ -63,6 +63,25 @@ test("domain rebind requires owner context", async () => {
   await assert.rejects(() => rebindDomainServices("svc-from", "svc-target"), error => error.code === "DOMAIN_OWNER_REQUIRED");
 });
 
+test("domain rebind rejects a source service owned by another user", async () => {
+  resetStoreForTests();
+  await updateStore(s => {
+    s.services["svc-from-other"] = { id:"svc-from-other", ownerId:"owner-b", status:"running" };
+    s.services["svc-target-owner"] = { id:"svc-target-owner", ownerId:"owner-a", status:"running" };
+    s.domains["dom-other"] = {
+      id:"dom-other", ownerId:"owner-b", serviceId:"svc-from-other",
+      hostname:"other.example.com", status:"active", tls:"managed",
+      routeId:null, createdAt:new Date().toISOString(), updatedAt:new Date().toISOString()
+    };
+    return s;
+  });
+  await assert.rejects(
+    () => rebindDomainServices("svc-from-other", "svc-target-owner", "owner-a"),
+    error => error.code === "DOMAIN_SERVICE_FORBIDDEN"
+  );
+  assert.equal((await getDomain("dom-other", "owner-b")).serviceId, "svc-from-other");
+});
+
 test("domain rebind validates target service ownership", async () => {
   resetStoreForTests();
   await updateStore(s => {

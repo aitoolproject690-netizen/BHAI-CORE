@@ -322,8 +322,11 @@ const server = http.createServer(async (req, res) => {
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
       const body = await readJson(req, 16_000_000);
       const request = createSpeechRequest(body);
+      await assertBillingQuota(identity.id, { requests: 1, charsIn: request.audio.length });
       if (process.env.WHISPER_ENABLED !== "true") return send(res, 503, { ok: false, error: "Local Whisper is not configured" }, rid);
       const result = await transcribeWhisper({ audio: request.audio, mimeType: request.mimeType, language: request.language, url: process.env.WHISPER_URL });
+      await recordBillingUsage(identity.id, { requests: 1, charsIn: request.audio.length, charsOut: String(result.text || "").length });
+      await recordUsage({ key: identity.id, input: request.audio.length, output: String(result.text || "").length });
       return send(res, 200, { ok: true, ...request, audio: undefined, ...result }, rid);
     }
 
@@ -332,8 +335,11 @@ const server = http.createServer(async (req, res) => {
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
       const body = await readJson(req);
       const request = createTtsRequest(body);
+      await assertBillingQuota(identity.id, { requests: 1, charsIn: request.text.length });
       if (process.env.PIPER_ENABLED !== "true") return send(res, 503, { ok: false, error: "Local Piper is not configured" }, rid);
       const result = await synthesizePiper({ text: request.text, voice: request.voice, language: request.language, url: process.env.PIPER_URL });
+      await recordBillingUsage(identity.id, { requests: 1, charsIn: request.text.length });
+      await recordUsage({ key: identity.id, input: request.text.length });
       return send(res, 200, { ok: true, ...request, ...result }, rid);
     }
 
@@ -375,6 +381,8 @@ const server = http.createServer(async (req, res) => {
         : candidates[0];
       if (!selected) return send(res, 503, { ok: false, error: "No configured vision-capable model" }, rid);
       const providerCfg = cfg.providers[selected.provider];
+      const imageInput = typeof body.image === "string" ? body.image : (body.image?.data || body.image?.base64 || "");
+      await assertBillingQuota(identity.id, { requests: 1, charsIn: String(body.prompt || "").length + String(imageInput).length });
       const result = await analyzeImage({
         provider: selected.provider,
         model: body.model || selected.model,
@@ -383,6 +391,8 @@ const server = http.createServer(async (req, res) => {
         prompt: body.prompt,
         image: body.image
       });
+      await recordBillingUsage(identity.id, { requests: 1, charsIn: String(body.prompt || "").length + String(imageInput).length, charsOut: String(result.text || "").length });
+      await recordUsage({ key: identity.id, input: String(body.prompt || "").length + String(imageInput).length, output: String(result.text || "").length });
       return send(res, 200, { ok: true, ...result }, rid);
     }
 

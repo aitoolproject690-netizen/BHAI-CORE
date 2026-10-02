@@ -6,7 +6,7 @@ import { publicError } from "./src/errors.js";
 import { requestId } from "./src/requestId.js";
 import { recordUsage, allUsage, allProviderUsage } from "./src/usage.js";
 import { assertBudget } from "./src/budget.js";
-import { authenticate, createApiKey, listApiKeys, revokeApiKey } from "./src/auth.js";
+import { authenticate, createApiKey, listApiKeys, revokeApiKey, rotateApiKey } from "./src/auth.js";
 import { health, readiness } from "./src/health.js";
 import { enqueue, getStoredJob } from "./src/queue.js";
 import { startSSE, sendEvent, endSSE } from "./src/stream.js";
@@ -1022,7 +1022,14 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/v1/keys" && req.method === "POST") {
       if (!adminAuthorized(req)) return send(res, 401, { ok: false, error: "Admin authentication required" }, rid);
       const body = await readJson(req);
-      return send(res, 201, { ok: true, ...(await createApiKey(body.name || "app", body.scopes)) }, rid);
+      return send(res, 201, { ok: true, ...(await createApiKey(body.name || "app", body.scopes, body.limits)) }, rid);
+    }
+
+    if (url.pathname.match(/^\\/v1\\/keys\\/([^/]+)\\/rotate$/) && req.method === "POST") {
+      if (!adminAuthorized(req)) return send(res, 401, { ok: false, error: "Admin authentication required" }, rid);
+      const id = url.pathname.split("/")[3];
+      const rotated = await rotateApiKey(id);
+      return rotated ? send(res, 200, { ok: true, ...rotated }, rid) : send(res, 404, { ok: false, error: "Active API key not found" }, rid);
     }
 
     if (url.pathname.startsWith("/v1/keys/") && req.method === "DELETE") {
@@ -1180,7 +1187,7 @@ const server = http.createServer(async (req, res) => {
       const usageKey = identity.id;
       const body = await readJson(req);
       const inputChars = JSON.stringify(body).length;
-      await assertBudget(usageKey);
+      await assertBudget(usageKey, identity.limits);
       const billingReservation = { requests: 1, charsIn: inputChars };
       await consumeBillingQuota(usageKey, billingReservation);
       let result;

@@ -31,9 +31,17 @@ export async function getCertificateSecrets(id,ownerId){
 export async function createCertificate({ownerId,domainId,hostname,challenge="http-01",issuer="acme"}={}) {
   requireOwner(ownerId);
   if(!domainId || !hostname) throw Object.assign(new Error("domainId and hostname required"),{code:"CERT_FIELDS_REQUIRED",status:400});
+  const existing = await getStore();
+  const domain = existing.domains?.[domainId];
+  if (!domain || domain.ownerId !== ownerId)
+    throw Object.assign(new Error("Certificate domain ownership mismatch"),{code:"CERT_DOMAIN_FORBIDDEN",status:403});
+  const normalizedHostname = String(hostname).toLowerCase().replace(/\\.$/, "");
+  const domainHostname = String(domain.hostname || "").toLowerCase().replace(/\\.$/, "");
+  if (normalizedHostname !== domainHostname)
+    throw Object.assign(new Error("Certificate hostname must match domain"),{code:"CERT_HOSTNAME_MISMATCH",status:400});
   if(!CHALLENGE_TYPES.has(challenge)) throw Object.assign(new Error("Unsupported ACME challenge"),{code:"CERT_CHALLENGE_INVALID",status:400});
   const id="cert_"+crypto.randomUUID(), now=new Date().toISOString();
-  const cert={id,ownerId,domainId,hostname:hostname.toLowerCase(),status:"pending",challenge,issuer,expiresAt:null,nextRenewalAt:null,lastError:null,createdAt:now,updatedAt:now};
+  const cert={id,ownerId,domainId,hostname:normalizedHostname,status:"pending",challenge,issuer,expiresAt:null,nextRenewalAt:null,lastError:null,createdAt:now,updatedAt:now};
   await updateStore(s=>{s.certificates??={};s.certificates[id]=cert;return s;});
   return publicCert(cert);
 }

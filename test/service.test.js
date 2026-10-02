@@ -37,6 +37,22 @@ test("stopping a service disables its route", async () => {
 });
 
 
+test("crashed service keeps its allocated port for restart", async () => {
+  resetStoreForTests();
+  const s = await createService({
+    ownerId: "owner-restart-port",
+    buildId: "build-restart-port",
+    command: "sh -c 'exit 1'",
+    cwd: process.cwd()
+  });
+  const port = s.port;
+  await new Promise(r => setTimeout(r, 500));
+  const store = await getStore();
+  assert.equal(store.services[s.id].port, port);
+  assert.equal(store.services[s.id].status, "restarting");
+  await stopService(s.id, "owner-restart-port");
+});
+
 test("service persistence redacts secret environment values", async () => {
   resetStoreForTests();
   const s = await createService({

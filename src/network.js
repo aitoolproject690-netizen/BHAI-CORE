@@ -98,6 +98,7 @@ export async function rebindServiceRoutes(fromServiceId, toServiceId, targetPort
     throw Object.assign(new Error("Target route service has invalid port"), { code:"ROUTE_TARGET_PORT_INVALID", status:409 });
   if (targetPort != null && !validPort(targetPort))
     throw Object.assign(new Error("Invalid targetPort"), { code:"ROUTE_TARGET_PORT_INVALID", status:400 });
+  const resolvedTargetPort = targetPort == null ? Number(targetService.port) : Number(targetPort);
   let changed = 0;
   await updateStore(store => {
     for (const route of Object.values(store.routes || {})) {
@@ -108,7 +109,7 @@ export async function rebindServiceRoutes(fromServiceId, toServiceId, targetPort
         route.status === "active"
       ) {
         route.serviceId = toServiceId;
-        if (validPort(targetPort)) route.targetPort = Number(targetPort);
+        route.targetPort = resolvedTargetPort;
         route.updatedAt = new Date().toISOString();
         changed++;
       }

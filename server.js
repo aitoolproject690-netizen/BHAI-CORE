@@ -395,7 +395,8 @@ const server = http.createServer(async (req, res) => {
     if (rollbackMatch && req.method === "POST") {
       const identity = await authenticate(req.headers["x-bhai-key"]);
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
-      const deployment = await rollbackDeployment(rollbackMatch[1], identity.id);
+      const body = await readJson(req);
+      const deployment = await executeAgentTool("cloud_deployment_update", { deploymentId: rollbackMatch[1], action: "rollback" }, identity, { approvalId: body.approvalId, requestId: rid });
       return deployment ? send(res, 200, { ok: true, deployment, rolledBack: true }, rid) : send(res, 404, { ok: false, error: "Deployment not found" }, rid);
     }
 
@@ -413,11 +414,12 @@ const server = http.createServer(async (req, res) => {
       const identity = await authenticate(req.headers["x-bhai-key"]);
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
       const body = await readJson(req);
-      if (body.status === "active") {
-        const deployment = await promoteDeployment(deploymentMatch[1], identity.id);
-        return deployment ? send(res, 200, { ok: true, deployment }, rid) : send(res, 404, { ok: false, error: "Deployment not found" }, rid);
-      }
-      const deployment = await setDeploymentStatus(deploymentMatch[1], identity.id, body.status);
+      const input = body.action === "rollback"
+        ? { deploymentId: deploymentMatch[1], action: "rollback" }
+        : body.status === "active"
+          ? { deploymentId: deploymentMatch[1], action: "promote" }
+          : { deploymentId: deploymentMatch[1], status: body.status };
+      const deployment = await executeAgentTool("cloud_deployment_update", input, identity, { approvalId: body.approvalId, requestId: rid });
       return deployment ? send(res, 200, { ok: true, deployment }, rid) : send(res, 404, { ok: false, error: "Deployment not found" }, rid);
     }
 

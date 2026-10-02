@@ -21,6 +21,10 @@ function publicDomain(d) {
 export async function createDomain({ ownerId, serviceId, hostname, tls = "managed" } = {}) {
   if (!ownerId || !serviceId || !validHostname(hostname))
     throw Object.assign(new Error("ownerId, serviceId and valid hostname required"), { code:"DOMAIN_FIELDS_REQUIRED", status:400 });
+  const existing = await getStore();
+  const service = existing.services?.[serviceId];
+  if (!service || service.ownerId !== ownerId)
+    throw Object.assign(new Error("Domain service ownership mismatch"), { code:"DOMAIN_SERVICE_FORBIDDEN", status:403 });
   if (!TLS_MODES.has(tls))
     throw Object.assign(new Error("Invalid TLS mode"), { code:"DOMAIN_TLS_INVALID", status:400 });
   const id = "dom_" + crypto.randomUUID();

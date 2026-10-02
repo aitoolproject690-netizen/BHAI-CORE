@@ -36,8 +36,20 @@ export async function createService({ ownerId, buildId, command, cwd, env = {}, 
   const serviceEnv = { ...env, PORT: String(assignedPort) };
   const service = { id, ownerId, buildId, command, cwd, env:serviceEnv, healthUrl, port:assignedPort, status: "starting", restartCount: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), child: null };
   services.set(id, service);
-  await persistService(service);
-  await launch(service);
+  try {
+    await persistService(service);
+    await launch(service);
+  } catch (error) {
+    services.delete(id);
+    try { await releasePort(assignedPort); } catch {}
+    try {
+      await updateStore(store => {
+        if (store.services?.[id]) delete store.services[id];
+        return store;
+      });
+    } catch {}
+    throw error;
+  }
   return publicService(service);
 }
 async function launch(service) {
@@ -86,7 +98,7 @@ export async function checkService(id, ownerId) {
   const s = services.get(id);
   if (!s || s.ownerId !== ownerId) return null;
   if (!s.healthUrl) return { id, status: s.status, health: null };
-  const health = await healthCheck(s.healthUrl);
+  const health = await healthCheck(s.healthUrl, { expectedPort: s.port });
   if (!health.ok && s.status === "running") {
     s.status = "unhealthy";
     await setServiceRouteStatus(s.id, "disabled");

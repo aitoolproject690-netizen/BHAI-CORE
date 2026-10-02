@@ -90,7 +90,7 @@ async function readJson(req, maxBytes = 2_000_000) {
 
 const server = http.createServer(async (req, res) => {
   const rid = requestId(req);
-  const rate = checkRateLimit(req.headers["x-bhai-key"] || req.socket.remoteAddress || "anonymous");
+  const rate = checkRateLimit(req.socket.remoteAddress || "anonymous");
   if (!rate.allowed) return send(res,429,{ok:false,error:"Rate limit exceeded",retryAfterMs:rate.retryAfterMs},rid);
 
   try {

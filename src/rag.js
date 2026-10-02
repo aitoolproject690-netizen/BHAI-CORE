@@ -7,7 +7,7 @@ const DEFAULT_CHUNK_SIZE = Number(process.env.BHAI_CHUNK_SIZE || 1200);
 const DEFAULT_OVERLAP = Number(process.env.BHAI_CHUNK_OVERLAP || 150);
 
 function tokenize(text) {
-  return String(text || "").toLowerCase().match(/[a-z0-9_]+/g) || [];
+  return String(text || "").toLowerCase().match(/[\p{L}\p{N}_]+/gu) || [];
 }
 function makeId() { return "chunk_" + crypto.randomUUID(); }
 

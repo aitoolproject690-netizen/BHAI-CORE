@@ -34,7 +34,7 @@ export async function createService({ ownerId, buildId, command, cwd, env = {}, 
   const id = "svc_" + crypto.randomUUID();
   const assignedPort = await allocatePort(port ?? env?.PORT);
   const serviceEnv = { ...env, PORT: String(assignedPort) };
-  const service = { id, ownerId, buildId, command, cwd, env:serviceEnv, healthUrl, port:assignedPort, status: "starting", restartCount: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), child: null };
+  const service = { id, ownerId, buildId, command, cwd, env:serviceEnv, healthUrl, port:assignedPort, status: "starting", restartCount: 0, restartToken: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), child: null };
   services.set(id, service);
   try {
     await persistService(service);
@@ -71,9 +71,10 @@ async function launch(service) {
     if (service.status === "crashed" && service.restartCount < MAX_RESTARTS) {
       service.restartCount++;
       service.status = "restarting";
+      const restartToken = ++service.restartToken;
       await persistService(service);
       await new Promise(r => setTimeout(r, Math.min(5000 * service.restartCount, 15000)));
-      if (services.has(service.id)) await launch(service);
+      if (services.has(service.id) && service.restartToken === restartToken && service.status === "restarting") await launch(service);
     }
   });
 }
@@ -85,6 +86,7 @@ export async function stopService(id, ownerId) {
   const s = services.get(id);
   if (!s || s.ownerId !== ownerId) return null;
   s.status = "stopping";
+  s.restartToken++;
   await stopRuntime(s.child);
   await releasePort(s.port);
   await setServiceRouteStatus(s.id, "disabled");

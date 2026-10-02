@@ -19,14 +19,21 @@ test("GitHub write requires explicit write scope", () => {
   assert.doesNotThrow(() => authorizeTool("github_file_write", { id: "u1", scopes: ["github:write", "agent:write"] }));
 });
 
-test("GitHub tools are visible but do not fake execution", async () => {
+test("GitHub tools fail closed when the connector is not configured", async () => {
   assert.ok(listAgentTools().some(item => item.name === "github_file_read"));
-  if (!process.env.GITHUB_TOKEN) return;
+  const previousToken = process.env.GITHUB_TOKEN;
+  delete process.env.GITHUB_TOKEN;
   try {
-    await executeAgentTool("github_file_read", { repository: "owner/repo", path: "README.md" }, { id: "u1", scopes: ["github:read", "agent:read"] });
-    assert.fail("expected GitHub connector configuration error");
-  } catch (error) {
-    assert.equal(error.code, "GITHUB_NOT_CONFIGURED");
-    assert.equal(error.status, 503);
+    await assert.rejects(
+      () => executeAgentTool(
+        "github_file_read",
+        { repository: "owner/repo", path: "README.md" },
+        { id: "u1", scopes: ["github:read", "agent:read"] }
+      ),
+      error => error.code === "GITHUB_NOT_CONFIGURED" && error.status === 503
+    );
+  } finally {
+    if (previousToken === undefined) delete process.env.GITHUB_TOKEN;
+    else process.env.GITHUB_TOKEN = previousToken;
   }
 });

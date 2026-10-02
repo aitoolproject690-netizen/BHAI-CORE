@@ -86,6 +86,16 @@ export async function setServiceRouteStatus(serviceId, status) {
 
 export async function rebindServiceRoutes(fromServiceId, toServiceId, targetPort, ownerId = null) {
   if (!toServiceId) return 0;
+  const snapshot = await getStore();
+  const targetService = snapshot.services?.[toServiceId];
+  if (!targetService)
+    throw Object.assign(new Error("Target route service not found"), { code:"ROUTE_SERVICE_NOT_FOUND", status:404 });
+  if (ownerId && targetService.ownerId !== ownerId)
+    throw Object.assign(new Error("Target route service ownership mismatch"), { code:"ROUTE_SERVICE_FORBIDDEN", status:403 });
+  if (!validPort(targetService.port))
+    throw Object.assign(new Error("Target route service has invalid port"), { code:"ROUTE_TARGET_PORT_INVALID", status:409 });
+  if (targetPort != null && !validPort(targetPort))
+    throw Object.assign(new Error("Invalid targetPort"), { code:"ROUTE_TARGET_PORT_INVALID", status:400 });
   let changed = 0;
   await updateStore(store => {
     for (const route of Object.values(store.routes || {})) {

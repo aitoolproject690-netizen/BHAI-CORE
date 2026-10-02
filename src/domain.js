@@ -26,11 +26,23 @@ export async function createDomain({ ownerId, serviceId, hostname, tls = "manage
   const service = existing.services?.[serviceId];
   if (!service || service.ownerId !== ownerId)
     throw Object.assign(new Error("Domain service ownership mismatch"), { code:"DOMAIN_SERVICE_FORBIDDEN", status:403 });
+  const servicePort = Number(service.port);
+  if (!Number.isInteger(servicePort) || servicePort < 1 || servicePort > 65535)
+    throw Object.assign(new Error("Domain service has invalid port"), { code:"DOMAIN_SERVICE_PORT_INVALID", status:409 });
+  const normalizedHostname = hostname.toLowerCase();
+  const hostnameTaken = Object.values(existing.domains || {}).some(d =>
+    String(d.hostname || "").toLowerCase() === normalizedHostname
+  );
+  const routeHostnameTaken = Object.values(existing.routes || {}).some(r =>
+    String(r.hostname || "").toLowerCase() === normalizedHostname
+  );
+  if (hostnameTaken || routeHostnameTaken)
+    throw Object.assign(new Error("Hostname is already in use"), { code:"DOMAIN_HOST_CONFLICT", status:409 });
   if (!TLS_MODES.has(tls))
     throw Object.assign(new Error("Invalid TLS mode"), { code:"DOMAIN_TLS_INVALID", status:400 });
   const id = "dom_" + crypto.randomUUID();
   const now = new Date().toISOString();
-  const domain = { id, ownerId, serviceId, hostname:hostname.toLowerCase(), status:"pending", tls, routeId:null, createdAt:now, updatedAt:now };
+  const domain = { id, ownerId, serviceId, hostname:normalizedHostname, status:"pending", tls, routeId:null, createdAt:now, updatedAt:now };
   await updateStore(store => { store.domains ??= {}; store.domains[id] = domain; return store; });
   return publicDomain(domain);
 }

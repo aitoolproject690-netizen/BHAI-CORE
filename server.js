@@ -109,7 +109,10 @@ async function readJson(req, maxBytes = 2_000_000) {
 const server = http.createServer(async (req, res) => {
   const rid = requestId(req);
   const rate = checkRateLimit(req.socket.remoteAddress || "anonymous");
-  if (!rate.allowed) return send(res,429,{ok:false,error:"Rate limit exceeded",retryAfterMs:rate.retryAfterMs},rid);
+  if (!rate.allowed) {
+    res.setHeader("retry-after", String(Math.max(1, Math.ceil(Number(rate.retryAfterMs || 60000) / 1000))));
+    return send(res,429,{ok:false,error:"Rate limit exceeded",retryAfterMs:rate.retryAfterMs},rid);
+  }
 
   try {
     if (req.method === "OPTIONS") {

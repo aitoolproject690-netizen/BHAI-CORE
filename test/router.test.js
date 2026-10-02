@@ -107,6 +107,46 @@ test("generate routes through a configured adapter and records the result", asyn
   }
 });
 
+test("generate retries retryable provider failures before succeeding", async () => {
+  const { generate } = await import("../src/router.js");
+  const { providerAdapters } = await import("../src/providers.js");
+
+  const previousOrder = process.env.AI_PROVIDER_ORDER;
+  const previousKey = process.env.OPENAI_API_KEY;
+  const previousRetries = process.env.BHAI_PROVIDER_RETRIES;
+  const previousAdapter = providerAdapters.openai;
+  let calls = 0;
+
+  process.env.AI_PROVIDER_ORDER = "openai";
+  process.env.OPENAI_API_KEY = "test-openai-key";
+  process.env.BHAI_PROVIDER_RETRIES = "1";
+  providerAdapters.openai = async () => {
+    calls += 1;
+    if (calls === 1) {
+      throw Object.assign(new Error("temporary outage"), { code: "TEMPORARY" });
+    }
+    return { text: "retry success" };
+  };
+
+  try {
+    const result = await generate({
+      messages: [{ role: "user", content: "hello" }]
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.provider, "openai");
+    assert.equal(result.text, "retry success");
+    assert.equal(result.attempts, 1);
+    assert.equal(result.retries, 1);
+    assert.equal(calls, 2);
+  } finally {
+    providerAdapters.openai = previousAdapter;
+    if (previousOrder === undefined) delete process.env.AI_PROVIDER_ORDER;
+    else process.env.AI_PROVIDER_ORDER = previousOrder;
+    if (previousKey === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = previousKey;
+  }
+});
+
 test("generate falls back after a provider failure", async () => {
   const { generate } = await import("../src/router.js");
   const { providerAdapters } = await import("../src/providers.js");

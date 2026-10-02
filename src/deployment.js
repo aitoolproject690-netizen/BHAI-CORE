@@ -19,6 +19,12 @@ function publicDeployment(d, production = false) {
 export async function createDeployment({ ownerId, repository, branch = "main", buildId, path, serviceId = null } = {}) {
   if (!ownerId || !repository || !buildId || !path)
     throw Object.assign(new Error("ownerId, repository, buildId and path required"), { code:"DEPLOYMENT_FIELDS_REQUIRED", status:400 });
+  if (serviceId) {
+    const store = await getStore();
+    const service = store.services?.[serviceId];
+    if (!service || service.ownerId !== ownerId)
+      throw Object.assign(new Error("Deployment service ownership mismatch"), { code:"DEPLOYMENT_SERVICE_FORBIDDEN", status:403 });
+  }
   const id = "dep_" + crypto.randomUUID();
   const now = new Date().toISOString();
   const deployment = { id, ownerId, repository, branch, buildId, path, serviceId, status:"ready", createdAt:now, updatedAt:now };

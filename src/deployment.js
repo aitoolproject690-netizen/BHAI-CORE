@@ -64,6 +64,12 @@ export async function setDeploymentStatus(id, ownerId, status) {
 
 export async function attachDeploymentService(id, ownerId, serviceId) {
   if (!serviceId) throw Object.assign(new Error("serviceId required"), { code:"DEPLOYMENT_SERVICE_REQUIRED", status:400 });
+  const store = await getStore();
+  const deployment = store.deployments?.[id];
+  const service = store.services?.[serviceId];
+  if (!deployment || deployment.ownerId !== ownerId) return null;
+  if (!service || service.ownerId !== ownerId)
+    throw Object.assign(new Error("Deployment service ownership mismatch"), { code:"DEPLOYMENT_SERVICE_FORBIDDEN", status:403 });
   let found = false;
   await updateStore(store => {
     const d = store.deployments?.[id];

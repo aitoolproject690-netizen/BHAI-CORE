@@ -11,10 +11,17 @@ export async function createDnsChallenge({ownerId,domainId,hostname,type="TXT",n
   const domain = existing.domains?.[domainId];
   if (!domain || domain.ownerId !== ownerId)
     throw Object.assign(new Error("DNS challenge domain ownership mismatch"),{code:"DNS_DOMAIN_FORBIDDEN",status:403});
+  const normalizedHostname = hostname.toLowerCase().replace(/\.$/, "");
+  const normalizedName = name.toLowerCase().replace(/\.$/, "");
+  if (normalizedHostname !== String(domain.hostname || "").toLowerCase().replace(/\.$/, ""))
+    throw Object.assign(new Error("DNS challenge hostname must match domain"),{code:"DNS_HOSTNAME_MISMATCH",status:400});
+  const allowedNames = new Set([normalizedHostname, `_acme-challenge.${normalizedHostname}`]);
+  if (!allowedNames.has(normalizedName))
+    throw Object.assign(new Error("DNS challenge record name does not match domain"),{code:"DNS_NAME_MISMATCH",status:400});
   if(!TYPES.has(type)) throw Object.assign(new Error("Unsupported DNS record type"),{code:"DNS_TYPE_INVALID",status:400});
   if(!Number.isInteger(ttl)||ttl<30||ttl>86400) throw Object.assign(new Error("Invalid DNS TTL"),{code:"DNS_TTL_INVALID",status:400});
   const id="dns_"+crypto.randomUUID(),now=new Date().toISOString();
-  const rec={id,ownerId,domainId,hostname:hostname.toLowerCase(),type,name:name.toLowerCase(),value:String(value),ttl,status:"pending",createdAt:now,updatedAt:now};
+  const rec={id,ownerId,domainId,hostname:normalizedHostname,type,name:normalizedName,value:String(value),ttl,status:"pending",createdAt:now,updatedAt:now};
   await updateStore(s=>{s.dnsRecords??={};s.dnsRecords[id]=rec;return s;}); return pub(rec);
 }
 export async function getDnsChallenge(id,ownerId){const s=await getStore(),r=s.dnsRecords?.[id];return r&&r.ownerId===ownerId?pub(r):null;}

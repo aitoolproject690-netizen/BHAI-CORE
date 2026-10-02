@@ -27,3 +27,16 @@ import { setBillingPlan } from "../src/billing.js";
 test("billing rejects unknown plans", async () => {
   await assert.rejects(() => setBillingPlan("test-owner", "not-a-plan"), { code: "BILLING_PLAN_INVALID", status: 400 });
 });
+
+import { createSpeechRequest, createTtsRequest } from "../src/voice.js";
+import { normalizeVisionRequest } from "../src/vision.js";
+
+test("voice request validators enforce required input and limits", () => {
+  assert.throws(() => createSpeechRequest({}), /audio is required/);
+  assert.throws(() => createTtsRequest({ text: "" }), /text is required/);
+});
+
+test("vision request validator accepts supported image data", () => {
+  const result = normalizeVisionRequest({ prompt: "describe", image: "aGVsbG8=" });
+  assert.equal(result.image.mimeType, "image/jpeg");
+});

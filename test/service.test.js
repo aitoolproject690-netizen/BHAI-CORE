@@ -71,6 +71,36 @@ test("service persistence redacts secret environment values", async () => {
   assert.notEqual(store.services[s.id].env.API_TOKEN, "super-secret");
 });
 
+test("healthy service activates its route after readiness check", async () => {
+  resetStoreForTests();
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({ ok: true, status: 200 });
+  let s;
+  try {
+    s = await createService({
+      ownerId: "owner-health-route",
+      buildId: "build-health-route",
+      command: "sleep 5",
+      cwd: process.cwd(),
+      healthUrl: "http://127.0.0.1:19002/health",
+      port: 19002
+    });
+    await createRoute({
+      ownerId: "owner-health-route",
+      hostname: "ready.example.com",
+      serviceId: s.id,
+      targetPort: s.port
+    });
+    const result = await monitorService(s.id, "owner-health-route");
+    assert.equal(result.health.ok, true);
+    assert.equal((await findRouteByHostname("ready.example.com")).serviceId, s.id);
+    await stopService(s.id, "owner-health-route");
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (s) await stopService(s.id, "owner-health-route").catch(() => {});
+  }
+});
+
 test("health monitor restart ignores the old runtime exit", async () => {
   resetStoreForTests();
   const originalFetch = globalThis.fetch;

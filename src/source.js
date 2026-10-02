@@ -24,9 +24,13 @@ function validateBranch(branch = "main") {
 
 function runGit(args, { cwd, timeoutMs = 120000 } = {}) {
   return new Promise((resolve, reject) => {
+    const inherited = {};
+    for (const key of ["PATH", "HOME", "TMPDIR", "LANG", "LC_ALL", "NODE_ENV"]) {
+      if (process.env[key] !== undefined) inherited[key] = process.env[key];
+    }
     const child = spawn("git", args, {
       cwd,
-      env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+      env: { ...inherited, GIT_TERMINAL_PROMPT: "0" },
       stdio: ["ignore", "pipe", "pipe"]
     });
     let stdout = "", stderr = "";

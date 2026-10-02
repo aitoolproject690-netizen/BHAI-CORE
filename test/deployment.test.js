@@ -84,6 +84,18 @@ test("rollback rejects the current production deployment", async () => {
 });
 
 
+test("deployment creation validates service owner", async () => {
+  resetStoreForTests();
+  await updateStore(s => {
+    s.services["svc-create-other"] = { id:"svc-create-other", ownerId:"user-b" };
+    return s;
+  });
+  await assert.rejects(
+    () => createDeployment({ ownerId:"user-a", repository:"owner/app", buildId:"build-create", path:"/tmp/deployment", serviceId:"svc-create-other" }),
+    error => error.code === "DEPLOYMENT_SERVICE_FORBIDDEN"
+  );
+});
+
 test("deployment service attachment is owner scoped", async () => {
   resetStoreForTests();
   const deployment = await createDeployment({ ownerId:"user-a", repository:"owner/app", buildId:"build-attach", path:"/tmp/deployment" });

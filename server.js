@@ -18,7 +18,7 @@ import { searchRag, ragContext } from "./src/rag.js";
 import { embeddingInfo } from "./src/embeddings.js";
 import { getModelRegistry, modelCapabilities } from "./src/models.js";
 import { analyzeImage, getVisionCandidates } from "./src/vision.js";
-import { createImageRequest, submitComfyUI, getComfyUIHistory, imageProviderInfo } from "./src/image.js";
+import { createImageRequest, submitComfyUI, getComfyUIHistory, imageProviderInfo, recordImageJobOwnership, getImageJobOwnership } from "./src/image.js";
 import { createVideoRequest, planVideo, submitVideoHttp, videoProviderInfo } from "./src/video.js";
 import { billingPlans, getBillingAccount, billingUsage, billingSnapshot, setBillingPlan, assertBillingQuota, recordBillingUsage } from "./src/billing.js";
 import { dashboardSnapshot } from "./src/dashboard.js";
@@ -350,6 +350,8 @@ const server = http.createServer(async (req, res) => {
     if (imageJobMatch && req.method === "GET") {
       const identity = await authenticate(req.headers["x-bhai-key"]);
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const ownership = await getImageJobOwnership(imageJobMatch[1], identity.id);
+      if (!ownership) return send(res, 404, { ok: false, error: "Image job not found" }, rid);
       const result = await getComfyUIHistory({ url: process.env.COMFYUI_URL, promptId: imageJobMatch[1] });
       return send(res, 200, { ok: true, ...result }, rid);
     }
@@ -366,6 +368,7 @@ const server = http.createServer(async (req, res) => {
         request,
         workflow: body.workflow
       });
+      await recordImageJobOwnership({ promptId: result.promptId, ownerId: identity.id, requestId: rid });
       await recordBillingUsage(identity.id, { requests: 1, imageJobs: 1 });
       await recordUsage({ key: identity.id, input: JSON.stringify(body).length });
       return send(res, 202, { ok: true, ...request, ...result, status: "submitted" }, rid);

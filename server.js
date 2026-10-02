@@ -540,8 +540,8 @@ const server = http.createServer(async (req, res) => {
       return send(res, 202, { ok:true, certificate:cert }, rid);
     }
     if (url.pathname.startsWith("/v1/cloud/certificates/") && req.method === "GET") {
-      const auth = authenticate(req);
-      if (!auth.ok) return send(res, 401, auth, rid);
+      const auth = await authenticate(req.headers["x-bhai-key"]);
+      if (!auth) return send(res, 401, { ok:false, error:"BHAI key required" }, rid);
       const id = url.pathname.split("/").pop();
       const cert = await getCertificate(id, auth.id);
       return cert ? send(res, 200, { ok:true, certificate:cert }, rid) : send(res, 404, { ok:false, error:"Certificate not found" }, rid);

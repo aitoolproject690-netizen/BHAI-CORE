@@ -56,7 +56,10 @@ function send(res, status, body, rid) {
     "content-type": "application/json; charset=utf-8",
     "cache-control": "no-store",
     "access-control-allow-origin": "*",
-    "x-request-id": rid
+    "x-request-id": rid,
+    "x-content-type-options": "nosniff",
+    "referrer-policy": "no-referrer",
+    "x-frame-options": "DENY"
   });
   res.end(JSON.stringify(body));
 }
@@ -113,7 +116,8 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(204, {
         "access-control-allow-origin": "*",
         "access-control-allow-headers": "content-type, authorization, x-bhai-key, x-bhai-admin-key",
-        "access-control-allow-methods": "GET,POST,DELETE,OPTIONS"
+        "access-control-allow-methods": "GET,POST,DELETE,OPTIONS",
+        "access-control-max-age": "600"
       });
       return res.end();
     }
@@ -936,6 +940,8 @@ const server = http.createServer(async (req, res) => {
         maxRequests: process.env.BHAI_MAX_REQUESTS,
         maxInputChars: process.env.BHAI_MAX_INPUT_CHARS
       });
+      const billingReservation = { requests: 1, charsIn: inputChars };
+      await consumeBillingQuota(usageKey, billingReservation);
 
       if (!adapter || !providerCfg?.key)
         return send(res, 503, { ok: false, error: "No streaming provider is configured" }, rid);
@@ -994,6 +1000,9 @@ const server = http.createServer(async (req, res) => {
           input: inputChars,
           output: String(result.text || "").length
         });
+        await recordBillingUsage(usageKey, {
+          charsOut: String(result.text || "").length
+        });
 
         sendEvent(res, completeEvent({
           provider: selected,
@@ -1007,6 +1016,9 @@ const server = http.createServer(async (req, res) => {
           error = Object.assign(new Error(error?.message || "Streaming failed after output started"), { status: 400 });
         }
         recordFailure(selected);
+        if (!emitted) {
+          await releaseBillingQuota(usageKey, billingReservation);
+        }
         await recordProviderUsage({
           provider: selected,
           success: false,

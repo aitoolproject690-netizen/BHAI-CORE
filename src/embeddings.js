@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 const DEFAULT_DIMENSIONS = Number(process.env.BHAI_EMBEDDING_DIMENSIONS || 256);
 
 function tokenize(text) {
-  return String(text || "").toLowerCase().match(/[a-z0-9_]+/g) || [];
+  return String(text || "").toLowerCase().match(/[\p{L}\p{N}_]+/gu) || [];
 }
 function hash32(value) {
   return crypto.createHash("sha256").update(value).digest().readUInt32BE(0);

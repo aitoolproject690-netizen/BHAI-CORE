@@ -10,6 +10,7 @@ const emptyState = () => ({
   apiKeys: {},
   usage: {},
   providerUsage: {},
+  billing: {},
   jobs: {},
   imageJobs: {},
   files: {},
@@ -70,7 +71,7 @@ async function ensureLoaded() {
   }
 
   const collectionNames = [
-    "apiKeys", "usage", "providerUsage", "jobs", "imageJobs", "files", "ragChunks",
+    "apiKeys", "usage", "providerUsage", "billing", "jobs", "imageJobs", "files", "ragChunks",
     "approvals", "services", "deployments", "servicePorts", "routes",
     "domains", "autoDeploy", "certificates", "acmeAccounts", "acmeOrders",
     "dnsRecords"
@@ -96,6 +97,7 @@ async function ensureLoaded() {
     apiKeys: parsed.apiKeys ?? {},
     usage: parsed.usage ?? {},
     providerUsage: parsed.providerUsage ?? {},
+    billing: parsed.billing ?? {},
     jobs: parsed.jobs ?? {},
     imageJobs: parsed.imageJobs ?? {},
     files: parsed.files ?? {},

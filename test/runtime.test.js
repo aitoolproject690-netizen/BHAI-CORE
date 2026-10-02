@@ -51,3 +51,13 @@ test("health checks reject non-local targets", async () => {
   await assert.rejects(() => healthCheck("http://example.com/health"), /local service/);
   await assert.rejects(() => healthCheck("http://127.0.0.1:9999/health", { expectedPort: 3000 }), /service port/);
 });
+
+
+test("runtime rejects multiline shell injection", () => {
+  process.env.BHAI_RUNTIME_ENABLED = "true";
+  assert.throws(
+    () => startRuntime({ command: "printf safe\nwhoami", cwd: process.cwd() }),
+    /Runtime command rejected/
+  );
+  delete process.env.BHAI_RUNTIME_ENABLED;
+});

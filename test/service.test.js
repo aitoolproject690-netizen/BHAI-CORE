@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 process.env.BHAI_RUNTIME_ENABLED="true";
 import { createService, getService, stopService, restoreServices, monitorService } from "../src/service.js";
 import { getStore, resetStoreForTests } from "../src/store.js";
-import { createRoute, findRouteByHostname } from "../src/network.js";
+import { createRoute, findRouteByHostname, setRouteStatus } from "../src/network.js";
 
 test("service lifecycle is owner scoped", async () => {
   const s = await createService({ ownerId:"owner-1", buildId:"build-1", command:"sleep 5", cwd:process.cwd() });
@@ -91,6 +91,8 @@ test("healthy service activates its route after readiness check", async () => {
       serviceId: s.id,
       targetPort: s.port
     });
+    const route = await findRouteByHostname("ready.example.com");
+    await setRouteStatus(route.id, "owner-health-route", "disabled");
     const result = await monitorService(s.id, "owner-health-route");
     assert.equal(result.health.ok, true);
     assert.equal((await findRouteByHostname("ready.example.com")).serviceId, s.id);

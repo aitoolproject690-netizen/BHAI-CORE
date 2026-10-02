@@ -4,7 +4,7 @@ import { config } from "./src/config.js";
 import { generate, getProviderStatus } from "./src/router.js";
 import { publicError } from "./src/errors.js";
 import { requestId } from "./src/requestId.js";
-import { recordUsage, allUsage, allProviderUsage } from "./src/usage.js";
+import { recordUsage, getUsage, allUsage, allProviderUsage } from "./src/usage.js";
 import { assertBudget } from "./src/budget.js";
 import { authenticate, createApiKey, listApiKeys, revokeApiKey, rotateApiKey } from "./src/auth.js";
 import { health, readiness } from "./src/health.js";
@@ -939,6 +939,12 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true, usage: await allUsage() }, rid);
     }
 
+    if (url.pathname === "/v1/audit" && req.method === "GET") {
+      if (!adminAuthorized(req)) return send(res, 401, { ok: false, error: "Admin authentication required" }, rid);
+      const limit = url.searchParams.get("limit") || "100";
+      return send(res, 200, { ok: true, audit: await listAudit({ limit }) }, rid);
+    }
+
     if (url.pathname === "/v1/metrics" && req.method === "GET") {
       if (!adminAuthorized(req)) return send(res, 401, { ok: false, error: "Admin authentication required" }, rid);
       return send(res, 200, {
@@ -1022,21 +1028,36 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/v1/keys" && req.method === "POST") {
       if (!adminAuthorized(req)) return send(res, 401, { ok: false, error: "Admin authentication required" }, rid);
       const body = await readJson(req);
-      return send(res, 201, { ok: true, ...(await createApiKey(body.name || "app", body.scopes, body.limits)) }, rid);
+      const created = await createApiKey(body.name || "app", body.scopes, body.limits);
+      await recordAudit({ actorId: cfg.masterAuth.username || "admin", action: "api_key.create", tool: "keys", status: "success", requestId: rid, metadata: { keyId: created.id, name: created.name, limits: created.limits, scopes: created.scopes } });
+      return send(res, 201, { ok: true, ...created }, rid);
     }
 
     if (url.pathname.match(/^\/v1\/keys\/([^/]+)\/rotate$/) && req.method === "POST") {
       if (!adminAuthorized(req)) return send(res, 401, { ok: false, error: "Admin authentication required" }, rid);
       const id = url.pathname.split("/")[3];
       const rotated = await rotateApiKey(id);
-      return rotated ? send(res, 200, { ok: true, ...rotated }, rid) : send(res, 404, { ok: false, error: "Active API key not found" }, rid);
+      if (!rotated) return send(res, 404, { ok: false, error: "Active API key not found" }, rid);
+      await recordAudit({ actorId: cfg.masterAuth.username || "admin", action: "api_key.rotate", tool: "keys", status: "success", requestId: rid, metadata: { previousKeyId: id, newKeyId: rotated.id } });
+      return send(res, 200, { ok: true, ...rotated }, rid);
+    }
+
+    const keyUsageMatch = url.pathname.match(/^\/v1\/keys\/([^/]+)\/usage$/);
+    if (keyUsageMatch && req.method === "GET") {
+      if (!adminAuthorized(req)) return send(res, 401, { ok: false, error: "Admin authentication required" }, rid);
+      const id = keyUsageMatch[1];
+      const key = (await listApiKeys()).find(item => item.id === id);
+      if (!key) return send(res, 404, { ok: false, error: "API key not found" }, rid);
+      return send(res, 200, { ok: true, key, usage: await getUsage(id) }, rid);
     }
 
     if (url.pathname.startsWith("/v1/keys/") && req.method === "DELETE") {
       if (!adminAuthorized(req)) return send(res, 401, { ok: false, error: "Admin authentication required" }, rid);
       const id = url.pathname.split("/").pop();
       const revoked = await revokeApiKey(id);
-      return send(res, revoked ? 200 : 404, { ok: revoked }, rid);
+      if (!revoked) return send(res, 404, { ok: false }, rid);
+      await recordAudit({ actorId: cfg.masterAuth.username || "admin", action: "api_key.revoke", tool: "keys", status: "success", requestId: rid, metadata: { keyId: id } });
+      return send(res, 200, { ok: true }, rid);
     }
 
     if (url.pathname === "/v1/jobs" && req.method === "POST") {
@@ -1072,10 +1093,7 @@ const server = http.createServer(async (req, res) => {
       const usageKey = identity.id;
       const inputChars = JSON.stringify(body).length;
 
-      await assertBudget(usageKey, {
-        maxRequests: process.env.BHAI_MAX_REQUESTS,
-        maxInputChars: process.env.BHAI_MAX_INPUT_CHARS
-      });
+      await assertBudget(usageKey, identity.limits);
 
       if (!adapter || !providerCfg?.key)
         return send(res, 503, { ok: false, error: "No streaming provider is configured" }, rid);

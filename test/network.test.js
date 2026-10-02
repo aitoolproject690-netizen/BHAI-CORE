@@ -38,5 +38,6 @@ test("network info exposes persistent routing capability", () => {
 
 test("route target is restricted to loopback", async () => {
   resetStoreForTests();
+  await updateStore(s => { s.services["svc-1"] = { id:"svc-1", ownerId:"owner-net" }; return s; });
   await assert.rejects(() => createRoute({ ownerId:"owner-net", hostname:"safe.example.com", serviceId:"svc-1", targetHost:"169.254.169.254", targetPort:3210 }), /loopback/);
 });

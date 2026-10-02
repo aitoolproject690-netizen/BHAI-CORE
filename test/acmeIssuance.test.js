@@ -1,0 +1,3 @@
+import test from "node:test";import assert from "node:assert/strict";import {acmeIssuanceInfo,startAcmeIssuance} from "../src/acmeIssuance.js";import {resetStoreForTests} from "../src/store.js";import {createCertificate} from "../src/certificates.js";
+test("ACME issuance reports provider-neutral DNS mutation",()=>{const i=acmeIssuanceInfo();assert.equal(i.dnsProviderMutation,false);assert.ok(i.flow.includes("finalize"));});
+test("issuance requires a registered account",async()=>{resetStoreForTests();const c=await createCertificate({ownerId:"u",domainId:"d",hostname:"example.com",challenge:"dns-01"});await assert.rejects(()=>startAcmeIssuance({ownerId:"u",certificateId:c.id,accountId:"missing"}),/Registered ACME account required/);});

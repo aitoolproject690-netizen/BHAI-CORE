@@ -33,6 +33,34 @@ test("agent jobs are isolated by authenticated owner", async () => {
 });
 
 
+
+test("expired high-risk approvals cannot be executed", async () => {
+  const { resetStoreForTests } = await import("../src/store.js");
+  const { createApproval, decideApproval } = await import("../src/approval.js");
+  const { executeAgentTool } = await import("../src/agent.js");
+
+  resetStoreForTests();
+  const identity = { id: "owner-expiry", scopes: ["*"] };
+  const approval = await createApproval({
+    actorId: identity.id,
+    tool: "github_repo_create",
+    input: { name: "expired-repo", private: true }
+  });
+  assert.ok(await decideApproval(approval.id, identity.id, "approved"));
+
+  const { getStore, updateStore } = await import("../src/store.js");
+  await updateStore(store => {
+    store.approvals[approval.id].expiresAt = new Date(Date.now() - 1000).toISOString();
+    return store;
+  });
+
+  await assert.rejects(
+    () => executeAgentTool("github_repo_create", { name: "expired-repo", private: true }, identity, { approvalId: approval.id }),
+    error => error.code === "APPROVAL_REQUIRED" && error.status === 428
+  );
+  assert.ok(await getStore());
+});
+
 test("approved high-risk agent actions are bound to the approved input", async () => {
   const { resetStoreForTests } = await import("../src/store.js");
   const { createApproval, decideApproval } = await import("../src/approval.js");

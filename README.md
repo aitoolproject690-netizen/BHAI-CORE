@@ -13,11 +13,15 @@ Independent AI foundation for the BHAI ecosystem.
 - No lock-in to Render, Replit, or one AI provider
 
 ## Endpoints
-GET /health
-GET /v1/providers
-GET /v1/usage
-GET /v1/metrics
-POST /v1/chat/completions
+
+Core:
+- GET /health
+- GET /v1/providers
+- GET /v1/usage
+- GET /v1/metrics
+- POST /v1/chat/completions
+
+Cloud/infrastructure routes are available under /v1/cloud/* for builds, deployments, services, domains, DNS, certificates, network, auto-deploy and TLS status. Mutation routes are authenticated and the cloud mutation surface requires the cloud:build permission. High-risk agent/cloud mutations additionally use the approval flow.
 
 ## Authentication
 
@@ -34,6 +38,23 @@ content-type: application/json
 }
 
 API keys are stored as hashes. Usage telemetry identifies BHAI keys by a non-reversible hash-derived identifier; raw keys are not persisted in usage records. Provider error telemetry is also redacted before persistence.
+
+Admin-only operational endpoints use the x-bhai-admin-key header and are separate from normal user-key authentication.
+
+## Security model
+
+- API keys are hashed at rest and scopes are enforced per agent tool.
+- Default API-key permissions do not grant GitHub write/admin or cloud-build mutation access.
+- High-risk GitHub and cloud mutations require the matching permission plus an approved, input-bound approval record.
+- Jobs, workspaces, services, deployments, domains, DNS records and audit records are owner-scoped.
+- Cloud execution paths are constrained to the authenticated owner's workspace/deployment roots and reject path/symlink escapes.
+- GitHub repository and file paths are validated to prevent traversal.
+- GitHub webhooks require BHAI_GITHUB_WEBHOOK_SECRET and a valid HMAC SHA-256 signature; delivery IDs are deduplicated.
+- HTTP requests are rate-limited and request bodies have a hard size limit.
+- Audit records are bounded and redact common API-key/secret prefixes.
+- Health checks are restricted to local service targets to avoid arbitrary SSRF.
+- Dangerous shell patterns are rejected by build/runtime command validation.
+- Never commit real API keys or other production secrets.
 
 ## Provider routing
 
@@ -61,4 +82,14 @@ BHAI-CORE has a persistent owner-scoped certificate lifecycle for custom domains
 
 Run npm test for the test suite and npm run check for syntax checks.
 
-Never commit real API keys.
+## Production checklist
+
+Before exposing BHAI-CORE publicly:
+1. Set strong, unique production secrets for API/admin/webhook authentication.
+2. Keep BHAI_RUNTIME_ENABLED and other execution features disabled unless required.
+3. Grant cloud/GitHub mutation scopes only to keys that need them.
+4. Configure a durable store location and back it up.
+5. Configure TLS at the deployment/ingress layer.
+6. Verify provider quotas, budgets and fallback order.
+7. Run npm test and npm run check in CI.
+8. Confirm webhook secrets, API keys and private certificate keys are never logged or committed.

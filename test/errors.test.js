@@ -14,3 +14,12 @@ test("public errors redact API keys from messages and details", () => {
   assert.equal(result.details[0].error.includes("bhai_another_secret"), false);
   assert.equal(result.details[0].error.includes("[redacted]"), true);
 });
+
+test("public errors redact provider query-string keys", () => {
+  const result = publicError({
+    message: "provider request failed: https://example.test/v1?key=super-secret&model=test"
+  });
+  assert.equal(result.error.includes("key=super-secret"), false);
+  assert.equal(result.error.includes("key=[redacted]"), true);
+  assert.equal(result.error.includes("model=test"), true);
+});

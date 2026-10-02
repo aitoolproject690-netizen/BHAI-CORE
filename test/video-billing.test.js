@@ -40,3 +40,10 @@ test("vision request validator accepts supported image data", () => {
   const result = normalizeVisionRequest({ prompt: "describe", image: "aGVsbG8=" });
   assert.equal(result.image.mimeType, "image/jpeg");
 });
+
+import { recordBillingUsage } from "../src/billing.js";
+
+test("billing rejects negative or non-finite usage deltas", async () => {
+  await assert.rejects(() => recordBillingUsage("billing-test", { requests: -1 }), { code: "BILLING_USAGE_INVALID", status: 400 });
+  await assert.rejects(() => recordBillingUsage("billing-test", { charsIn: Number.NaN }), { code: "BILLING_USAGE_INVALID", status: 400 });
+});

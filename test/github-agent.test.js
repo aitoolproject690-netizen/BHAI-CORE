@@ -30,7 +30,7 @@ test("GitHub tools fail closed when the connector is not configured", async () =
         { repository: "owner/repo", path: "README.md" },
         { id: "u1", scopes: ["github:read", "agent:read"] }
       ),
-      error => error.code === "GITHUB_NOT_CONFIGURED" && error.status === 503
+      { code: "GITHUB_NOT_CONFIGURED", status: 503 }
     );
   } finally {
     if (previousToken === undefined) delete process.env.GITHUB_TOKEN;

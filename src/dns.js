@@ -26,7 +26,7 @@ export async function createDnsChallenge({ownerId,domainId,hostname,type="TXT",n
 }
 export async function getDnsChallenge(id,ownerId){const s=await getStore(),r=s.dnsRecords?.[id];return r&&r.ownerId===ownerId?pub(r):null;}
 export async function listDnsChallenges(ownerId){const s=await getStore();return Object.values(s.dnsRecords||{}).filter(r=>r.ownerId===ownerId).map(pub);}
-export async function setDnsChallengeStatus(id,ownerId,status){if(!STATUSES.has(status))throw Object.assign(new Error("Invalid DNS status"),{code:"DNS_STATUS_INVALID",status:400});let found=false;await updateStore(s=>{const r=s.dnsRecords?.[id];if(!r||r.ownerId!==ownerId)return s;r.status=status;r.updatedAt=new Date().toISOString();found=true;return s;});return found?getDnsChallenge(id,ownerId):null;}
+export async function setDnsChallengeStatus(id,ownerId,status){if(!STATUSES.has(status))throw Object.assign(new Error("Invalid DNS status"),{code:"DNS_STATUS_INVALID",status:400});if(status==="verified")throw Object.assign(new Error("DNS verification must use live verification"),{code:"DNS_VERIFICATION_REQUIRED",status:409});let found=false;await updateStore(s=>{const r=s.dnsRecords?.[id];if(!r||r.ownerId!==ownerId)return s;r.status=status;r.updatedAt=new Date().toISOString();found=true;return s;});return found?getDnsChallenge(id,ownerId):null;}
 export async function verifyDnsChallenge(id,ownerId){
   const s=await getStore(),r=s.dnsRecords?.[id]; if(!r||r.ownerId!==ownerId)return null;
   let values=[];

@@ -42,7 +42,10 @@ export async function listCertificates(ownerId){const s=await getStore();return 
 export async function setCertificateStatus(id,ownerId,status,patch={}) {
   if(!STATUSES.has(status)) throw Object.assign(new Error("Invalid certificate status"),{code:"CERT_STATUS_INVALID",status:400});
   let found=false;
-  const safePatch = {};\n  for (const key of ["expiresAt","nextRenewalAt","lastError","issuer","challenge"]) {\n    if (Object.prototype.hasOwnProperty.call(patch || {}, key)) safePatch[key] = patch[key];\n  }\n  await updateStore(s=>{const c=s.certificates?.[id];if(!c||c.ownerId!==ownerId)return s;c.status=status;Object.assign(c,safePatch);c.updatedAt=new Date().toISOString();found=true;return s;});
+  const safePatch = {};
+  for (const key of ["expiresAt","nextRenewalAt","lastError","issuer","challenge"]) {
+    if (Object.prototype.hasOwnProperty.call(patch || {}, key)) safePatch[key] = patch[key];
+  }\n  await updateStore(s=>{const c=s.certificates?.[id];if(!c||c.ownerId!==ownerId)return s;c.status=status;Object.assign(c,safePatch);c.updatedAt=new Date().toISOString();found=true;return s;});
   return found?getCertificate(id,ownerId):null;
 }
 export function certificateInfo(){return{persistent:true,ownerScoped:true,statuses:[...STATUSES],challengeTypes:[...CHALLENGE_TYPES],automation:"ACME-ready foundation; issuer integration external"};}

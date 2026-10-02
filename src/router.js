@@ -5,7 +5,7 @@ import { withRetry, classifyError } from "./retry.js";
 import { recordProviderUsage } from "./usage.js";
 
 export function isProviderConfigured(name, cfg = config()) {
-  return Boolean(cfg.providers[name]?.key && providerAdapters[name]);
+  return Boolean(cfg.providers[name]?.key && typeof providerAdapters[name] === "function");
 }
 
 export function normalizeMaxAttempts(value, fallback) {

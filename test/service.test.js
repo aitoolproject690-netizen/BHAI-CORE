@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 process.env.BHAI_RUNTIME_ENABLED="true";
-import { createService, getService, stopService, restoreServices } from "../src/service.js";
+import { createService, getService, stopService, restoreServices, monitorService } from "../src/service.js";
 import { getStore, resetStoreForTests } from "../src/store.js";
 import { createRoute, findRouteByHostname } from "../src/network.js";
 
@@ -42,7 +42,7 @@ test("crashed service keeps its allocated port for restart", async () => {
   const s = await createService({
     ownerId: "owner-restart-port",
     buildId: "build-restart-port",
-    command: "sh -c 'exit 1'",
+    command: "false",
     cwd: process.cwd()
   });
   const port = s.port;
@@ -70,4 +70,21 @@ test("service persistence redacts secret environment values", async () => {
   assert.equal(store.services[s.id].env.API_TOKEN, "[REDACTED]");
   assert.equal(store.services[s.id].env.PUBLIC_MODE, "true");
   assert.notEqual(store.services[s.id].env.API_TOKEN, "super-secret");
+});
+
+test("health monitor restart ignores the old runtime exit", async () => {
+  resetStoreForTests();
+  const s = await createService({
+    ownerId: "owner-monitor-race",
+    buildId: "build-monitor-race",
+    command: "sleep 5",
+    cwd: process.cwd(),
+    healthUrl: "http://127.0.0.1/health"
+  });
+  const result = await monitorService(s.id, "owner-monitor-race");
+  assert.equal(result.restarted, true);
+  const current = await getService(s.id, "owner-monitor-race");
+  assert.equal(current.status, "running");
+  assert.equal(current.restartCount, 1);
+  await stopService(s.id, "owner-monitor-race");
 });

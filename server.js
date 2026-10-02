@@ -943,14 +943,15 @@ const server = http.createServer(async (req, res) => {
         maxRequests: process.env.BHAI_MAX_REQUESTS,
         maxInputChars: process.env.BHAI_MAX_INPUT_CHARS
       });
-      const billingReservation = { requests: 1, charsIn: inputChars };
-      await consumeBillingQuota(usageKey, billingReservation);
 
       if (!adapter || !providerCfg?.key)
         return send(res, 503, { ok: false, error: "No streaming provider is configured" }, rid);
 
       if (!canAttempt(selected))
         return send(res, 503, { ok: false, error: "Provider circuit is open", provider: selected }, rid);
+
+      const billingReservation = { requests: 1, charsIn: inputChars };
+      await consumeBillingQuota(usageKey, billingReservation);
 
       startSSE(res);
       sendEvent(res, { type: EVENTS.START, requestId: rid, provider: selected, model: providerCfg.model });

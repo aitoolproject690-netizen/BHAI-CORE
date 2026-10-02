@@ -149,3 +149,6 @@ Before exposing BHAI-CORE publicly:
 
 Video generation intentionally uses an external adapter rather than embedding a vendor-specific paid API in the core. Configure VIDEO_API_URL and optionally VIDEO_API_KEY when a video provider is selected.
 
+
+
+CI verification note: PostgreSQL store integration coverage runs against PostgreSQL 16 in GitHub Actions.

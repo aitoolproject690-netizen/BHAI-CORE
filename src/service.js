@@ -65,7 +65,6 @@ async function launch(service) {
     if (!services.has(service.id)) return;
     if (service.status === "stopping" || service.status === "stopped") { service.status = "stopped"; await setServiceRouteStatus(service.id, "disabled"); service.updatedAt = new Date().toISOString(); await persistService(service); return; }
     service.status = result.code === 0 ? "stopped" : "crashed";
-    if (service.status === "crashed") { try { await releasePort(service.port); } catch {} }
     service.updatedAt = new Date().toISOString();
     await setServiceRouteStatus(service.id, "disabled");
     await persistService(service);

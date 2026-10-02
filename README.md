@@ -108,3 +108,4 @@ Before exposing BHAI-CORE publicly:
 - GET /v1/dashboard returns an owner-scoped account/resource/billing summary.
 
 Video generation intentionally uses an external adapter rather than embedding a vendor-specific paid API in the core. Configure VIDEO_API_URL and optionally VIDEO_API_KEY when a video provider is selected.
+

@@ -38,7 +38,7 @@ import { createDnsChallenge, getDnsChallenge, listDnsChallenges, setDnsChallenge
 import { getAcmeDirectory, acmeInfo, createAcmeAccount, listAcmeAccounts, registerStoredAcmeAccount, renewDueCertificates } from "./src/acme.js";
 import { createAcmeOrder, getAcmeOrder, listAcmeOrders, prepareDnsChallenge, setAcmeOrderStatus, acmeOrderInfo } from "./src/acmeOrder.js";
 import { createAutoDeploy, getAutoDeploy, listAutoDeploys, setAutoDeployStatus, autoDeployInfo, findAutoDeploysByRepository, recordAutoDeployRun, claimWebhookDelivery } from "./src/autodeploy.js";
-import { createRoute, getRoute, listRoutes, setRouteStatus, findRouteByHostname, networkInfo, proxyRequest } from "./src/network.js";
+import { createRoute, getRoute, listRoutes, setRouteStatus, findRouteByHostname, networkInfo, networkSecurityInfo, proxyRequest } from "./src/network.js";
 import { executeCloudBuildJob } from "./src/cloudJob.js";
 import { startAcmeIssuance, completeAcmeIssuance, acmeIssuanceInfo } from "./src/acmeIssuance.js";
 import crypto from "node:crypto";

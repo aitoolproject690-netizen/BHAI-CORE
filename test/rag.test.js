@@ -46,3 +46,14 @@ test("RAG context includes source labels", async () => {
   assert.match(context.context, /Source 1/);
   assert.match(context.context, /Vector search/);
 });
+
+test("RAG tokenization supports Hindi text", async () => {
+  resetStoreForTests();
+  const file = await createTextFile({
+    ownerId: "hindi-user",
+    name: "hindi.txt",
+    text: "भाई यह BHAI CORE की हिंदी फाइल है।"
+  });
+  const results = await searchRag("hindi-user", "हिंदी फाइल");
+  assert.equal(results[0].fileId, file.id);
+});

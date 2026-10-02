@@ -86,9 +86,19 @@ export function runtimeInfo() {
   };
 }
 
-export async function healthCheck(url, { timeoutMs = 10000 } = {}) {
+export async function healthCheck(url, { timeoutMs = 10000, expectedPort = null } = {}) {
   if (!url || typeof url !== "string") {
     throw Object.assign(new Error("Health URL required"), { code: "HEALTH_URL_REQUIRED", status: 400 });
+  }
+  let parsed;
+  try { parsed = new URL(url); } catch {
+    throw Object.assign(new Error("Invalid health URL"), { code: "HEALTH_URL_INVALID", status: 400 });
+  }
+  if (!["http:", "https:"].includes(parsed.protocol) || !["127.0.0.1", "localhost", "::1"].includes(parsed.hostname)) {
+    throw Object.assign(new Error("Health URL must target the local service"), { code: "HEALTH_URL_TARGET_INVALID", status: 400 });
+  }
+  if (expectedPort != null && Number(parsed.port || (parsed.protocol === "https:" ? 443 : 80)) !== Number(expectedPort)) {
+    throw Object.assign(new Error("Health URL port must match the service port"), { code: "HEALTH_URL_PORT_INVALID", status: 400 });
   }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);

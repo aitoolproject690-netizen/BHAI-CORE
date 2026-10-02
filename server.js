@@ -443,7 +443,7 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/v1/cloud/autodeploy" && req.method === "POST") {
       const identity = await authenticate(req.headers["x-bhai-key"]);
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
-      if (!requireCloudBuild(identity, res, rid)) return;      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      if (!requireCloudBuild(identity, res, rid)) return;
       const body = await readJson(req);
       const hook = await createAutoDeploy({ ownerId: identity.id, repository: body.repository, branch: body.branch });
       return send(res, 201, { ok: true, autoDeploy: hook }, rid);

@@ -26,14 +26,14 @@ export function startRuntime({ command, cwd, env = {}, timeoutMs = DEFAULT_TIMEO
   const append = (target, chunk) => (target + chunk.toString()).slice(-MAX_OUTPUT);
   child.stdout.on("data", chunk => { stdout = append(stdout, chunk); });
   child.stderr.on("data", chunk => { stderr = append(stderr, chunk); });
-  let timer = setTimeout(() => {}, timeoutMs);
+  const timeout = Math.max(1000, Number(timeoutMs) || DEFAULT_TIMEOUT);\n  let timedOut = false;\n  let timer = setTimeout(() => {\n    timedOut = true;\n    child.kill("SIGTERM");\n    setTimeout(() => { if (!child.killed) child.kill("SIGKILL"); }, 2000).unref();\n  }, timeout);
   const ready = new Promise((resolve, reject) => {
     child.once("spawn", () => resolve({ pid: child.pid }));
     child.once("error", reject);
   });
   const exit = new Promise(resolve => child.once("close", (code, signal) => {
     clearTimeout(timer);
-    resolve({ code, signal, stdout, stderr });
+    resolve({ code, signal, stdout, stderr, timedOut });
   }));
   return { child, ready, exit, pid: child.pid, command: safeCommand };
 }

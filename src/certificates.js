@@ -9,11 +9,23 @@ function publicCert(c) {
     id:c.id, ownerId:c.ownerId, domainId:c.domainId, hostname:c.hostname,
     status:c.status, challenge:c.challenge, issuer:c.issuer || "acme",
     expiresAt:c.expiresAt || null, nextRenewalAt:c.nextRenewalAt || null,
+    csr:c.csr || null,
     lastError:c.lastError || null, createdAt:c.createdAt, updatedAt:c.updatedAt
   };
 }
 function requireOwner(ownerId){ if(!ownerId) throw Object.assign(new Error("ownerId required"),{code:"CERT_OWNER_REQUIRED",status:400}); }
 
+export async function prepareCertificateKey(id,ownerId){
+ const s=await getStore(),c=s.certificates?.[id]; if(!c||c.ownerId!==ownerId)return null;
+ const pair=createCertificateKey(); const csr=createCsr({hostname:c.hostname,...pair});
+ const encryptedPrivateKey=encryptPrivateKey(pair.privateKey);
+ await updateStore(s=>{const x=s.certificates?.[id];if(x){x.encryptedPrivateKey=encryptedPrivateKey;x.csr=csr.toString("base64url");x.status="ready";x.updatedAt=new Date().toISOString();}return s;});
+ return {certificate:await getCertificate(id,ownerId),csr:csr.toString("base64url")};
+}
+export async function getCertificateSecrets(id,ownerId){
+ const s=await getStore(),c=s.certificates?.[id]; if(!c||c.ownerId!==ownerId)return null;
+ return {privateKey:c.encryptedPrivateKey?decryptPrivateKey(c.encryptedPrivateKey):null,csr:c.csr||null,certificatePem:c.certificatePem||null};
+}
 export async function createCertificate({ownerId,domainId,hostname,challenge="http-01",issuer="acme"}={}) {
   requireOwner(ownerId);
   if(!domainId || !hostname) throw Object.assign(new Error("domainId and hostname required"),{code:"CERT_FIELDS_REQUIRED",status:400});

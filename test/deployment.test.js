@@ -105,6 +105,42 @@ test("deployment service attachment is owner scoped", async () => {
 });
 
 
+test("rollback restores the previous production traffic binding", async () => {
+  resetStoreForTests();
+  process.env.BHAI_RUNTIME_ENABLED = "true";
+  let oldService, newService;
+  try {
+    oldService = await createService({ ownerId:"user-rb", buildId:"old-rb", command:"sleep 10", cwd:process.cwd() });
+    newService = await createService({ ownerId:"user-rb", buildId:"new-rb", command:"sleep 10", cwd:process.cwd() });
+    const oldDeployment = await createDeployment({ ownerId:"user-rb", repository:"owner/rb", branch:"main", buildId:"old-rb", path:"/tmp/old-rb" });
+    const newDeployment = await createDeployment({ ownerId:"user-rb", repository:"owner/rb", branch:"main", buildId:"new-rb", path:"/tmp/new-rb" });
+    await attachDeploymentService(oldDeployment.id, "user-rb", oldService.id);
+    await attachDeploymentService(newDeployment.id, "user-rb", newService.id);
+    await updateStore(s => {
+      s.production ??= {};
+      s.routes ??= {};
+      s.production["user-rb:owner/rb:main"] = oldDeployment.id;
+      s.deployments[oldDeployment.id].status = "active";
+      s.routes["route-rb"] = {
+        id:"route-rb", ownerId:"user-rb", hostname:"rb.example.com",
+        serviceId:oldService.id, targetHost:"127.0.0.1", targetPort:oldService.port, status:"active"
+      };
+      return s;
+    });
+    await promoteDeployment(newDeployment.id, "user-rb");
+    const rolledBack = await rollbackDeployment(oldDeployment.id, "user-rb");
+    assert.equal(rolledBack.id, oldDeployment.id);
+    const store = await getStore();
+    assert.equal(store.production["user-rb:owner/rb:main"], oldDeployment.id);
+    assert.equal(store.routes["route-rb"].serviceId, oldService.id);
+    assert.equal(store.routes["route-rb"].targetPort, oldService.port);
+  } finally {
+    if (oldService) await stopService(oldService.id, "user-rb").catch(() => {});
+    if (newService) await stopService(newService.id, "user-rb").catch(() => {});
+    delete process.env.BHAI_RUNTIME_ENABLED;
+  }
+});
+
 test("production cutover updates pointer and traffic bindings together", async () => {
   resetStoreForTests();
   process.env.BHAI_RUNTIME_ENABLED = "true";

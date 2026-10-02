@@ -641,15 +641,19 @@ const server = http.createServer(async (req, res) => {
         : send(res, 404, { ok: false, error: "Build job not found" }, rid);
     }
 
-    if (url.pathname === "/v1/usage" && req.method === "GET")
+    if (url.pathname === "/v1/usage" && req.method === "GET") {
+      if (!adminAuthorized(req)) return send(res, 401, { ok: false, error: "Admin authentication required" }, rid);
       return send(res, 200, { ok: true, usage: await allUsage() }, rid);
+    }
 
-    if (url.pathname === "/v1/metrics" && req.method === "GET")
+    if (url.pathname === "/v1/metrics" && req.method === "GET") {
+      if (!adminAuthorized(req)) return send(res, 401, { ok: false, error: "Admin authentication required" }, rid);
       return send(res, 200, {
         ok: true,
         providers: await allProviderUsage(),
         timestamp: new Date().toISOString()
       }, rid);
+    }
 
     if (url.pathname === "/v1/files" && req.method === "GET") {
       const identity = await authenticate(req.headers["x-bhai-key"]);

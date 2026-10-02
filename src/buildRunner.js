@@ -3,6 +3,14 @@ import { spawn } from "node:child_process";
 const DEFAULT_TIMEOUT = 10 * 60 * 1000;
 const DEFAULT_OUTPUT = 200_000;
 
+function buildEnv(extra = {}) {
+  const inherited = {};
+  for (const key of ["PATH", "HOME", "TMPDIR", "LANG", "LC_ALL", "NODE_ENV"]) {
+    if (process.env[key] !== undefined) inherited[key] = process.env[key];
+  }
+  return { ...inherited, ...extra };
+}
+
 function shellCommand(command) {
   if (typeof command !== "string" || !command.trim()) throw new Error("command is required");
   if (/\b(?:rm\s+-rf|mkfs|shutdown|reboot|curl\s+.*\|\s*(?:sh|bash)|wget\s+.*\|\s*(?:sh|bash))\b|(?:;|&&|\|\||`|\$\(|>|<)/i.test(command)) {
@@ -19,7 +27,7 @@ export async function runBuildCommand(command, { cwd, timeoutMs = DEFAULT_TIMEOU
   return new Promise((resolve, reject) => {
     const child = spawn("/bin/sh", ["-lc", safe], {
       cwd,
-      env: { ...process.env, ...env },
+      env: buildEnv(env),
       stdio: ["ignore", "pipe", "pipe"]
     });
     let stdout = "", stderr = "", truncated = false;

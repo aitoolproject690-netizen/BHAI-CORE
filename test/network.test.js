@@ -36,6 +36,15 @@ test("network info exposes persistent routing capability", () => {
   assert.equal(info.routing, "hostname_to_service");
 });
 
+test("route target port must match the service port", async () => {
+  resetStoreForTests();
+  await updateStore(s => { s.services["svc-1"] = { id:"svc-1", ownerId:"owner-net", status:"running", port:3210 }; return s; });
+  await assert.rejects(
+    () => createRoute({ ownerId:"owner-net", hostname:"wrong-port.example.com", serviceId:"svc-1", targetPort:3211 }),
+    error => error.code === "ROUTE_TARGET_PORT_MISMATCH"
+  );
+});
+
 test("route target is restricted to loopback", async () => {
   resetStoreForTests();
   await updateStore(s => { s.services["svc-1"] = { id:"svc-1", ownerId:"owner-net" }; return s; });

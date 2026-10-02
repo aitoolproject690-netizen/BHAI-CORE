@@ -86,7 +86,8 @@ function secretsEqual(provided, expected) {
 }
 
 function adminAuthorized(req) {
-  return secretsEqual(req.headers["x-bhai-admin-key"], process.env.BHAI_CORE_ADMIN_KEY);
+  if (secretsEqual(req.headers["x-bhai-admin-key"], process.env.BHAI_CORE_ADMIN_KEY)) return true;
+  return cfg.masterAuth.enabled && authenticateMaster(req, cfg.masterAuth.username, process.env.BHAI_CORE_PASSWORD);
 }
 
 async function readJsonRaw(req, maxBytes = 2_000_000) {
@@ -176,12 +177,16 @@ const server = http.createServer(async (req, res) => {
       *{box-sizing:border-box}body{margin:0;background:#080d18;color:#eef2ff;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
       main{max-width:980px;margin:auto;padding:24px 16px 40px}.top{display:flex;justify-content:space-between;align-items:center;gap:12px}.brand{font-size:26px;font-weight:800}.live{color:#7ee2a8;font-size:13px}
       h1{font-size:34px;margin:24px 0 6px}p{color:#9da9c4;margin-top:0}.section{margin-top:24px}.section h2{font-size:18px;margin:0 0 12px}
-      .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}.card,.provider{display:block;padding:17px;border:1px solid #24304a;border-radius:16px;background:#10182a;color:#eef2ff;text-decoration:none}.card:hover{border-color:#49638f}
+      .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}.card,.provider{display:block;padding:17px;border:1px solid #24304a;border-radius:16px;background:#10182a;color:#eef2ff;text-decoration:none}
       .card b{display:block;margin-bottom:7px}.url,small{color:#8fa0bf;font-size:13px;word-break:break-all}.provider>div{display:flex;justify-content:space-between;align-items:center;gap:8px}
       .pill{font-size:10px;padding:5px 8px;border-radius:999px;background:#2d2330;color:#ffb5b5}.pill.ready{background:#173d2a;color:#7ee2a8}
+      .panel{padding:17px;border:1px solid #24304a;border-radius:16px;background:#10182a}.row{display:flex;gap:10px;flex-wrap:wrap}.row>*{flex:1;min-width:150px}
+      input,button{width:100%;padding:12px;border-radius:10px;border:1px solid #33415f;background:#0b1221;color:#eef2ff;font:inherit}button{cursor:pointer;background:#173d2a;border-color:#285c43}
+      pre{white-space:pre-wrap;word-break:break-word;background:#090f1c;padding:12px;border-radius:10px;color:#b9c8e8;min-height:20px}
       .note{margin-top:18px;padding:14px;border-radius:14px;background:#111c31;border:1px solid #273753;color:#b8c4dd;font-size:13px;line-height:1.5}
       </style></head><body><main><div class="top"><div class="brand">🤖 BHAI-CORE</div><div class="live">● LIVE</div></div>
-      <h1>API Dashboard</h1><p>Core service, AI providers aur available modules ek jagah.</p>
+      <h1>API Dashboard</h1><p>Core service, AI providers aur API keys ek jagah.</p>
+      <div class="section"><h2>🔐 Master Access → API Key</h2><div class="panel"><p>Apne master username/password se ek BHAI API key create karo. Password page par store nahi hota.</p><div class="row"><input id="u" placeholder="Username" autocomplete="username"><input id="p" placeholder="Password" type="password" autocomplete="current-password"><input id="n" placeholder="Key name" value="my-app"></div><button id="create">Create API Key</button><pre id="out"></pre></div></div>
       <div class="section"><h2>AI Providers</h2><div class="grid">${providerCards}</div></div>
       <div class="section"><h2>Core</h2><div class="grid">
       <a class="card" href="/v1/models"><b>🤖 Models</b><span class="url">Configured model registry</span></a>
@@ -189,7 +194,6 @@ const server = http.createServer(async (req, res) => {
       <a class="card" href="/health"><b>❤️ Health</b><span class="url">Service health</span></a>
       <a class="card" href="/ready"><b>✅ Ready</b><span class="url">Readiness check</span></a>
       <a class="card" href="/v1"><b>📚 API Index</b><span class="url">All major API routes</span></a>
-      <a class="card" href="/"><b>🌐 Status</b><span class="url">Root service status</span></a>
       </div></div>
       <div class="section"><h2>Engine Modules</h2><div class="grid">
       <div class="card"><b>💬 Chat + Streaming</b><span class="url">Provider router + SSE</span></div>
@@ -197,12 +201,14 @@ const server = http.createServer(async (req, res) => {
       <div class="card"><b>🛠️ Agent</b><span class="url">Tools, approvals, audit</span></div>
       <div class="card"><b>🖼️ Image</b><span class="url">ComfyUI adapter</span></div>
       <div class="card"><b>🎬 Video</b><span class="url">External video adapter</span></div>
-      <div class="card"><b>🎙️ Voice + Vision</b><span class="url">Local Whisper/Piper + vision providers</span></div>
+      <div class="card"><b>🎙️ Voice + Vision</b><span class="url">Whisper/Piper + vision providers</span></div>
       <div class="card"><b>🐙 GitHub + Cloud</b><span class="url">Repository/build/deployment tools</span></div>
       <div class="card"><b>💳 Billing</b><span class="url">Plans, quota and usage foundation</span></div>
       </div></div>
-      <div class="note">🔐 Chat, keys aur mutation APIs authentication ke peeche hain. Provider key configure hone ke baad Models me provider dikhne lagega. Dashboard khud koi secret expose nahi karta.</div>
-      </main></body></html>`;
+      <div class="note">🔒 Master credentials are only used for the request. The generated API key is shown once; save it securely. Provider keys are never displayed here.</div>
+      <script>
+      document.getElementById("create").onclick=async()=>{const u=document.getElementById("u").value,p=document.getElementById("p").value,n=document.getElementById("n").value||"my-app",out=document.getElementById("out");out.textContent="Creating…";try{const r=await fetch("/v1/keys",{method:"POST",headers:{"content-type":"application/json","authorization":"Basic "+btoa(u+":"+p)},body:JSON.stringify({name:n})});const d=await r.json();out.textContent=r.ok?"API KEY (save now):\n"+d.key+"\n\nKey ID: "+d.id:JSON.stringify(d,null,2)}catch(e){out.textContent=String(e)}};
+      </script></main></body></html>`;
       res.writeHead(200, {"content-type":"text/html; charset=utf-8","cache-control":"no-store"});
       return res.end(html);
     }

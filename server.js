@@ -41,6 +41,7 @@ import { createAutoDeploy, getAutoDeploy, listAutoDeploys, setAutoDeployStatus, 
 import { createRoute, getRoute, listRoutes, setRouteStatus, findRouteByHostname, networkInfo, networkSecurityInfo, proxyRequest } from "./src/network.js";
 import { executeCloudBuildJob } from "./src/cloudJob.js";
 import { startAcmeIssuance, completeAcmeIssuance, acmeIssuanceInfo } from "./src/acmeIssuance.js";
+import { createRenewalScheduler, renewalSchedulerInfo } from "./src/renewalScheduler.js";
 import crypto from "node:crypto";
 import { checkRateLimit, rateLimitInfo } from "./src/rateLimit.js";
 
@@ -511,7 +512,7 @@ const server = http.createServer(async (req, res) => {
       return account ? send(res,200,{ok:true,account},rid) : send(res,404,{ok:false,error:"ACME account not found"},rid);
     }
 
-    if (url.pathname === "/v1/cloud/acme/info" && req.method === "GET") return send(res,200,{ok:true,acme:acmeInfo()},rid);
+    if (url.pathname === "/v1/cloud/acme/info" && req.method === "GET") return send(res,200,{ok:true,acme:acmeInfo(),renewalScheduler:renewalSchedulerInfo()},rid);
     if (url.pathname === "/v1/cloud/acme/directory" && req.method === "GET") { try{return send(res,200,{ok:true,...await getAcmeDirectory()},rid);}catch(error){return send(res,error.status||502,{ok:false,error:error.message,code:error.code||"ACME_ERROR"},rid);} }
     if (url.pathname === "/v1/cloud/acme/accounts" && req.method === "GET") { const identity=await authenticate(req.headers["x-bhai-key"]);if(!identity)return send(res,401,{ok:false,error:"BHAI key required"},rid);return send(res,200,{ok:true,accounts:await listAcmeAccounts(identity.id)},rid); }
     if (url.pathname === "/v1/cloud/acme/accounts" && req.method === "POST") { const identity=await authenticate(req.headers["x-bhai-key"]);if(!identity)return send(res,401,{ok:false,error:"BHAI key required"},rid);const account=await createAcmeAccount({ownerId:identity.id});return send(res,202,{ok:true,account},rid); }
@@ -907,6 +908,11 @@ const server = http.createServer(async (req, res) => {
     }, rid);
   }
 });
+
+const renewalScheduler = createRenewalScheduler({
+  onError: error => console.error("BHAI-CORE ACME renewal sweep:", error?.message || error)
+});
+if (process.env.BHAI_ACME_ENABLED === "true") renewalScheduler.start();
 
 server.listen(cfg.port, cfg.host, () => {
   console.log("BHAI-CORE listening on http://" + cfg.host + ":" + cfg.port);

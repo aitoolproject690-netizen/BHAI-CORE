@@ -74,6 +74,7 @@ async function openAICompatibleStream(url, headers, body, onToken, timeoutMs = 6
       }
     }
   }
+  if (!fullText) throw new Error("Provider returned no stream text");
   return fullText;
 }
 
@@ -130,6 +131,7 @@ async function ollamaChatStream({ url, model, messages, temperature = 0.7, onTok
       if (token) { fullText += token; await onToken(token); }
     } catch {}
   }
+  if (!fullText) throw new Error("Ollama returned no stream text");
   return { text: fullText };
 }
 

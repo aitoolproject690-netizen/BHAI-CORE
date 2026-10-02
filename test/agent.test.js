@@ -4,7 +4,7 @@ import { listAgentTools } from "../src/agent.js";
 
 test("agent exposes core tools", () => {
   const names = listAgentTools().map(x => x.name);
-  assert.deepEqual(names, ["chat","rag_search","rag_context","vision_analyze","image_generate","voice_transcribe","voice_synthesize","models","job_create","job_get","github_repo_list","github_repo_get","github_file_read","github_file_write","github_repo_create","cloud_build_plan","cloud_build_execute"]);
+  assert.deepEqual(names, ["chat","rag_search","rag_context","vision_analyze","image_generate","voice_transcribe","voice_synthesize","models","job_create","job_get","github_repo_list","github_repo_get","github_file_read","github_file_write","github_repo_create","cloud_build_plan","cloud_build_execute","cloud_service_create"]);
 });
 
 test("agent tool metadata is safe to expose", () => {
@@ -77,6 +77,36 @@ test("approved high-risk agent actions are bound to the approved input", async (
 
   await assert.rejects(
     () => executeAgentTool("github_repo_create", { name: "different-repo", private: true }, identity, { approvalId: approval.id }),
+    error => error.code === "APPROVAL_REQUIRED" && error.status === 428
+  );
+});
+
+
+test("cloud service creation requires the cloud build permission", async () => {
+  const { executeAgentTool } = await import("../src/agent.js");
+  await assert.rejects(
+    () => executeAgentTool("cloud_service_create", {
+      buildId: "build-1",
+      command: "node server.js",
+      cwd: process.cwd()
+    }, { id: "owner-no-cloud", scopes: ["agent:read", "agent:write"] }),
+    error => error.code === "PERMISSION_DENIED" && error.status === 403
+  );
+});
+
+test("cloud service creation requires an approved exact input", async () => {
+  const { resetStoreForTests } = await import("../src/store.js");
+  const { createApproval, decideApproval } = await import("../src/approval.js");
+  const { executeAgentTool } = await import("../src/agent.js");
+
+  resetStoreForTests();
+  const identity = { id: "owner-cloud-service", scopes: ["cloud:build", "agent:write"] };
+  const input = { buildId: "build-1", command: "node server.js", cwd: process.cwd() };
+  const approval = await createApproval({ actorId: identity.id, tool: "cloud_service_create", input });
+  assert.ok(await decideApproval(approval.id, identity.id, "approved"));
+
+  await assert.rejects(
+    () => executeAgentTool("cloud_service_create", { ...input, command: "node other.js" }, identity, { approvalId: approval.id }),
     error => error.code === "APPROVAL_REQUIRED" && error.status === 428
   );
 });

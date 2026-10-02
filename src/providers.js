@@ -129,7 +129,7 @@ async function geminiChatStream({ key, model, messages, temperature = 0.7, onTok
   for (const rawLine of buffer.split("\n")) {
     const line = rawLine.trim();
     if (!line.startsWith("data:")) continue;
-    try { await emit(JSON.parse(line.slice(5).trim()); } catch {}
+    try { await emit(JSON.parse(line.slice(5).trim())); } catch {}
   }
   if (!fullText) throw new Error("Gemini returned no stream text");
   return { text: fullText };

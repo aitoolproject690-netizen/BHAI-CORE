@@ -441,9 +441,9 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (url.pathname === "/v1/cloud/autodeploy" && req.method === "POST") {
-      if (!requireCloudBuild(identity, res, rid)) return;
       const identity = await authenticate(req.headers["x-bhai-key"]);
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      if (!requireCloudBuild(identity, res, rid)) return;      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
       const body = await readJson(req);
       const hook = await createAutoDeploy({ ownerId: identity.id, repository: body.repository, branch: body.branch });
       return send(res, 201, { ok: true, autoDeploy: hook }, rid);
@@ -460,7 +460,6 @@ const server = http.createServer(async (req, res) => {
     if (autoDeployMatch && req.method === "POST") {
       const identity = await authenticate(req.headers["x-bhai-key"]);
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
-      if (!requireCloudBuild(identity, res, rid)) return;
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
       const body = await readJson(req);
       const hook = await setAutoDeployStatus(autoDeployMatch[1], identity.id, body.status);
@@ -481,7 +480,6 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/v1/cloud/network/routes" && req.method === "POST") {
       const identity = await authenticate(req.headers["x-bhai-key"]);
       if (!identity) return send(res, 401, { ok:false, error:"BHAI key required" }, rid);
-      if (!requireCloudBuild(identity, res, rid)) return;
       if (!identity) return send(res, 401, { ok:false, error:"BHAI key required" }, rid);
       const body = await readJson(req);
       const service = await getService(body.serviceId, identity.id);
@@ -500,7 +498,6 @@ const server = http.createServer(async (req, res) => {
     if (routeMatch && req.method === "POST") {
       const identity = await authenticate(req.headers["x-bhai-key"]);
       if (!identity) return send(res, 401, { ok:false, error:"BHAI key required" }, rid);
-      if (!requireCloudBuild(identity, res, rid)) return;
       if (!identity) return send(res, 401, { ok:false, error:"BHAI key required" }, rid);
       const body = await readJson(req);
       const route = await setRouteStatus(routeMatch[1], identity.id, body.status);
@@ -529,11 +526,10 @@ const server = http.createServer(async (req, res) => {
     const acmeOrderMatch=url.pathname.match(/^\/v1\/cloud\/acme\/orders\/([^/]+)$/);
     if(acmeOrderMatch&&req.method==="GET"){const identity=await authenticate(req.headers["x-bhai-key"]);if(!identity)return send(res,401,{ok:false,error:"BHAI key required"},rid);const order=await getAcmeOrder(acmeOrderMatch[1],identity.id);return order?send(res,200,{ok:true,order},rid):send(res,404,{ok:false,error:"ACME order not found"},rid);}
     if(acmeOrderMatch&&req.method==="POST"){const identity=await authenticate(req.headers["x-bhai-key"]);if(!identity)return send(res,401,{ok:false,error:"BHAI key required"},rid);if (!requireCloudBuild(identity, res, rid)) return;const body=await readJson(req);if(body.action==="prepare_dns")return send(res,202,{ok:true,...await prepareDnsChallenge(acmeOrderMatch[1],identity.id,{recordName:body.recordName,recordValue:body.recordValue})},rid);const order=await setAcmeOrderStatus(acmeOrderMatch[1],identity.id,body.status,body.patch||{});return order?send(res,200,{ok:true,order},rid):send(res,404,{ok:false,error:"ACME order not found"},rid);}
-      if (!requireCloudBuild(identity, res, rid)) return;
     if (url.pathname === "/v1/cloud/acme/accounts/register" && req.method === "POST") {
-      if (!requireCloudBuild(identity, res, rid)) return;
       const identity = await authenticate(req.headers["x-bhai-key"]);
-      if (!identity) return send(res,401,{ok:false,error:"BHAI key required"},rid);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      if (!requireCloudBuild(identity, res, rid)) return;      if (!identity) return send(res,401,{ok:false,error:"BHAI key required"},rid);
       const body=await readJson(req);
       const account=await registerStoredAcmeAccount({id:body.id,ownerId:identity.id});
       return account ? send(res,200,{ok:true,account},rid) : send(res,404,{ok:false,error:"ACME account not found"},rid);
@@ -543,7 +539,6 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/v1/cloud/acme/directory" && req.method === "GET") { try{return send(res,200,{ok:true,...await getAcmeDirectory()},rid);}catch(error){return send(res,error.status||502,{ok:false,error:error.message,code:error.code||"ACME_ERROR"},rid);} }
     if (url.pathname === "/v1/cloud/acme/accounts" && req.method === "GET") { const identity=await authenticate(req.headers["x-bhai-key"]);if(!identity)return send(res,401,{ok:false,error:"BHAI key required"},rid);return send(res,200,{ok:true,accounts:await listAcmeAccounts(identity.id)},rid); }
     if (url.pathname === "/v1/cloud/acme/accounts" && req.method === "POST") { const identity=await authenticate(req.headers["x-bhai-key"]);if(!identity)return send(res,401,{ok:false,error:"BHAI key required"},rid);if (!requireCloudBuild(identity, res, rid)) return;const account=await createAcmeAccount({ownerId:identity.id});return send(res,202,{ok:true,account},rid); }
-      if (!requireCloudBuild(identity, res, rid)) return;
     if (url.pathname === "/v1/cloud/acme/renew" && req.method === "POST") { const identity=await authenticate(req.headers["x-bhai-key"]);if(!identity)return send(res,401,{ok:false,error:"BHAI key required"},rid);if (!requireCloudBuild(identity, res, rid)) return;return send(res,200,{ok:true,...await renewDueCertificates(identity.id)},rid); }
     if (url.pathname === "/v1/cloud/dns/info" && req.method === "GET") return send(res, 200, { ok:true, dns:dnsInfo() }, rid);
     if (url.pathname === "/v1/cloud/dns/challenges" && req.method === "GET") {
@@ -551,8 +546,9 @@ const server = http.createServer(async (req, res) => {
       return send(res,200,{ok:true,records:await listDnsChallenges(identity.id)},rid);
     }
     if (url.pathname === "/v1/cloud/dns/challenges" && req.method === "POST") {
-      if (!requireCloudBuild(identity, res, rid)) return;
-      const identity = await authenticate(req.headers["x-bhai-key"]); if (!identity) return send(res,401,{ok:false,error:"BHAI key required"},rid);
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      if (!requireCloudBuild(identity, res, rid)) return; if (!identity) return send(res,401,{ok:false,error:"BHAI key required"},rid);
       const body=await readJson(req); const record=await createDnsChallenge({...body,ownerId:identity.id});
       return send(res,202,{ok:true,record},rid);
     }
@@ -566,10 +562,9 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok:true, certificates:await listCertificates(auth.id) }, rid);
     }
     if (url.pathname === "/v1/cloud/certificates" && req.method === "POST") {
-      if (!requireCloudBuild(identity, res, rid)) return;
       const auth = await authenticate(req.headers["x-bhai-key"]);
       if (!auth) return send(res, 401, { ok:false, error:"BHAI key required" }, rid);
-      const body = await readJson(req);
+      if (!requireCloudBuild(auth, res, rid)) return;      const body = await readJson(req);
       const cert = await createCertificate({ ...body, ownerId:auth.id });
       return send(res, 202, { ok:true, certificate:cert }, rid);
     }
@@ -602,7 +597,6 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/v1/cloud/domains" && req.method === "POST") {
       const identity = await authenticate(req.headers["x-bhai-key"]);
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
-      if (!requireCloudBuild(identity, res, rid)) return;
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
       const body = await readJson(req);
       const service = await getService(body.serviceId, identity.id);
@@ -625,7 +619,6 @@ const server = http.createServer(async (req, res) => {
     if (domainMatch && req.method === "POST") {
       const identity = await authenticate(req.headers["x-bhai-key"]);
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
-      if (!requireCloudBuild(identity, res, rid)) return;
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
       const body = await readJson(req);
       const domain = await setDomainStatus(domainMatch[1], identity.id, body.status);
@@ -646,7 +639,6 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/v1/cloud/services" && req.method === "POST") {
       const identity = await authenticate(req.headers["x-bhai-key"]);
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
-      if (!requireCloudBuild(identity, res, rid)) return;
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
       const body = await readJson(req);
       const result = await executeAgentTool("cloud_service_create", body, identity, { approvalId: body.approvalId, requestId: rid });
@@ -663,7 +655,6 @@ const server = http.createServer(async (req, res) => {
     if (serviceMatch && req.method === "DELETE") {
       const identity = await authenticate(req.headers["x-bhai-key"]);
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
-      if (!requireCloudBuild(identity, res, rid)) return;
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
       const service = await stopService(serviceMatch[1], identity.id);
       return service ? send(res, 200, { ok: true, service }, rid) : send(res, 404, { ok: false, error: "Service not found" }, rid);
@@ -672,7 +663,6 @@ const server = http.createServer(async (req, res) => {
     if (monitorMatch && req.method === "POST") {
       const identity = await authenticate(req.headers["x-bhai-key"]);
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
-      if (!requireCloudBuild(identity, res, rid)) return;
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
       const result = await monitorService(monitorMatch[1], identity.id);
       return result ? send(res, 200, { ok: true, ...result }, rid) : send(res, 404, { ok: false, error: "Service not found" }, rid);

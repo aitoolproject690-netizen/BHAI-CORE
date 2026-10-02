@@ -19,6 +19,9 @@ import { embeddingInfo } from "./src/embeddings.js";
 import { getModelRegistry, modelCapabilities } from "./src/models.js";
 import { analyzeImage, getVisionCandidates } from "./src/vision.js";
 import { createImageRequest, submitComfyUI, imageProviderInfo } from "./src/image.js";
+import { createVideoRequest, planVideo, submitVideoHttp, videoProviderInfo } from "./src/video.js";
+import { billingPlans, getBillingAccount, billingUsage, billingSnapshot, setBillingPlan, assertBillingQuota, recordBillingUsage } from "./src/billing.js";
+import { dashboardSnapshot } from "./src/dashboard.js";
 import { createSpeechRequest, transcribeWhisper, createTtsRequest, synthesizePiper, voiceProviderInfo } from "./src/voice.js";
 import { canAttempt, recordFailure, recordSuccess } from "./src/circuitBreaker.js";
 import { listAgentTools, executeAgentTool } from "./src/agent.js";
@@ -342,12 +345,15 @@ const server = http.createServer(async (req, res) => {
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
       const body = await readJson(req);
       const request = createImageRequest(body);
+      await assertBillingQuota(identity.id, { requests: 1, imageJobs: 1 });
       if (request.provider !== "comfyui") return send(res, 400, { ok: false, error: "Unsupported image provider" }, rid);
       const result = await submitComfyUI({
         url: process.env.COMFYUI_URL,
         request,
         workflow: body.workflow
       });
+      await recordBillingUsage(identity.id, { requests: 1, imageJobs: 1 });
+      await recordUsage({ key: identity.id, input: JSON.stringify(body).length });
       return send(res, 202, { ok: true, ...request, ...result, status: "submitted" }, rid);
     }
 
@@ -370,6 +376,57 @@ const server = http.createServer(async (req, res) => {
         image: body.image
       });
       return send(res, 200, { ok: true, ...result }, rid);
+    }
+
+    if (url.pathname === "/v1/video/providers" && req.method === "GET")
+      return send(res, 200, { ok: true, providers: videoProviderInfo() }, rid);
+
+    if (url.pathname === "/v1/video/plan" && req.method === "POST") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const request = createVideoRequest(await readJson(req));
+      await assertBillingQuota(identity.id, { requests: 1, videoSeconds: request.durationSeconds });
+      return send(res, 200, { ok: true, request, plan: planVideo(request) }, rid);
+    }
+
+    if (url.pathname === "/v1/video/generate" && req.method === "POST") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      const request = createVideoRequest(await readJson(req));
+      await assertBillingQuota(identity.id, { requests: 1, videoSeconds: request.durationSeconds });
+      if (request.provider !== "http") return send(res, 400, { ok: false, error: "Unsupported video provider" }, rid);
+      const result = await submitVideoHttp({ url: process.env.VIDEO_API_URL, apiKey: process.env.VIDEO_API_KEY, request });
+      await recordBillingUsage(identity.id, { requests: 1, videoSeconds: request.durationSeconds });
+      await recordUsage({ key: identity.id, input: JSON.stringify(request).length });
+      return send(res, 202, { ok: true, ...request, ...result }, rid);
+    }
+
+    if (url.pathname === "/v1/billing/plans" && req.method === "GET")
+      return send(res, 200, { ok: true, plans: billingPlans() }, rid);
+
+    if (url.pathname === "/v1/billing" && req.method === "GET") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      return send(res, 200, { ok: true, ...(await billingSnapshot(identity.id)) }, rid);
+    }
+
+    if (url.pathname === "/v1/billing/usage" && req.method === "GET") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      return send(res, 200, { ok: true, ...(await billingUsage(identity.id)) }, rid);
+    }
+
+    if (url.pathname === "/v1/billing/admin/subscription" && req.method === "POST") {
+      if (!adminAuthorized(req)) return send(res, 401, { ok: false, error: "Admin authentication required" }, rid);
+      const body = await readJson(req);
+      if (!body.ownerId) return send(res, 400, { ok: false, error: "ownerId is required" }, rid);
+      return send(res, 200, { ok: true, account: await setBillingPlan(body.ownerId, body.plan) }, rid);
+    }
+
+    if (url.pathname === "/v1/dashboard" && req.method === "GET") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
+      return send(res, 200, { ok: true, ...(await dashboardSnapshot(identity.id)) }, rid);
     }
 
     if (url.pathname === "/v1/models/capabilities" && req.method === "GET") {
@@ -924,7 +981,9 @@ const server = http.createServer(async (req, res) => {
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
       const usageKey = identity.id;
       const body = await readJson(req);
+      const inputChars = JSON.stringify(body).length;
       await assertBudget(usageKey);
+      await assertBillingQuota(usageKey, { requests: 1, charsIn: inputChars });
       const result = await generate({
         messages: body.messages,
         provider: body.provider,
@@ -933,8 +992,13 @@ const server = http.createServer(async (req, res) => {
       });
       await recordUsage({
         key: usageKey,
-        input: JSON.stringify(body).length,
+        input: inputChars,
         output: String(result.text || "").length
+      });
+      await recordBillingUsage(usageKey, {
+        requests: 1,
+        charsIn: inputChars,
+        charsOut: String(result.text || "").length
       });
       return send(res, 200, result, rid);
     }
@@ -942,7 +1006,7 @@ const server = http.createServer(async (req, res) => {
     return send(res, 404, { ok: false, error: "Not found" }, rid);
   } catch (error) {
     await recordUsage({ key: req.headers["x-bhai-key"] || "anonymous", failed: true });
-    return send(res, error.code === "BUDGET_EXCEEDED" ? 429 : error.code === "PERMISSION_DENIED" ? 403 : error.code === "REQUEST_BODY_TOO_LARGE" ? 413 : error.code === "REQUEST_BODY_INVALID_JSON" ? 400 : 500, {
+    return send(res, error.code === "BUDGET_EXCEEDED" || error.code === "BILLING_QUOTA_EXCEEDED" ? 429 : error.code === "PERMISSION_DENIED" ? 403 : error.code === "REQUEST_BODY_TOO_LARGE" ? 413 : error.code === "REQUEST_BODY_INVALID_JSON" ? 400 : 500, {
       ok: false, ...publicError(error), requestId: rid
     }, rid);
   }

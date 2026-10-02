@@ -64,6 +64,7 @@ export async function executeAgentTool(name, input = {}, identity = {}, options 
   await recordAudit({ actorId: identity.id, action: "agent.execute", tool, status: "started", requestId: options.requestId });
 
   let auditStatus = "completed";
+  let auditError = null;
   try {
     switch (tool) {
     case "chat":
@@ -155,14 +156,7 @@ export async function executeAgentTool(name, input = {}, identity = {}, options 
     }
   } catch (error) {
     auditStatus = "failed";
-    await recordAudit({
-      actorId: identity.id,
-      action: "agent.execute",
-      tool,
-      status: "failed",
-      requestId: options.requestId,
-      metadata: { code: error?.code, status: error?.status, error: error?.message }
-    });
+    auditError = { code: error?.code, status: error?.status, error: error?.message };
     throw error;
   } finally {
     await recordAudit({
@@ -170,7 +164,8 @@ export async function executeAgentTool(name, input = {}, identity = {}, options 
       action: "agent.execute",
       tool,
       status: auditStatus,
-      requestId: options.requestId
+      requestId: options.requestId,
+      metadata: auditError || undefined
     });
   }
 }

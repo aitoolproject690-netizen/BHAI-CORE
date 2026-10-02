@@ -1,9 +1,14 @@
 import { getUsage } from "./usage.js";
 
+function normalizeLimit(value) {
+  const number = Number(value);
+  return Number.isSafeInteger(number) && number > 0 ? number : 0;
+}
+
 export async function budgetStatus(key, limits = {}) {
   const used = await getUsage(key);
-  const maxRequests = Number(limits.maxRequests ?? process.env.BHAI_MAX_REQUESTS ?? 0);
-  const maxInputChars = Number(limits.maxInputChars ?? process.env.BHAI_MAX_INPUT_CHARS ?? 0);
+  const maxRequests = normalizeLimit(limits.maxRequests ?? process.env.BHAI_MAX_REQUESTS ?? 0);
+  const maxInputChars = normalizeLimit(limits.maxInputChars ?? process.env.BHAI_MAX_INPUT_CHARS ?? 0);
 
   return {
     exceeded: (maxRequests > 0 && used.requests >= maxRequests) ||

@@ -144,6 +144,8 @@ test("generate retries retryable provider failures before succeeding", async () 
     else process.env.AI_PROVIDER_ORDER = previousOrder;
     if (previousKey === undefined) delete process.env.OPENAI_API_KEY;
     else process.env.OPENAI_API_KEY = previousKey;
+    if (previousRetries === undefined) delete process.env.BHAI_PROVIDER_RETRIES;
+    else process.env.BHAI_PROVIDER_RETRIES = previousRetries;
   }
 });
 

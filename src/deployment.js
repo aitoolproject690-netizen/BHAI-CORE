@@ -103,6 +103,8 @@ export async function attachDeploymentService(id, ownerId, serviceId) {
 export async function promoteDeployment(id, ownerId) {
   const target = await getDeployment(id, ownerId);
   if (!target) return null;
+  if (target.status === "failed" || target.status === "stopped")
+    throw Object.assign(new Error("Deployment is not deployable"), { code:"DEPLOYMENT_NOT_DEPLOYABLE", status:409 });
   if (!target.serviceId)
     throw Object.assign(new Error("Deployment has no service"), { code:"DEPLOYMENT_SERVICE_MISSING", status:409 });
   const service = await getService(target.serviceId, ownerId);

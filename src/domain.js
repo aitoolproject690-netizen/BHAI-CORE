@@ -49,8 +49,17 @@ export async function setDomainStatus(id, ownerId, status) {
   if (!STATUSES.has(status))
     throw Object.assign(new Error("Invalid domain status"), { code:"DOMAIN_STATUS_INVALID", status:400 });
   if (status === "active") {
+    const store = await getStore();
+    const domain = store.domains?.[id];
+    if (!domain || domain.ownerId !== ownerId) return null;
     const records = await listDnsChallenges(ownerId);
-    const verified = records.some(r => r.domainId === id && r.status === "verified");
+    const verified = records.some(r =>
+      r.domainId === id &&
+      r.status === "verified" &&
+      String(r.hostname || "").toLowerCase().replace(/\.$/, "") === String(domain.hostname || "").toLowerCase().replace(/\.$/, "") &&
+      String(r.name || "").toLowerCase().replace(/\.$/, "") === "_acme-challenge." + String(domain.hostname || "").toLowerCase().replace(/\.$/, "") &&
+      r.type === "TXT"
+    );
     if (!verified) throw Object.assign(new Error("Domain DNS verification required before activation"), { code:"DOMAIN_DNS_NOT_VERIFIED", status:409 });
   }
   let found = false;

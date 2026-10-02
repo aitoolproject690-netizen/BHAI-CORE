@@ -51,6 +51,9 @@ test("crashed service keeps its allocated port for restart", async () => {
   assert.equal(store.services[s.id].port, port);
   assert.equal(store.services[s.id].status, "restarting");
   await stopService(s.id, "owner-restart-port");
+  await new Promise(r => setTimeout(r, 5200));
+  const stopped = await getService(s.id, "owner-restart-port");
+  assert.equal(stopped.status, "stopped");
 });
 
 test("service persistence redacts secret environment values", async () => {

@@ -33,4 +33,10 @@ test("request body limit counts UTF-8 bytes", async () => {
     error => error.code === "REQUEST_BODY_TOO_LARGE" && error.status === 413
   );
   assert.equal(await readRequestBody(Readable.from(["😀"]), 4), "😀");
+
+  const emoji = Buffer.from("😀");
+  assert.equal(
+    await readRequestBody(Readable.from([emoji.subarray(0, 2), emoji.subarray(2)]), 4),
+    "😀"
+  );
 });

@@ -58,6 +58,20 @@ async function openAICompatibleStream(url, headers, body, onToken, timeoutMs = 6
         }
       } catch {}
     }
+  const finalText = decoder.decode();
+  buffer += finalText;
+  if (buffer.trim()) {
+    const line = buffer.trim();
+    if (line.startsWith("data:")) {
+      const payload = line.slice(5).trim();
+      if (payload !== "[DONE]") {
+        try {
+          const data = JSON.parse(payload);
+          const token = data?.choices?.[0]?.delta?.content || "";
+          if (token) { fullText += token; await onToken(token); }
+        } catch {}
+      }
+    }
   }
   return fullText;
 }
@@ -105,6 +119,14 @@ async function ollamaChatStream({ url, model, messages, temperature = 0.7, onTok
         if (token) { fullText += token; await onToken(token); }
       } catch {}
     }
+  const finalText = decoder.decode();
+  buffer += finalText;
+  if (buffer.trim()) {
+    try {
+      const data = JSON.parse(buffer.trim());
+      const token = data?.message?.content || "";
+      if (token) { fullText += token; await onToken(token); }
+    } catch {}
   }
   return { text: fullText };
 }

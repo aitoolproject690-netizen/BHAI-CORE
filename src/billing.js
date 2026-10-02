@@ -112,6 +112,32 @@ export async function consumeBillingQuota(ownerId, delta = {}) {
   return result;
 }
 
+export async function releaseBillingQuota(ownerId, delta = {}) {
+  if (!ownerId) throw new Error("ownerId is required");
+  for (const field of ["requests", "charsIn", "charsOut", "imageJobs", "videoSeconds"]) {
+    if (delta[field] != null && (!Number.isFinite(Number(delta[field])) || Number(delta[field]) < 0)) {
+      throw Object.assign(new Error("Invalid billing usage delta: " + field), { code: "BILLING_USAGE_INVALID", status: 400 });
+    }
+  }
+  let result;
+  const month = monthKey();
+  await updateStore(store => {
+    const current = store.billing?.[ownerId];
+    if (!current || current.month !== month) {
+      result = current ? { ...current } : null;
+      return store;
+    }
+    const base = { ...current };
+    for (const field of ["requests", "charsIn", "charsOut", "imageJobs", "videoSeconds"]) {
+      base[field] = Math.max(0, Number(base[field] || 0) - (Number(delta[field]) || 0));
+    }
+    store.billing[ownerId] = base;
+    result = { ...base };
+    return store;
+  });
+  return result;
+}
+
 export async function assertBillingQuota(ownerId, delta = {}) {
   const account = await getBillingAccount(ownerId);
   const store = await getStore();

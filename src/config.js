@@ -2,6 +2,18 @@ export function env(name, fallback = "") {
   const value = process.env[name];
   return value === undefined || value === "" ? fallback : value;
 }
+function masterAuthConfig(username, password) {
+  const configured = Boolean(username || password);
+  if (!configured) return { enabled: false };
+  if (!username || !password) {
+    throw Object.assign(new Error("BHAI_CORE_USERNAME and BHAI_CORE_PASSWORD must both be configured"), {
+      code: "CONFIG_MASTER_AUTH_INVALID",
+      status: 500
+    });
+  }
+  return { enabled: true };
+}
+
 export function config() {
   const port = Number(env("PORT", "8080"));
   const host = env("HOST", "0.0.0.0");
@@ -24,6 +36,10 @@ export function config() {
     github: {
       token: env("GITHUB_TOKEN"),
       url: env("GITHUB_API_URL", "https://api.github.com")
+    },
+    masterAuth: {
+      ...masterAuthConfig(env("BHAI_CORE_USERNAME"), env("BHAI_CORE_PASSWORD")),
+      username: env("BHAI_CORE_USERNAME")
     },
     providers: {
       ollama: {

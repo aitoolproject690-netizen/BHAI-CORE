@@ -71,3 +71,12 @@ test("store initializes an empty state only when the persistent file is missing"
   assert.deepEqual(result.approvals, {});
   await fs.rm(dir, { recursive: true, force: true });
 });
+
+test("store rejects malformed collection fields instead of accepting invalid types", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "bhai-store-"));
+  const file = path.join(dir, "store.json");
+  await fs.writeFile(file, JSON.stringify({ usage: [] }), "utf8");
+  const result = await runStoreProbe(file);
+  assert.deepEqual(result, { ok: false, code: "STORE_CORRUPT", status: 500 });
+  await fs.rm(dir, { recursive: true, force: true });
+});

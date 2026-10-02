@@ -5,6 +5,22 @@ import { getStore, updateStore } from "./store.js";
 import { healthCheck } from "./runtime.js";
 
 const ROUTE_STATUSES = new Set(["active", "disabled"]);
+const HOP_BY_HOP_HEADERS = new Set([
+  "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
+  "te", "trailer", "transfer-encoding", "upgrade"
+]);
+
+function stripHopByHopHeaders(headers = {}) {
+  const connectionTokens = String(headers.connection || "")
+    .split(",")
+    .map(value => value.trim().toLowerCase())
+    .filter(Boolean);
+  const blocked = new Set([...HOP_BY_HOP_HEADERS, ...connectionTokens]);
+  return Object.fromEntries(
+    Object.entries(headers).filter(([name]) => !blocked.has(String(name).toLowerCase()))
+  );
+}
+
 
 function validPort(port) {
   const n = Number(port);
@@ -158,13 +174,14 @@ export function networkInfo() {
 export function proxyRequest(req, res, route) {
   return new Promise(resolve => {
     const transport = process.env.BHAI_NETWORK_TLS === "true" ? https : http;
-    const headers = { ...req.headers, host: route.targetHost + ":" + route.targetPort, "x-bhai-route-id": route.id };
+    const headers = stripHopByHopHeaders({ ...req.headers });
     delete headers["x-bhai-key"];
     delete headers["x-bhai-admin-key"];
     delete headers["x-bhai-route-id"];
+    headers.host = route.targetHost + ":" + route.targetPort;
     headers["x-bhai-route-id"] = route.id;
     const upstream = transport.request({ hostname:route.targetHost, port:route.targetPort, method:req.method, path:req.url, headers, timeout:Number(process.env.BHAI_NETWORK_PROXY_TIMEOUT_MS || 15000) }, response => {
-      res.writeHead(response.statusCode || 502, response.headers);
+      res.writeHead(response.statusCode || 502, stripHopByHopHeaders(response.headers));
       response.pipe(res);
       response.on("end", resolve);
     });

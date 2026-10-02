@@ -80,3 +80,10 @@ test("store rejects malformed collection fields instead of accepting invalid typ
   assert.deepEqual(result, { ok: false, code: "STORE_CORRUPT", status: 500 });
   await fs.rm(dir, { recursive: true, force: true });
 });
+
+
+test("store initializes conversations collection", async () => {
+  resetStoreForTests();
+  const store = await getStore();
+  assert.deepEqual(store.conversations, {});
+});

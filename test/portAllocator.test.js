@@ -24,3 +24,15 @@ test("allocator reports configured range", () => {
   assert.equal(info.persistent, true);
   assert.equal(info.allocation, "store_locked");
 });
+
+test("allocator rejects preferred port outside configured range", async () => {
+  resetStoreForTests();
+  const oldStart = process.env.BHAI_SERVICE_PORT_START;
+  const oldEnd = process.env.BHAI_SERVICE_PORT_END;
+  process.env.BHAI_SERVICE_PORT_START = "12000";
+  process.env.BHAI_SERVICE_PORT_END = "12002";
+  await assert.rejects(() => allocatePort(11999), /outside configured range/);
+  await assert.rejects(() => allocatePort(12003), /outside configured range/);
+  if (oldStart === undefined) delete process.env.BHAI_SERVICE_PORT_START; else process.env.BHAI_SERVICE_PORT_START = oldStart;
+  if (oldEnd === undefined) delete process.env.BHAI_SERVICE_PORT_END; else process.env.BHAI_SERVICE_PORT_END = oldEnd;
+});

@@ -104,3 +104,20 @@ test("route rebind validates target service ownership and port", async () => {
   assert.equal(await rebindServiceRoutes("svc-from", "svc-target", 3300, "owner-a"), 1);
   assert.equal((await findRouteByHostname("app.example.com")).targetPort, 3300);
 });
+
+
+test("route rebind uses target service port when targetPort is omitted", async () => {
+  resetStoreForTests();
+  await updateStore(s => {
+    s.services["svc-from"] = { id:"svc-from", ownerId:"owner-a", status:"running", port:3200 };
+    s.services["svc-target"] = { id:"svc-target", ownerId:"owner-a", status:"running", port:3300 };
+    s.routes["rte-2"] = {
+      id:"rte-2", ownerId:"owner-a", hostname:"default-port.example.com",
+      serviceId:"svc-from", targetHost:"127.0.0.1", targetPort:3200,
+      status:"active"
+    };
+    return s;
+  });
+  assert.equal(await rebindServiceRoutes("svc-from", "svc-target", undefined, "owner-a"), 1);
+  assert.equal((await findRouteByHostname("default-port.example.com")).targetPort, 3300);
+});

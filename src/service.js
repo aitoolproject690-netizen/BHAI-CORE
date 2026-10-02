@@ -131,6 +131,7 @@ export async function monitorService(id, ownerId) {
   if (!result.health.ok && s.status === "unhealthy" && s.restartCount < MAX_RESTARTS) {
     s.restartCount++;
     s.status = "restarting";
+    s.restartToken++;
     await setServiceRouteStatus(s.id, "disabled");
     s.updatedAt = new Date().toISOString();
     await persistService(s);

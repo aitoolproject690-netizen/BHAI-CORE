@@ -3,6 +3,8 @@ import path from "node:path";
 import crypto from "node:crypto";
 
 const file = process.env.BHAI_STORE_FILE || "./data/bhai-core-store.json";
+const maxBytes = Number(process.env.BHAI_STORE_MAX_BYTES || 10 * 1024 * 1024);
+const backupEnabled = process.env.BHAI_STORE_BACKUP !== "false";
 
 const emptyState = () => ({
   apiKeys: {},
@@ -64,10 +66,18 @@ async function ensureLoaded() {
 }
 
 async function persist(snapshot) {
+  const serialized = JSON.stringify(snapshot, null, 2);
+  const size = Buffer.byteLength(serialized, "utf8");
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1024) throw new Error("Invalid BHAI_STORE_MAX_BYTES configuration");
+  if (size > maxBytes) throw Object.assign(new Error("Persistent store size limit exceeded"), { code:"STORE_SIZE_LIMIT", status:507, size, maxBytes });
   await fs.mkdir(path.dirname(file), { recursive: true });
   const tmp = `${file}.${process.pid}.${crypto.randomUUID()}.tmp`;
-  await fs.writeFile(tmp, JSON.stringify(snapshot, null, 2), "utf8");
+  await fs.writeFile(tmp, serialized, { encoding:"utf8", mode:0o600 });
+  if (backupEnabled) {
+    try { await fs.copyFile(file, `${file}.bak`); } catch (error) { if (error.code !== "ENOENT") throw error; }
+  }
   await fs.rename(tmp, file);
+  try { await fs.chmod(file, 0o600); } catch {}
 }
 
 export async function getStore() {
@@ -101,7 +111,9 @@ export function storageInfo() {
   return {
     backend: "json",
     file,
-    persistent: true
+    persistent: true,
+    maxBytes,
+    backupEnabled
   };
 }
 

@@ -47,3 +47,17 @@ test("billing rejects negative or non-finite usage deltas", async () => {
   await assert.rejects(() => recordBillingUsage("billing-test", { requests: -1 }), { code: "BILLING_USAGE_INVALID", status: 400 });
   await assert.rejects(() => recordBillingUsage("billing-test", { charsIn: Number.NaN }), { code: "BILLING_USAGE_INVALID", status: 400 });
 });
+
+import { consumeBillingQuota, setBillingPlan } from "../src/billing.js";
+
+test("billing quota consumption is atomic under concurrent requests", async () => {
+  resetStoreForTests();
+  await setBillingPlan("race-user", "free");
+  await consumeBillingQuota("race-user", { requests: 99 });
+  const results = await Promise.allSettled([
+    consumeBillingQuota("race-user", { requests: 1 }),
+    consumeBillingQuota("race-user", { requests: 1 })
+  ]);
+  assert.equal(results.filter(result => result.status === "fulfilled").length, 1);
+  assert.equal(results.filter(result => result.status === "rejected" && result.reason?.code === "BILLING_QUOTA_EXCEEDED").length, 1);
+});

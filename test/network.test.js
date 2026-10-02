@@ -65,10 +65,12 @@ test("health-gated service routes start disabled until readiness", async () => {
     () => setRouteStatus(route.id, "owner-net", "active"),
     error => error.code === "ROUTE_SERVICE_UNHEALTHY"
   );
-  await updateStore(s => {
-    s.services["svc-health-gated"].healthUrl = null;
-    return s;
-  });
-  await setRouteStatus(route.id, "owner-net", "active");
-  assert.equal((await findRouteByHostname("health.example.com")).id, route.id);
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({ ok:true, status:200 });
+  try {
+    await setRouteStatus(route.id, "owner-net", "active");
+    assert.equal((await findRouteByHostname("health.example.com")).id, route.id);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

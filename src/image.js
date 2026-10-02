@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { getStore, updateStore } from "./store.js";
 
 const MAX_PROMPT_CHARS = Number(process.env.BHAI_MAX_IMAGE_PROMPT_CHARS || 4000);
 
@@ -63,6 +64,31 @@ export function imageProviderInfo() {
       configured: Boolean(process.env.COMFYUI_URL || process.env.COMFYUI_ENABLED === "true")
     }
   };
+}
+
+export async function recordImageJobOwnership({ promptId, ownerId, requestId = null }) {
+  const id = String(promptId || "").trim();
+  if (!id || !/^[A-Za-z0-9_-]+$/.test(id)) throw new Error("Invalid image job id");
+  if (!ownerId) throw new Error("ownerId is required");
+  await updateStore(store => {
+    store.imageJobs ??= {};
+    store.imageJobs[id] = {
+      promptId: id,
+      ownerId: String(ownerId),
+      requestId: requestId || null,
+      createdAt: new Date().toISOString()
+    };
+    return store;
+  });
+  return { promptId: id, ownerId: String(ownerId) };
+}
+
+export async function getImageJobOwnership(promptId, ownerId) {
+  const id = String(promptId || "").trim();
+  const store = await getStore();
+  const job = store.imageJobs?.[id];
+  if (!job || job.ownerId !== ownerId) return null;
+  return { ...job };
 }
 
 export async function getComfyUIHistory({ url, promptId }) {

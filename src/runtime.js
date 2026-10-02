@@ -5,17 +5,25 @@ const MAX_OUTPUT = Number(process.env.BHAI_RUNTIME_MAX_OUTPUT_CHARS || 50000);
 const ALLOWED_COMMANDS = new Set(["start"]);
 
 function validateCommand(command) {
-  if (!command || typeof command !== "string") throw Object.assign(new Error("Runtime start command required"), { code: "RUNTIME_COMMAND_REQUIRED", status: 400 });
+  if (!command || typeof command !== "string") {
+    throw Object.assign(new Error("Runtime start command required"), { code: "RUNTIME_COMMAND_REQUIRED", status: 400 });
+  }
   if (!ALLOWED_COMMANDS.has("start")) throw new Error("Runtime policy invalid");
-  const blocked = /(rm\s+-rf|mkfs|shutdown|reboot|curl\s+[^|]*\|\s*(sh|bash)|wget\s+[^|]*\|\s*(sh|bash)|(?:;|&&|\|\||`|\$\(|>|<))/i;
-  if (blocked.test(command)) throw Object.assign(new Error("Runtime command rejected"), { code: "RUNTIME_COMMAND_REJECTED", status: 400 });
+  const blocked = /(rm\s+-rf|mkfs|shutdown|reboot|curl\s+[^|]*\|\s*(sh|bash)|wget\s+[^|]*\|\s*(sh|bash)|(?:;|&&|\|\||\`|\$\(|>|<))/i;
+  if (blocked.test(command)) {
+    throw Object.assign(new Error("Runtime command rejected"), { code: "RUNTIME_COMMAND_REJECTED", status: 400 });
+  }
   return command;
 }
 
 export function startRuntime({ command, cwd, env = {}, timeoutMs = DEFAULT_TIMEOUT } = {}) {
-  if (process.env.BHAI_RUNTIME_ENABLED !== "true") throw Object.assign(new Error("Cloud runtime is disabled"), { code: "RUNTIME_DISABLED", status: 503 });
+  if (process.env.BHAI_RUNTIME_ENABLED !== "true") {
+    throw Object.assign(new Error("Cloud runtime is disabled"), { code: "RUNTIME_DISABLED", status: 503 });
+  }
   const safeCommand = validateCommand(command);
-  if (!cwd) throw Object.assign(new Error("Runtime cwd required"), { code: "RUNTIME_CWD_REQUIRED", status: 400 });
+  if (!cwd) {
+    throw Object.assign(new Error("Runtime cwd required"), { code: "RUNTIME_CWD_REQUIRED", status: 400 });
+  }
   const child = spawn("/bin/sh", ["-lc", safeCommand], {
     cwd,
     env: { ...process.env, ...env },
@@ -26,7 +34,17 @@ export function startRuntime({ command, cwd, env = {}, timeoutMs = DEFAULT_TIMEO
   const append = (target, chunk) => (target + chunk.toString()).slice(-MAX_OUTPUT);
   child.stdout.on("data", chunk => { stdout = append(stdout, chunk); });
   child.stderr.on("data", chunk => { stderr = append(stderr, chunk); });
-  const timeout = Math.max(1000, Number(timeoutMs) || DEFAULT_TIMEOUT);\n  let timedOut = false;\n  let timer = setTimeout(() => {\n    timedOut = true;\n    child.kill("SIGTERM");\n    setTimeout(() => { if (!child.killed) child.kill("SIGKILL"); }, 2000).unref();\n  }, timeout);
+
+  const timeout = Math.max(1000, Number(timeoutMs) || DEFAULT_TIMEOUT);
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    child.kill("SIGTERM");
+    setTimeout(() => {
+      if (!child.killed) child.kill("SIGKILL");
+    }, 2000).unref();
+  }, timeout);
+
   const ready = new Promise((resolve, reject) => {
     child.once("spawn", () => resolve({ pid: child.pid }));
     child.once("error", reject);
@@ -45,11 +63,18 @@ export async function stopRuntime(child, signal = "SIGTERM") {
 }
 
 export function runtimeInfo() {
-  return { enabled: process.env.BHAI_RUNTIME_ENABLED === "true", timeoutMs: DEFAULT_TIMEOUT, maxOutputChars: MAX_OUTPUT, shellPolicy:"single-command-no-shell-chaining" };
+  return {
+    enabled: process.env.BHAI_RUNTIME_ENABLED === "true",
+    timeoutMs: DEFAULT_TIMEOUT,
+    maxOutputChars: MAX_OUTPUT,
+    shellPolicy: "single-command-no-shell-chaining"
+  };
 }
 
 export async function healthCheck(url, { timeoutMs = 10000 } = {}) {
-  if (!url || typeof url !== "string") throw Object.assign(new Error("Health URL required"), { code: "HEALTH_URL_REQUIRED", status: 400 });
+  if (!url || typeof url !== "string") {
+    throw Object.assign(new Error("Health URL required"), { code: "HEALTH_URL_REQUIRED", status: 400 });
+  }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -57,5 +82,7 @@ export async function healthCheck(url, { timeoutMs = 10000 } = {}) {
     return { ok: response.ok, status: response.status };
   } catch (error) {
     return { ok: false, error: error.name === "AbortError" ? "TIMEOUT" : error.message };
-  } finally { clearTimeout(timer); }
+  } finally {
+    clearTimeout(timer);
+  }
 }

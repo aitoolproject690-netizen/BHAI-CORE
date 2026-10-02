@@ -80,7 +80,16 @@ async function readJsonRaw(req, maxBytes = 2_000_000) {
 
 async function readJson(req, maxBytes = 2_000_000) {
   const body = await readRequestBody(req, maxBytes);
-  return body ? JSON.parse(body) : {};
+  if (!body) return {};
+  try {
+    return JSON.parse(body);
+  } catch (error) {
+    throw Object.assign(new Error("Invalid JSON request body"), {
+      code: "REQUEST_BODY_INVALID_JSON",
+      status: 400,
+      cause: error
+    });
+  }
 }
 
 const server = http.createServer(async (req, res) => {
@@ -893,7 +902,7 @@ const server = http.createServer(async (req, res) => {
     return send(res, 404, { ok: false, error: "Not found" }, rid);
   } catch (error) {
     await recordUsage({ key: req.headers["x-bhai-key"] || "anonymous", failed: true });
-    return send(res, error.code === "BUDGET_EXCEEDED" ? 429 : error.code === "PERMISSION_DENIED" ? 403 : error.code === "REQUEST_BODY_TOO_LARGE" ? 413 : 500, {
+    return send(res, error.code === "BUDGET_EXCEEDED" ? 429 : error.code === "PERMISSION_DENIED" ? 403 : error.code === "REQUEST_BODY_TOO_LARGE" ? 413 : error.code === "REQUEST_BODY_INVALID_JSON" ? 400 : 500, {
       ok: false, ...publicError(error), requestId: rid
     }, rid);
   }

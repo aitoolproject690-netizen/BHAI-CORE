@@ -33,6 +33,30 @@ export async function cleanupWorkspace(workspace) {
   return true;
 }
 
+
+export async function validateOwnedExecutionPath(cwd, ownerId) {
+  if (!ownerId || typeof cwd !== "string" || !cwd.trim()) {
+    throw Object.assign(new Error("Owned execution workspace required"), { code: "EXECUTION_PATH_REQUIRED", status: 400 });
+  }
+  const target = path.resolve(cwd);
+  const roots = [
+    process.env.BHAI_WORKSPACE_ROOT || path.join(os.tmpdir(), "bhai-core-workspaces"),
+    process.env.BHAI_DEPLOYMENT_ROOT || path.join(os.tmpdir(), "bhai-core-deployments")
+  ];
+  const safeOwner = safePart(ownerId, "owner");
+  let targetReal;
+  try { targetReal = await fs.realpath(target); } catch {
+    throw Object.assign(new Error("Execution workspace not found"), { code: "EXECUTION_PATH_NOT_FOUND", status: 400 });
+  }
+  for (const rootValue of roots) {
+    const ownerRoot = path.resolve(rootValue, safeOwner);
+    let ownerReal;
+    try { ownerReal = await fs.realpath(ownerRoot); } catch { continue; }
+    if (targetReal === ownerReal || targetReal.startsWith(ownerReal + path.sep)) return targetReal;
+  }
+  throw Object.assign(new Error("Execution workspace is not owned by the authenticated user"), { code: "EXECUTION_PATH_FORBIDDEN", status: 403 });
+}
+
 export async function workspaceInfo() {
   return {
     root: process.env.BHAI_WORKSPACE_ROOT || path.join(os.tmpdir(), "bhai-core-workspaces"),

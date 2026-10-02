@@ -31,7 +31,7 @@ export async function runBuildCommand(command, { cwd, timeoutMs = DEFAULT_TIMEOU
       detached: true,
       stdio: ["ignore", "pipe", "pipe"]
     });
-    let stdout = "", stderr = "", truncated = false;
+    let stdout = "", stderr = "", truncated = false, timedOut = false;
     const append = (target, chunk) => {
       const value = target + chunk.toString();
       if (value.length <= maxOutputChars) return value;
@@ -41,13 +41,14 @@ export async function runBuildCommand(command, { cwd, timeoutMs = DEFAULT_TIMEOU
     child.stdout.on("data", chunk => { stdout = append(stdout, chunk); });
     child.stderr.on("data", chunk => { stderr = append(stderr, chunk); });
     const timer = setTimeout(() => {
+      timedOut = true;
       terminateProcessTree(child, "SIGTERM");
       setTimeout(() => terminateProcessTree(child, "SIGKILL"), 2000).unref();
     }, Math.max(1000, Number(timeoutMs) || DEFAULT_TIMEOUT));
     child.on("error", error => { clearTimeout(timer); reject(error); });
     child.on("close", (code, signal) => {
       clearTimeout(timer);
-      resolve({ command: safe, code, signal, stdout, stderr, truncated, ok: code === 0 && !signal });
+      resolve({ command: safe, code, signal, stdout, stderr, truncated, timedOut, ok: code === 0 && !signal && !timedOut });
     });
   });
 }

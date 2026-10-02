@@ -93,3 +93,18 @@ Before exposing BHAI-CORE publicly:
 6. Verify provider quotas, budgets and fallback order.
 7. Run npm test and npm run check in CI.
 8. Confirm webhook secrets, API keys and private certificate keys are never logged or committed.
+
+
+## Media, dashboard, and billing APIs
+
+- GET /v1/image/providers lists configured image providers.
+- POST /v1/image/generate submits an image generation request; GET /v1/image/jobs/:promptId reads ComfyUI job history.
+- GET /v1/video/providers lists the external video adapter.
+- POST /v1/video/plan validates and returns a deterministic video timeline.
+- POST /v1/video/generate submits the timeline to VIDEO_API_URL when configured.
+- GET /v1/billing/plans lists plan quotas.
+- GET /v1/billing and GET /v1/billing/usage expose the authenticated owner's billing state.
+- POST /v1/billing/admin/subscription changes a customer's plan and requires the admin key.
+- GET /v1/dashboard returns an owner-scoped account/resource/billing summary.
+
+Video generation intentionally uses an external adapter rather than embedding a vendor-specific paid API in the core. Configure VIDEO_API_URL and optionally VIDEO_API_KEY when a video provider is selected.

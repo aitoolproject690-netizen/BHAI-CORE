@@ -123,8 +123,15 @@ export async function rebindDomainServices(fromServiceId, toServiceId, ownerId =
   const targetService = snapshot.services?.[toServiceId];
   if (!targetService)
     throw Object.assign(new Error("Target domain service not found"), { code:"DOMAIN_SERVICE_NOT_FOUND", status:404 });
-  if (ownerId && targetService.ownerId !== ownerId)
+  if (targetService.ownerId !== ownerId)
     throw Object.assign(new Error("Target domain service ownership mismatch"), { code:"DOMAIN_SERVICE_FORBIDDEN", status:403 });
+  if (fromServiceId != null) {
+    const sourceService = snapshot.services?.[fromServiceId];
+    if (!sourceService)
+      throw Object.assign(new Error("Source domain service not found"), { code:"DOMAIN_SERVICE_NOT_FOUND", status:404 });
+    if (sourceService.ownerId !== ownerId)
+      throw Object.assign(new Error("Source domain service ownership mismatch"), { code:"DOMAIN_SERVICE_FORBIDDEN", status:403 });
+  }
   let changed = 0;
   await updateStore(store => {
     for (const domain of Object.values(store.domains || {})) {

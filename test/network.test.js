@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createRoute, findRouteByHostname, listRoutes, setRouteStatus, networkInfo } from "../src/network.js";
+import { createRoute, findRouteByHostname, listRoutes, setRouteStatus, networkInfo, rebindServiceRoutes } from "../src/network.js";
 import { resetStoreForTests, updateStore } from "../src/store.js";
 
 test("network route is owner scoped and hostname normalized", async () => {
@@ -73,4 +73,30 @@ test("health-gated service routes start disabled until readiness", async () => {
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+
+test("route rebind validates target service ownership and port", async () => {
+  resetStoreForTests();
+  await updateStore(s => {
+    s.services["svc-from"] = { id:"svc-from", ownerId:"owner-a", status:"running", port:3200 };
+    s.services["svc-target"] = { id:"svc-target", ownerId:"owner-a", status:"running", port:3300 };
+    s.services["svc-other"] = { id:"svc-other", ownerId:"owner-b", status:"running", port:3400 };
+    s.routes["rte-1"] = {
+      id:"rte-1", ownerId:"owner-a", hostname:"app.example.com",
+      serviceId:"svc-from", targetHost:"127.0.0.1", targetPort:3200,
+      status:"active"
+    };
+    return s;
+  });
+  await assert.rejects(
+    () => rebindServiceRoutes("svc-from", "svc-other", 3400, "owner-a"),
+    error => error.code === "ROUTE_SERVICE_FORBIDDEN"
+  );
+  await assert.rejects(
+    () => rebindServiceRoutes("svc-from", "svc-target", 70000, "owner-a"),
+    error => error.code === "ROUTE_TARGET_PORT_INVALID"
+  );
+  assert.equal(await rebindServiceRoutes("svc-from", "svc-target", 3300, "owner-a"), 1);
+  assert.equal((await findRouteByHostname("app.example.com")).targetPort, 3300);
 });

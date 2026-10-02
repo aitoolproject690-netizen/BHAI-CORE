@@ -13,6 +13,30 @@ test("domains are owner-scoped and normalize hostname", async () => {
   assert.equal(await getDomain(domain.id, "user-b"), null);
 });
 
+test("domain activation requires exact verified TXT challenge", async () => {
+  resetStoreForTests();
+  await updateStore(s => {
+    s.services["svc_1"] = { id:"svc_1", ownerId:"user-a" };
+    return s;
+  });
+  const domain = await createDomain({ ownerId:"user-a", serviceId:"svc_1", hostname:"app.example.com" });
+  const other = await createDnsChallenge({
+    ownerId:"user-a", domainId:domain.id, hostname:domain.hostname,
+    name:"_acme-challenge.app.example.com", value:"token", type:"CNAME"
+  });
+  await setDnsChallengeStatus(other.id, "user-a", "verified");
+  await assert.rejects(
+    () => setDomainStatus(domain.id, "user-a", "active"),
+    error => error.code === "DOMAIN_DNS_NOT_VERIFIED"
+  );
+  const valid = await createDnsChallenge({
+    ownerId:"user-a", domainId:domain.id, hostname:domain.hostname,
+    name:"_acme-challenge.app.example.com", value:"token2", type:"TXT"
+  });
+  await setDnsChallengeStatus(valid.id, "user-a", "verified");
+  assert.equal((await setDomainStatus(domain.id, "user-a", "active")).status, "active");
+});
+
 test("domain status is validated", async () => {
   resetStoreForTests();
   await updateStore(s => { s.services["svc_1"] = { id:"svc_1", ownerId:"user-a" }; return s; });

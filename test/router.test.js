@@ -216,6 +216,8 @@ test("generate reports configured provider failures with sanitized details", asy
         assert.equal(error.message, "All configured AI providers failed");
         assert.equal(error.details.length, 1);
         assert.equal(error.details[0].provider, "openai");
+        assert.equal(error.details.length, 1);
+        assert.equal(error.details[0].provider, "openai");
         assert.equal(error.details[0].kind, "permanent");
         assert.equal(error.details[0].error, "request failed with api_key=secret-value");
         const { publicError } = await import("../src/errors.js");

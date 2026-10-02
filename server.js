@@ -1100,7 +1100,7 @@ document.getElementById("refreshKeys").onclick=loadKeys;loadKeys();</script></ma
       const usageKey = identity.id;
       const inputChars = JSON.stringify(body).length;
 
-      await assertBudget(usageKey, identity.limits);
+      await assertBudget(usageKey, identity.limits, { requests: 1, inputChars });
 
       if (!adapter || !providerCfg?.key)
         return send(res, 503, { ok: false, error: "No streaming provider is configured" }, rid);

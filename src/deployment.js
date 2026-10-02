@@ -1,8 +1,6 @@
 import crypto from "node:crypto";
 import { getStore, updateStore } from "./store.js";
 import { getService, checkService } from "./service.js";
-import { rebindServiceRoutes } from "./network.js";
-import { rebindDomainServices } from "./domain.js";
 
 const STATUSES = new Set(["ready", "active", "stopped", "failed"]);
 
@@ -101,16 +99,39 @@ export async function promoteDeployment(id, ownerId) {
   const previousId = store.production?.[key] || null;
   const previous = previousId ? store.deployments?.[previousId] : null;
 
-  if (previous?.serviceId && previous.serviceId !== target.serviceId) {
-    await rebindServiceRoutes(previous.serviceId, target.serviceId, service.port, ownerId);
-    await rebindDomainServices(previous.serviceId, target.serviceId, ownerId);
-  }
-
   await updateStore(next => {
     next.production ??= {};
+
+    // Switch the production pointer and all owner-scoped traffic bindings in
+    // one persisted transaction. This prevents a partial cutover where routes
+    // point at the new service while the production pointer still references
+    // the previous deployment.
+    if (previous?.serviceId && previous.serviceId !== target.serviceId) {
+      for (const route of Object.values(next.routes || {})) {
+        if (
+          route.ownerId === ownerId &&
+          route.serviceId === previous.serviceId &&
+          route.status === "active"
+        ) {
+          route.serviceId = target.serviceId;
+          route.targetPort = Number(service.port);
+          route.updatedAt = new Date().toISOString();
+        }
+      }
+      for (const domain of Object.values(next.domains || {})) {
+        if (domain.ownerId === ownerId && domain.serviceId === previous.serviceId) {
+          domain.serviceId = target.serviceId;
+          domain.updatedAt = new Date().toISOString();
+        }
+      }
+    }
+
     next.production[key] = target.id;
     const d = next.deployments?.[target.id];
-    if (d) { d.status = "active"; d.updatedAt = new Date().toISOString(); }
+    if (d) {
+      d.status = "active";
+      d.updatedAt = new Date().toISOString();
+    }
     return next;
   });
 

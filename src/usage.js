@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { getStore, updateStore } from "./store.js";
 
 const empty = () => ({ requests: 0, failures: 0, charsIn: 0, charsOut: 0 });
@@ -14,15 +15,22 @@ const emptyProvider = () => ({
   lastRequestAt: null
 });
 
+function normalizeUsageKey(key) {
+  const value = String(key ?? "anonymous");
+  if (!value.startsWith("bhai_")) return value;
+  return "key_" + crypto.createHash("sha256").update(value).digest("hex").slice(0, 24);
+}
+
 export async function recordUsage({ key = "anonymous", input = 0, output = 0, failed = false }) {
+  const usageKey = normalizeUsageKey(key);
   let result;
   await updateStore(store => {
-    const b = store.usage[key] || empty();
+    const b = store.usage[usageKey] || empty();
     b.requests += 1;
     b.charsIn += Number(input) || 0;
     b.charsOut += Number(output) || 0;
     if (failed) b.failures += 1;
-    store.usage[key] = b;
+    store.usage[usageKey] = b;
     result = { ...b };
     return store;
   });
@@ -59,7 +67,7 @@ export async function recordProviderUsage({
 
 export async function getUsage(key = "anonymous") {
   const store = await getStore();
-  return { ...(store.usage[key] || empty()) };
+  return { ...(store.usage[normalizeUsageKey(key)] || empty()) };
 }
 
 export async function allUsage() {

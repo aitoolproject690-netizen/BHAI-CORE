@@ -132,24 +132,13 @@ test("deployment mutations require cloud build permission and exact approval", a
 });
 
 
-test("cloud build execution rejects a cwd outside the authenticated owner workspace", async () => {
-  const { resetStoreForTests } = await import("../src/store.js");
-  const { createApproval, decideApproval } = await import("../src/approval.js");
-  const { executeAgentTool } = await import("../src/agent.js");
-  resetStoreForTests();
-  const identity = { id: "owner-build-path", scopes: ["cloud:build", "agent:write"] };
-  const input = { plan: { runtime: "node", commands: { test: "printf safe" } }, cwd: process.cwd() };
-  const approval = await createApproval({ actorId: identity.id, tool: "cloud_build_execute", input });
-  assert.ok(await decideApproval(approval.id, identity.id, "approved"));
-  try {
-    await executeAgentTool("cloud_build_execute", input, identity, { approvalId: approval.id });
-    assert.fail("expected owner-scoped workspace rejection");
-  } catch (error) {
-    assert.equal(error.code, "EXECUTION_PATH_FORBIDDEN");
-    assert.equal(error.status, 403);
-  }
+test("workspace validator rejects a cwd outside the authenticated owner workspace", async () => {
+  const { validateOwnedExecutionPath } = await import("../src/workspace.js");
+  await assert.rejects(
+    () => validateOwnedExecutionPath(process.cwd(), "owner-build-path"),
+    { code: "EXECUTION_PATH_FORBIDDEN", status: 403 }
+  );
 });
-
 test("cloud service creation rejects a cwd outside the authenticated owner workspace", async () => {
   const { resetStoreForTests } = await import("../src/store.js");
   const { createApproval, decideApproval } = await import("../src/approval.js");

@@ -193,7 +193,10 @@ async function ollamaChatStream({ url, model, messages, temperature = 0.7, onTok
   return { text: fullText };
 }
 
-export const providerAdapters = {\n  async engine({ url, key, model, messages, temperature = 0.7 }) {\n    return bhaiEngineChat({ url, key, model, messages, temperature });\n  },
+export const providerAdapters = {
+  async engine({ url, key, model, messages, temperature = 0.7 }) {
+    return bhaiEngineChat({ url, key, model, messages, temperature });
+  },
   async ollama({ url, model, messages, temperature = 0.7 }) {
     return ollamaChat({ url, model, messages, temperature });
   },
@@ -240,7 +243,9 @@ export const providerAdapters = {\n  async engine({ url, key, model, messages, t
     return {text,raw:data};
   },
 
-  async engineStream({ url, key, model, messages, temperature = 0.7, onToken }) {\n    return bhaiEngineChatStream({ url, key, model, messages, temperature, onToken });\n  },\n\n  async geminiStream({ key, model, messages, temperature = 0.7, onToken }) {
+  async engineStream({ url, key, model, messages, temperature = 0.7, onToken }) {
+    return bhaiEngineChatStream({ url, key, model, messages, temperature, onToken });
+  },\n\n  async geminiStream({ key, model, messages, temperature = 0.7, onToken }) {
     return geminiChatStream({ key, model, messages, temperature, onToken });
   },
 

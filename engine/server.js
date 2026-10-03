@@ -1,13 +1,14 @@
 import http from "node:http";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import fs from "node:fs/promises";
 import { getLlama, LlamaChatSession } from "node-llama-cpp";
 
 const PORT = Number(process.env.PORT || 10000);
 const HOST = process.env.HOST || "0.0.0.0";
 const API_KEY = process.env.BHAI_ENGINE_API_KEY || "";
-const MODEL_PATH = process.env.BHAI_ENGINE_MODEL_PATH ||
-  path.join(path.dirname(fileURLToPath(import.meta.url)), "models", "smollm2-135m-instruct-q4_k_m.gguf");
+const MODEL_PATH = process.env.BHAI_ENGINE_MODEL_PATH || "";
+const MODEL_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "models");
 const MODEL_NAME = process.env.BHAI_ENGINE_MODEL || "smollm2-135m-instruct-q4_k_m";
 const MAX_BODY = Number(process.env.BHAI_ENGINE_MAX_BODY || 512 * 1024);
 const MAX_TOKENS = Number(process.env.BHAI_ENGINE_MAX_TOKENS || 256);
@@ -47,8 +48,13 @@ async function ensureModel() {
   if (modelLoadPromise) return modelLoadPromise;
   modelLoadPromise = (async () => {
     llama = await getLlama();
-    model = await llama.loadModel({ modelPath: MODEL_PATH });
-    console.log(JSON.stringify({ event: "model_loaded", model: MODEL_NAME }));
+    const modelPath = MODEL_PATH || (await fs.readdir(MODEL_DIR))
+      .filter(name => name.toLowerCase().endsWith(".gguf"))
+      .sort()[0];
+    if (!modelPath) throw Object.assign(new Error("No GGUF model found in " + MODEL_DIR), { code: "MODEL_NOT_FOUND" });
+    const resolvedModelPath = path.isAbsolute(modelPath) ? modelPath : path.join(MODEL_DIR, modelPath);
+    model = await llama.loadModel({ modelPath: resolvedModelPath });
+    console.log(JSON.stringify({ event: "model_loaded", model: MODEL_NAME, model_path: resolvedModelPath }));
   })().catch(error => {
     modelLoadPromise = undefined;
     throw error;

@@ -10,6 +10,8 @@ const API_KEY = process.env.BHAI_ENGINE_API_KEY || "";
 const MODEL_PATH = process.env.BHAI_ENGINE_MODEL_PATH || "";
 const MODEL_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "models");
 const MODEL_NAME = process.env.BHAI_ENGINE_MODEL || "smollm2-135m-instruct-q4_k_m";
+const GPU_MODE = process.env.BHAI_ENGINE_GPU || "auto";
+const REQUIRE_GPU = /^(1|true|yes)$/i.test(process.env.BHAI_ENGINE_REQUIRE_GPU || "");
 const MAX_BODY = Number(process.env.BHAI_ENGINE_MAX_BODY || 512 * 1024);
 const MAX_TOKENS = Number(process.env.BHAI_ENGINE_MAX_TOKENS || 256);
 
@@ -47,14 +49,18 @@ async function ensureModel() {
   if (model) return;
   if (modelLoadPromise) return modelLoadPromise;
   modelLoadPromise = (async () => {
-    llama = await getLlama();
+    llama = await getLlama({ gpu: GPU_MODE });
+    console.log(JSON.stringify({ event: "compute_backend", gpu_mode: GPU_MODE, gpu_backend: llama.gpu || false }));
     const modelPath = MODEL_PATH || (await fs.readdir(MODEL_DIR))
       .filter(name => name.toLowerCase().endsWith(".gguf"))
       .sort()[0];
     if (!modelPath) throw Object.assign(new Error("No GGUF model found in " + MODEL_DIR), { code: "MODEL_NOT_FOUND" });
     const resolvedModelPath = path.isAbsolute(modelPath) ? modelPath : path.join(MODEL_DIR, modelPath);
     model = await llama.loadModel({ modelPath: resolvedModelPath });
-    console.log(JSON.stringify({ event: "model_loaded", model: MODEL_NAME, model_path: resolvedModelPath }));
+    if (REQUIRE_GPU && !model.gpuLayers) {
+      throw Object.assign(new Error("GPU required but no GPU layers were loaded"), { code: "GPU_REQUIRED" });
+    }
+    console.log(JSON.stringify({ event: "model_loaded", model: MODEL_NAME, model_path: resolvedModelPath, gpu_backend: llama.gpu || false, gpu_layers: model.gpuLayers }));
   })().catch(error => {
     modelLoadPromise = undefined;
     throw error;

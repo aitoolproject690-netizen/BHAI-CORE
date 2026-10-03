@@ -16,7 +16,7 @@ test("config accepts the default provider order", () => {
   try {
     delete process.env.AI_PROVIDER_ORDER;
     const cfg = config();
-    assert.deepEqual(cfg.providerOrder, ["ollama", "gemini", "openai", "anthropic", "huggingface"]);
+    assert.deepEqual(cfg.providerOrder, ["engine", "ollama", "gemini", "openai", "anthropic", "huggingface"]);
   } finally {
     restoreEnv();
   }

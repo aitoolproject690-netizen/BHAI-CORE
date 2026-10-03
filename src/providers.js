@@ -1,3 +1,4 @@
+import { bhaiEngineChat, bhaiEngineChatStream } from "./engine.js";
 function timeoutSignal(ms = 30000) {
   return AbortSignal.timeout ? AbortSignal.timeout(ms) : undefined;
 }
@@ -193,6 +194,9 @@ async function ollamaChatStream({ url, model, messages, temperature = 0.7, onTok
 }
 
 export const providerAdapters = {
+  async engine({ url, key, model, messages, temperature = 0.7 }) {
+    return bhaiEngineChat({ url, key, model, messages, temperature });
+  },
   async ollama({ url, model, messages, temperature = 0.7 }) {
     return ollamaChat({ url, model, messages, temperature });
   },
@@ -237,6 +241,10 @@ export const providerAdapters = {
     const text = data?.choices?.[0]?.message?.content || "";
     if (!text) throw new Error("Hugging Face returned no text");
     return {text,raw:data};
+  },
+
+  async engineStream({ url, key, model, messages, temperature = 0.7, onToken }) {
+    return bhaiEngineChatStream({ url, key, model, messages, temperature, onToken });
   },
 
   async geminiStream({ key, model, messages, temperature = 0.7, onToken }) {

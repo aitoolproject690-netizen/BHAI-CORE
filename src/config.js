@@ -20,8 +20,8 @@ export function config() {
   if (!host.trim()) {
     throw Object.assign(new Error("Invalid HOST configuration"), { code: "CONFIG_HOST_INVALID", status: 500 });
   }
-  const providerOrder = env("AI_PROVIDER_ORDER", "ollama,gemini,openai,anthropic,huggingface").split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
-  const supportedProviders = new Set(["ollama", "gemini", "openai", "anthropic", "huggingface"]);
+  const providerOrder = env("AI_PROVIDER_ORDER", "engine,ollama,gemini,openai,anthropic,huggingface").split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+  const supportedProviders = new Set(["engine", "ollama", "gemini", "openai", "anthropic", "huggingface"]);
   if (!providerOrder.length || providerOrder.some(name => !supportedProviders.has(name))) {
     throw Object.assign(new Error("Invalid AI_PROVIDER_ORDER configuration"), { code: "CONFIG_PROVIDER_ORDER_INVALID", status: 500 });
   }
@@ -40,6 +40,11 @@ export function config() {
     masterAuth: {
       ...masterAuthConfig(env("BHAI_CORE_USERNAME"), env("BHAI_CORE_PASSWORD")),
       username: env("BHAI_CORE_USERNAME")
+    },
+    engine: {
+      url: env("BHAI_ENGINE_URL"),
+      key: env("BHAI_ENGINE_API_KEY"),
+      model: env("BHAI_ENGINE_MODEL", "bhai-local")
     },
     providers: {
       ollama: {

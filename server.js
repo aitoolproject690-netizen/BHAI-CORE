@@ -1111,15 +1111,24 @@ document.getElementById("refreshKeys").onclick=loadKeys;loadKeys();</script></ma
         return send(res, 400, { ok: false, error: "messages must be a non-empty array" }, rid);
 
       const provider = String(body.provider || "").toLowerCase();
-      const selected = provider || cfg.providerOrder.find(name => cfg.providers[name]?.key && providerAdapters[name + "Stream"]);
+      const providerConfig = name => name === "engine" ? cfg.engine : cfg.providers[name];
+      const isConfigured = name => {
+        const entry = providerConfig(name);
+        return Boolean(
+          entry &&
+          (name === "engine" ? entry.url && entry.model : entry.key) &&
+          providerAdapters[name + "Stream"]
+        );
+      };
+      const selected = provider || cfg.providerOrder.find(isConfigured);
       const adapter = providerAdapters[selected + "Stream"];
-      const providerCfg = cfg.providers[selected];
+      const providerCfg = providerConfig(selected);
       const usageKey = identity.id;
       const inputChars = JSON.stringify(body).length;
 
       await assertBudget(usageKey, identity.limits, { requests: 1, inputChars });
 
-      if (!adapter || !providerCfg?.key)
+      if (!adapter || !isConfigured(selected))
         return send(res, 503, { ok: false, error: "No streaming provider is configured" }, rid);
 
       if (!canAttempt(selected))

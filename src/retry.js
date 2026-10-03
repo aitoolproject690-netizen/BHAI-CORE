@@ -31,7 +31,11 @@ export function classifyError(error) {
   if (status === 404 || /model.*not.*found|not found/.test(message)) {
     return "model";
   }
-  if (status === 429 || RETRYABLE_CODES.has(code) || /rate.?limit|timeout|temporar|overloaded|capacity/.test(message)) {
+  if (
+    status === 429 ||
+    RETRYABLE_CODES.has(code) ||
+    /rate.?limit|timeout|timed out|temporar|overloaded|capacity|fetch failed|network error|network request|connection (?:refused|reset|closed)|socket|dns|name resolution/.test(message)
+  ) {
     return "retryable";
   }
   if (status >= 500 && status <= 599) return "retryable";

@@ -10,4 +10,6 @@ test("self-hosted engine runtime manifest is present and pinned", () => {
   assert.match(server, /\/v1\/chat\/completions/);
   assert.match(server, /BHAI_ENGINE_API_KEY/);
   assert.match(server, /LlamaChatSession/);
+  assert.match(server, /BHAI_ENGINE_GPU/);
+  assert.match(server, /BHAI_ENGINE_REQUIRE_GPU/);
 });

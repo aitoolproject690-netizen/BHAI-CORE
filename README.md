@@ -152,3 +152,5 @@ Video generation intentionally uses an external adapter rather than embedding a 
 
 
 CI verification note: PostgreSQL store integration coverage runs against PostgreSQL 16 in GitHub Actions.
+
+CI trigger verification: 2026-10-03

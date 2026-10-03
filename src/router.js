@@ -4,8 +4,16 @@ import { breakerState, canAttempt, recordFailure, recordSuccess } from "./circui
 import { withRetry, classifyError } from "./retry.js";
 import { recordProviderUsage } from "./usage.js";
 
+function providerConfig(name, cfg) {
+  return name === "engine" ? cfg.engine : cfg.providers[name];
+}
+
 export function isProviderConfigured(name, cfg = config()) {
-  return Boolean(cfg.providers[name]?.key && typeof providerAdapters[name] === "function");
+  const entry = providerConfig(name, cfg);
+  if (name === "engine") {
+    return Boolean(entry?.url && entry?.model && typeof providerAdapters[name] === "function");
+  }
+  return Boolean(entry?.key && typeof providerAdapters[name] === "function");
 }
 
 export function normalizeMaxAttempts(value, fallback) {
@@ -23,7 +31,7 @@ export function getProviderStatus() {
         name,
         {
           configured: isProviderConfigured(name, cfg),
-          model: String(cfg.providers[name]?.model ?? ""),
+          model: String(providerConfig(name, cfg)?.model ?? ""),
           enabled: cfg.providerOrder.includes(name),
           breaker: breakerState(name)
         }
@@ -57,7 +65,7 @@ export async function generate({ messages, provider, temperature = 0.7, maxAttem
 
     try {
       const result = await withRetry(
-        () => providerAdapters[name]({ ...cfg.providers[name], messages, temperature }),
+        () => providerAdapters[name]({ ...providerConfig(name, cfg), messages, temperature }),
         {
           retries: Number(process.env.BHAI_PROVIDER_RETRIES ?? 2),
           onRetry: () => { retries += 1; }
@@ -69,7 +77,7 @@ export async function generate({ messages, provider, temperature = 0.7, maxAttem
       return {
         ok: true,
         provider: name,
-        model: cfg.providers[name].model,
+        model: providerConfig(name, cfg).model,
         text: result.text,
         attempts: i + 1,
         retries,

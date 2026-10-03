@@ -157,3 +157,15 @@ CI trigger verification: 2026-10-03
 
 CI verification branch check: 2026-10-03
 Production hardening verification: standardized provider error HTTP mapping merged and CI-verified on 2026-10-03
+
+
+## BHAI engine (self-hosted model contract)
+
+BHAI-CORE can use a self-hosted, vendor-neutral BHAI engine before external providers. Configure:
+- `BHAI_ENGINE_URL`: base URL of an OpenAI-compatible inference server (the adapter accepts either `/v1` or a host root).
+- `BHAI_ENGINE_MODEL`: model identifier exposed by that server (default `bhai-local`).
+- `BHAI_ENGINE_API_KEY`: optional engine credential; it is never returned by provider status.
+
+The default provider order is now `engine,ollama,gemini,openai,anthropic,huggingface`. The engine is only considered configured when both its URL and model are present, so existing deployments keep working until a real self-hosted engine is connected.
+
+This separates the BHAI API/control plane from the model runtime. A future BHAI inference service can therefore replace Gemini without changing the public chat API or BHAI X integration. Ollama remains available as a local development bridge while the self-hosted model runtime is being built.

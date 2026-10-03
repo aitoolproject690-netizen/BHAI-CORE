@@ -1,3 +1,4 @@
+import { bhaiEngineChat, bhaiEngineChatStream } from "./engine.js";
 function timeoutSignal(ms = 30000) {
   return AbortSignal.timeout ? AbortSignal.timeout(ms) : undefined;
 }
@@ -192,7 +193,7 @@ async function ollamaChatStream({ url, model, messages, temperature = 0.7, onTok
   return { text: fullText };
 }
 
-export const providerAdapters = {
+export const providerAdapters = {\n  async engine({ url, key, model, messages, temperature = 0.7 }) {\n    return bhaiEngineChat({ url, key, model, messages, temperature });\n  },
   async ollama({ url, model, messages, temperature = 0.7 }) {
     return ollamaChat({ url, model, messages, temperature });
   },
@@ -239,7 +240,7 @@ export const providerAdapters = {
     return {text,raw:data};
   },
 
-  async geminiStream({ key, model, messages, temperature = 0.7, onToken }) {
+  async engineStream({ url, key, model, messages, temperature = 0.7, onToken }) {\n    return bhaiEngineChatStream({ url, key, model, messages, temperature, onToken });\n  },\n\n  async geminiStream({ key, model, messages, temperature = 0.7, onToken }) {
     return geminiChatStream({ key, model, messages, temperature, onToken });
   },
 

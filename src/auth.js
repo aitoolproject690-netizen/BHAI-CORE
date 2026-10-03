@@ -81,4 +81,29 @@ export async function listApiKeys() {
   return Object.values(store.apiKeys).map(({ hash, ...safe }) => safe);
 }
 
+
+export async function ensureBootstrapApiKey(raw, name = "bootstrap") {
+  const key = String(raw || "").trim();
+  if (!key) return null;
+  const digest = hash(key);
+  const id = hash(key).slice(0, 16);
+  let created = false;
+  await updateStore(store => {
+    const existing = store.apiKeys[id];
+    if (existing?.active && hashesEqual(existing.hash, digest)) return store;
+    store.apiKeys[id] = {
+      id,
+      name: String(name || "bootstrap").slice(0, 120),
+      hash: digest,
+      createdAt: existing?.createdAt || new Date().toISOString(),
+      active: true,
+      scopes: undefined,
+      limits: {}
+    };
+    created = true;
+    return store;
+  });
+  return { id, created };
+}
+
 export function resetApiKeys() {}

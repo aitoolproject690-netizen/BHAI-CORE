@@ -118,6 +118,10 @@ async function chat(body, res) {
 
 const server = http.createServer(async (req, res) => {
   try {
+    if (req.url === "/" && req.method === "GET") {
+      send(res, 200, { ok: true, service: "BHAI Engine", model: MODEL_NAME, endpoints: ["/health", "/ready", "/v1/models", "/v1/chat/completions"] });
+      return;
+    }
     if (req.url === "/health" && req.method === "GET") {
       send(res, model ? 200 : 503, { ok: Boolean(model), service: "BHAI Engine", model: MODEL_NAME, model_loaded: Boolean(model) });
       return;

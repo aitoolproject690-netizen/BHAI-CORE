@@ -1,0 +1,12 @@
+{
+  "name": "bhai-engine-runtime",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "node-llama-cpp": "3.22.1"
+  }
+}

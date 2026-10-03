@@ -14,6 +14,7 @@ const MAX_TOKENS = Number(process.env.BHAI_ENGINE_MAX_TOKENS || 256);
 
 let model;
 let llama;
+let modelLoadPromise;
 
 function authorized(req) {
   return Boolean(API_KEY && req.headers.authorization === "Bearer " + API_KEY);
@@ -43,9 +44,16 @@ function normalizeMessages(messages) {
 
 async function ensureModel() {
   if (model) return;
-  llama = await getLlama();
-  model = await llama.loadModel({ modelPath: MODEL_PATH });
-  console.log(JSON.stringify({ event: "model_loaded", model: MODEL_NAME }));
+  if (modelLoadPromise) return modelLoadPromise;
+  modelLoadPromise = (async () => {
+    llama = await getLlama();
+    model = await llama.loadModel({ modelPath: MODEL_PATH });
+    console.log(JSON.stringify({ event: "model_loaded", model: MODEL_NAME }));
+  })().catch(error => {
+    modelLoadPromise = undefined;
+    throw error;
+  });
+  return modelLoadPromise;
 }
 
 async function chat(body, res) {
@@ -68,12 +76,10 @@ async function chat(body, res) {
       "cache-control": "no-cache",
       "connection": "keep-alive"
     });
-    let full = "";
     await session.prompt(prompt, {
       temperature: Number.isFinite(Number(body.temperature)) ? Number(body.temperature) : 0.7,
       maxTokens: Math.min(Math.max(Number(body.max_tokens) || MAX_TOKENS, 1), MAX_TOKENS),
       onTextChunk(chunk) {
-        full += chunk;
         res.write("data: " + JSON.stringify({ choices: [{ delta: { content: chunk } }] }) + "\n\n");
       }
     });
@@ -101,8 +107,12 @@ async function chat(body, res) {
 const server = http.createServer(async (req, res) => {
   try {
     if (req.url === "/health" && req.method === "GET") {
-      send(res, model ? 200 : 200, { ok: true, service: "BHAI Engine", model: MODEL_NAME, model_loaded: Boolean(model) });
+      send(res, model ? 200 : 503, { ok: Boolean(model), service: "BHAI Engine", model: MODEL_NAME, model_loaded: Boolean(model) });
       return;
+    }
+    if (req.url === "/ready" && req.method === "GET") {
+      await ensureModel();
+      return send(res, 200, { ok: true, service: "BHAI Engine", model: MODEL_NAME, model_loaded: true });
     }
     if (req.url === "/v1/models" && req.method === "GET") {
       if (!authorized(req)) return send(res, 401, { error: { message: "Unauthorized" } });
@@ -120,4 +130,7 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, HOST, () => console.log(`BHAI Engine listening on http://${HOST}:${PORT}`));
+server.listen(PORT, HOST, () => {
+  console.log(`BHAI Engine listening on http://${HOST}:${PORT}`);
+  ensureModel().catch(error => console.error(JSON.stringify({ event: "model_load_failed", error: error.message })));
+});

@@ -16,7 +16,7 @@ let model;
 let llama;
 
 function authorized(req) {
-  return !API_KEY || req.headers.authorization === "Bearer " + API_KEY;
+  return Boolean(API_KEY && req.headers.authorization === "Bearer " + API_KEY);
 }
 
 function send(res, status, body, headers = {}) {

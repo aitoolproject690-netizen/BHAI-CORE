@@ -245,7 +245,9 @@ export const providerAdapters = {
 
   async engineStream({ url, key, model, messages, temperature = 0.7, onToken }) {
     return bhaiEngineChatStream({ url, key, model, messages, temperature, onToken });
-  },\n\n  async geminiStream({ key, model, messages, temperature = 0.7, onToken }) {
+  },
+
+  async geminiStream({ key, model, messages, temperature = 0.7, onToken }) {
     return geminiChatStream({ key, model, messages, temperature, onToken });
   },
 

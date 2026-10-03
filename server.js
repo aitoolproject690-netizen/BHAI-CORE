@@ -1241,8 +1241,32 @@ document.getElementById("refreshKeys").onclick=loadKeys;loadKeys();</script></ma
     return send(res, 404, { ok: false, error: "Not found" }, rid);
   } catch (error) {
     await recordUsage({ key: req.headers["x-bhai-key"] || "anonymous", failed: true });
-    return send(res, error.code === "BUDGET_EXCEEDED" || error.code === "BILLING_QUOTA_EXCEEDED" ? 429 : error.code === "PERMISSION_DENIED" ? 403 : error.code === "REQUEST_BODY_TOO_LARGE" ? 413 : error.code === "REQUEST_BODY_INVALID_JSON" ? 400 : 500, {
-      ok: false, ...publicError(error), requestId: rid
+    const classified = classifyError(error);
+    const status = error.code === "BUDGET_EXCEEDED" || error.code === "BILLING_QUOTA_EXCEEDED"
+      ? 429
+      : error.code === "PERMISSION_DENIED"
+        ? 403
+        : error.code === "REQUEST_BODY_TOO_LARGE"
+          ? 413
+          : error.code === "REQUEST_BODY_INVALID_JSON"
+            ? 400
+            : error.status === 400
+              ? 400
+              : classified === "auth"
+                ? 502
+                : classified === "model"
+                  ? 502
+                  : classified === "retryable"
+                    ? (Number(error.status) === 429 ? 429 : 503)
+                    : (Number(error.status) >= 400 && Number(error.status) < 600 ? Number(error.status) : 500);
+    if (status === 429) {
+      res.setHeader("retry-after", String(Math.max(1, Number(error.retryAfterSeconds || error.retryAfter || 1))));
+    }
+    return send(res, status, {
+      ok: false,
+      ...publicError(error),
+      kind: classified,
+      requestId: rid
     }, rid);
   }
 });

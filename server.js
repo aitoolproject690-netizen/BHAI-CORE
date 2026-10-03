@@ -50,6 +50,7 @@ import { checkRateLimit, rateLimitInfo } from "./src/rateLimit.js";
 import { readRequestBody } from "./src/requestBody.js";
 import { authenticateMaster } from "./src/masterAuth.js";
 import { sessionCookie, clearSessionCookie, authenticateSession } from "./src/dashboardAuth.js";
+import { hasApiAccess } from "./src/access.js";
 
 const cfg = config();
 
@@ -316,9 +317,19 @@ document.getElementById("refreshKeys").onclick=loadKeys;loadKeys();</script></ma
       return send(res, 202, { ok:true, event:"push", repository, branch, commit, triggered:hooks.length }, rid);
     }
 
-    if (cfg.masterAuth.enabled && !authenticateMaster(req, cfg.masterAuth.username, process.env.BHAI_CORE_PASSWORD)) {
+    const apiIdentity = req.headers["x-bhai-key"]
+      ? await authenticate(req.headers["x-bhai-key"])
+      : null;
+    const masterAuthenticated = authenticateMaster(req, cfg.masterAuth.username, process.env.BHAI_CORE_PASSWORD);
+    const sessionAuthenticated = authenticateSession(req, cfg.masterAuth.username);
+    if (!hasApiAccess({
+      masterAuthEnabled: cfg.masterAuth.enabled,
+      masterAuthenticated,
+      sessionAuthenticated,
+      apiAuthenticated: Boolean(apiIdentity)
+    })) {
       res.setHeader("www-authenticate", 'Basic realm="BHAI-CORE"');
-      return send(res, 401, { ok: false, error: "Master username/password required" }, rid);
+      return send(res, 401, { ok: false, error: "Master authentication or valid BHAI API key required" }, rid);
     }
 
     if (!authorized(req))

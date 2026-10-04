@@ -2,6 +2,7 @@ import http from "node:http";
 import { startTlsServer, tlsInfo } from "./src/tls.js";
 import { config } from "./src/config.js";
 import { generate, getProviderStatus } from "./src/router.js";
+import { bhaiEngineProbe } from "./src/engine.js";
 import { publicError } from "./src/errors.js";
 import { requestId } from "./src/requestId.js";
 import { recordUsage, getUsage, allUsage, allProviderUsage } from "./src/usage.js";
@@ -164,6 +165,7 @@ const server = http.createServer(async (req, res) => {
         endpoints: {
           models: "/v1/models",
           providers: "/v1/providers",
+          engineHealth: "/v1/engine/health",
           memory: "/v1/memory/info",
           embeddings: "/v1/embeddings",
           chat: "/v1/chat/completions",
@@ -466,6 +468,37 @@ document.getElementById("refreshKeys").onclick=loadKeys;loadKeys();</script></ma
 
     if (url.pathname === "/v1/providers" && req.method === "GET")
       return send(res, 200, { ok: true, providers: getProviderStatus() }, rid);
+
+    if (url.pathname === "/v1/engine/health" && req.method === "GET") {
+      const configured = Boolean(String(cfg.engine.url || "").trim() && String(cfg.engine.model || "").trim());
+      if (!configured) {
+        return send(res, 503, {
+          ok: false,
+          provider: "engine",
+          configured: false,
+          reachable: false,
+          model: cfg.engine.model,
+          error: "BHAI engine is not configured"
+        }, rid);
+      }
+      try {
+        const probe = await bhaiEngineProbe(cfg.engine);
+        return send(res, probe.ok ? 200 : 503, {
+          provider: "engine",
+          configured: true,
+          ...probe
+        }, rid);
+      } catch (error) {
+        return send(res, Number(error?.status) >= 400 ? Number(error.status) : 503, {
+          ok: false,
+          provider: "engine",
+          configured: true,
+          reachable: false,
+          model: cfg.engine.model,
+          error: String(error?.message || "BHAI engine probe failed").slice(0, 500)
+        }, rid);
+      }
+    }
 
     if (url.pathname === "/v1/models" && req.method === "GET") {
       const probe = url.searchParams.get("probe") === "true";

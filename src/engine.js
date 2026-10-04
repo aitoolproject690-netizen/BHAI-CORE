@@ -8,6 +8,12 @@ function endpoint(baseUrl) {
   return base.endsWith("/v1") ? base + "/chat/completions" : base + "/v1/chat/completions";
 }
 
+function modelsEndpoint(baseUrl) {
+  const base = String(baseUrl || "").trim().replace(/\/+$/, "");
+  if (!base) throw new Error("BHAI_ENGINE_URL is not configured");
+  return base.endsWith("/v1") ? base + "/models" : base + "/v1/models";
+}
+
 function headers(key) {
   const result = { "content-type": "application/json" };
   if (key) result.authorization = "Bearer " + key;
@@ -24,6 +30,27 @@ async function readJson(response) {
     throw error;
   }
   return data;
+}
+
+export async function bhaiEngineProbe({ url, key, model }) {
+  const response = await fetch(modelsEndpoint(url), {
+    method: "GET",
+    headers: headers(key),
+    signal: timeoutSignal()
+  });
+  const data = await readJson(response);
+  const availableModels = Array.isArray(data?.data)
+    ? data.data.map(item => String(item?.id || "")).filter(Boolean)
+    : [];
+  const targetModel = String(model || "").trim();
+  const modelAvailable = Boolean(targetModel && availableModels.includes(targetModel));
+  return {
+    ok: response.ok && modelAvailable,
+    reachable: true,
+    model: targetModel,
+    model_available: modelAvailable,
+    available_models: availableModels.slice(0, 20)
+  };
 }
 
 export async function bhaiEngineChat({ url, key, model, messages, temperature = 0.7 }) {

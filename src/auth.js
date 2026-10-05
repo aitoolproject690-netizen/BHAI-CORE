@@ -91,11 +91,19 @@ export async function ensureBootstrapApiKey(raw, name = "bootstrap") {
   await updateStore(store => {
     const existing = store.apiKeys[id];
     if (existing?.active && hashesEqual(existing.hash, digest)) return store;
+    const now = new Date().toISOString();
+    const bootstrapName = String(name || "bootstrap").slice(0, 120);
+    for (const [keyId, item] of Object.entries(store.apiKeys)) {
+      if (keyId !== id && item?.active && item?.name === bootstrapName) {
+        item.active = false;
+        item.revokedAt = now;
+      }
+    }
     store.apiKeys[id] = {
       id,
-      name: String(name || "bootstrap").slice(0, 120),
+      name: bootstrapName,
       hash: digest,
-      createdAt: existing?.createdAt || new Date().toISOString(),
+      createdAt: existing?.createdAt || now,
       active: true,
       scopes: undefined,
       limits: {}

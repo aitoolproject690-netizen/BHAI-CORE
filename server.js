@@ -54,6 +54,7 @@ import { authenticateMaster } from "./src/masterAuth.js";
 import { sessionCookie, clearSessionCookie, authenticateSession } from "./src/dashboardAuth.js";
 import { hasApiAccess } from "./src/access.js";
 import { attachMobileNode } from "./src/mobileNode.js";
+import { moduleCatalog, moduleForRequest, modulePermissions } from "./src/modules.js";
 
 const cfg = config();
 await ensureBootstrapApiKey(process.env.BHAI_CORE_BOOTSTRAP_API_KEY, process.env.BHAI_CORE_BOOTSTRAP_NAME || "BHAI-X");
@@ -208,6 +209,7 @@ const server = http.createServer(async (req, res) => {
           ragSearch: "/v1/rag/search",
           agentTools: "/v1/agent/tools",
           jobs: "/v1/jobs",
+          modules: "/v1/modules",
           keys: "/v1/keys"
         }
       }, rid);
@@ -258,6 +260,7 @@ const server = http.createServer(async (req, res) => {
           const state = info.configured ? "READY" : "NOT CONFIGURED";
           return '<div class="provider"><div><b>' + name.toUpperCase() + '</b><span class="pill ' + (info.configured ? 'ready' : '') + '">' + state + '</span></div><small>' + String(info.model || 'no model') + '</small></div>';
         }).join("");
+      const moduleCards = moduleCatalog().map(module => "<label class=\"module-option\"><input type=\"checkbox\" name=\"engineModule\" value=\"" + module.id + "\" checked><span><b>" + module.icon + " " + module.name + "</b><small>" + module.description + "</small></span></label>").join("");
       const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BHAI-CORE</title><style>
       *{box-sizing:border-box}body{margin:0;background:#080d18;color:#eef2ff;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
       main{max-width:980px;margin:auto;padding:24px 16px 40px}.top{display:flex;justify-content:space-between;align-items:center;gap:12px}.brand{font-size:26px;font-weight:800}.live{color:#7ee2a8;font-size:13px}
@@ -266,12 +269,13 @@ const server = http.createServer(async (req, res) => {
       .card b{display:block;margin-bottom:7px}.url,small{color:#8fa0bf;font-size:13px;word-break:break-all}.provider>div{display:flex;justify-content:space-between;align-items:center;gap:8px}
       .pill{font-size:10px;padding:5px 8px;border-radius:999px;background:#2d2330;color:#ffb5b5}.pill.ready{background:#173d2a;color:#7ee2a8}
       .panel{padding:17px;border:1px solid #24304a;border-radius:16px;background:#10182a}.row{display:flex;gap:10px;flex-wrap:wrap}.row>*{flex:1;min-width:150px}
+      .module-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin:12px 0}.module-option{display:flex;gap:10px;align-items:flex-start;padding:13px;border:1px solid #2b3a58;border-radius:12px;background:#0b1221;cursor:pointer}.module-option input{width:auto;margin:4px 0 0;accent-color:#62d39b}.module-option b{display:block}.module-option small{display:block;margin-top:4px}.module-actions{display:flex;gap:8px;flex-wrap:wrap}.module-actions button{width:auto;min-width:120px}
       input,button{width:100%;padding:12px;border-radius:10px;border:1px solid #33415f;background:#0b1221;color:#eef2ff;font:inherit}button{cursor:pointer;background:#173d2a;border-color:#285c43}
       pre{white-space:pre-wrap;word-break:break-word;background:#090f1c;padding:12px;border-radius:10px;color:#b9c8e8;min-height:20px}
       .note{margin-top:18px;padding:14px;border-radius:14px;background:#111c31;border:1px solid #273753;color:#b8c4dd;font-size:13px;line-height:1.5}
       </style></head><body><main><div class="top"><div class="brand">🤖 BHAI-CORE</div><div class="live">● LIVE</div></div>
       <h1>API Dashboard</h1><p>Core service, AI providers aur API keys ek jagah.</p>
-      <div class="section"><h2>🔐 Master Access → API Key</h2><div class="panel"><p>Dashboard session authenticated hai. Master password browser mein store nahi hota.</p><div class="row"><input id="n" placeholder="Key name" value="my-app"></div><button id="create">Create API Key</button><button id="logout" style="margin-top:10px;background:#2d2330;border-color:#563746">Logout</button><pre id="out"></pre></div></div>
+      <div class="section"><h2>🔐 Master Access → API Key</h2><div class="panel"><p>Dashboard session authenticated hai. Select karo ki ye API key kin Engine Modules ko use kar sakti hai.</p><div class="row"><input id="n" placeholder="Key name" value="my-app"></div><div class="module-actions"><button id="allModules" type="button">Select All Modules</button><button id="noModules" type="button" style="background:#2d2330;border-color:#563746">Clear All</button></div><div class="module-grid">${moduleCards}</div><button id="create">Create API Key</button><button id="logout" style="margin-top:10px;background:#2d2330;border-color:#563746">Logout</button><pre id="out"></pre></div></div>
       <div class="section"><h2>🔑 API Keys</h2><div class="panel"><div class="row"><input id="limitReq" type="number" min="1" placeholder="Max requests (optional)"><input id="limitChars" type="number" min="1" placeholder="Max input chars (optional)"></div><button id="refreshKeys" style="margin-top:10px">Refresh Keys & Usage</button><div id="keys" style="margin-top:12px"></div></div></div>
       <div class="section"><h2>📊 Usage & Audit</h2><div class="grid"><a class="card" href="/v1/usage"><b>Usage API</b><span class="url">All key usage (admin)</span></a><a class="card" href="/v1/metrics"><b>Provider Metrics</b><span class="url">Latency, retries, failures</span></a><a class="card" href="/v1/audit"><b>Audit Log</b><span class="url">Recent admin/security events</span></a></div></div>
       <div class="section"><h2>AI Providers</h2><div class="grid">${providerCards}</div></div>
@@ -283,14 +287,7 @@ const server = http.createServer(async (req, res) => {
       <a class="card" href="/v1"><b>📚 API Index</b><span class="url">All major API routes</span></a>
       </div></div>
       <div class="section"><h2>Engine Modules</h2><div class="grid">
-      <div class="card"><b>💬 Chat + Streaming</b><span class="url">Provider router + SSE</span></div>
-      <div class="card"><b>🧠 RAG + Memory</b><span class="url">Files, embeddings, conversations</span></div>
-      <div class="card"><b>🛠️ Agent</b><span class="url">Tools, approvals, audit</span></div>
-      <div class="card"><b>🖼️ Image</b><span class="url">ComfyUI adapter</span></div>
-      <div class="card"><b>🎬 Video</b><span class="url">External video adapter</span></div>
-      <div class="card"><b>🎙️ Voice + Vision</b><span class="url">Whisper/Piper + vision providers</span></div>
-      <div class="card"><b>🐙 GitHub + Cloud</b><span class="url">Repository/build/deployment tools</span></div>
-      <div class="card"><b>💳 Billing</b><span class="url">Plans, quota and usage foundation</span></div>
+      ${moduleCatalog().map(module => '<div class="card"><b>' + module.icon + " " + module.name + '</b><span class="url">' + module.description + '</span></div>').join("")}
       </div></div>
       <div class="note">🔒 Master credentials are only used for the request. The generated API key is shown once; save it securely. Provider keys are never displayed here.</div>
       <script>
@@ -309,6 +306,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       const REQUEST_TIMEOUT_MS = 8000;
+      const selectedModules = () => Array.from(document.querySelectorAll("input[name=engineModule]:checked")).map(input => input.value);
 
       async function apiJson(path, options = {}) {
         const controller = new AbortController();
@@ -343,11 +341,14 @@ const server = http.createServer(async (req, res) => {
         button.disabled = true;
         out.textContent = "Creating…";
         try {
+          const modules = selectedModules();
+          if (!modules.length) throw new Error("At least one Engine Module select karo");
           const data = await apiJson("/v1/keys", {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({
               name,
+              modules,
               limits: {
                 maxRequests: Number($("limitReq").value) || undefined,
                 maxInputChars: Number($("limitChars").value) || undefined
@@ -359,7 +360,8 @@ const server = http.createServer(async (req, res) => {
             "API KEY (save now):",
             data.key,
             "",
-            "Key ID: " + data.id
+            "Key ID: " + data.id,
+            "Modules: " + (Array.isArray(data.modules) ? JSON.stringify(data.modules) : JSON.stringify(modules))
           ].join(NL);
           void loadKeys();
         } catch (error) {
@@ -405,7 +407,7 @@ const server = http.createServer(async (req, res) => {
             details.className = "url";
             details.textContent =
               "Limits: " + JSON.stringify(key.limits || {}) +
-              " · Scopes: " + JSON.stringify(key.scopes || []);
+              " · Modules: " + (Array.isArray(key.modules) ? JSON.stringify(key.modules) : "ALL (legacy/default)");
 
             const row = document.createElement("div");
             row.className = "row";
@@ -484,6 +486,9 @@ const server = http.createServer(async (req, res) => {
 
       $("create").type = "button";
       $("create").addEventListener("click", createApiKey);
+      const moduleInputs = () => Array.from(document.querySelectorAll("input[name=engineModule]"));
+      $("allModules").addEventListener("click", () => moduleInputs().forEach(input => { input.checked = true; }));
+      $("noModules").addEventListener("click", () => moduleInputs().forEach(input => { input.checked = false; }));
       $("logout").type = "button";
       $("logout").addEventListener("click", async () => {
         try {
@@ -556,6 +561,22 @@ const server = http.createServer(async (req, res) => {
       res.setHeader("www-authenticate", 'Basic realm="BHAI-CORE"');
       return send(res, 401, { ok: false, error: "Master authentication or valid BHAI API key required" }, rid);
     }
+    const requestedModule = moduleForRequest(url.pathname, req.method);
+    if (requestedModule && apiIdentity && !masterAuthenticated && !sessionAuthenticated && Array.isArray(apiIdentity.modules)) {
+      if (!apiIdentity.modules.includes(requestedModule)) {
+        return send(res, 403, {
+          ok: false,
+          error: "API key does not include this Engine Module",
+          code: "MODULE_ACCESS_DENIED",
+          module: requestedModule,
+          modules: apiIdentity.modules
+        }, rid);
+      }
+    }
+    if (url.pathname === "/v1/modules" && req.method === "GET") {
+      return send(res, 200, { ok: true, modules: moduleCatalog() }, rid);
+    }
+
 
     if (url.pathname === "/v1/memory/info" && req.method === "GET")
       return send(res, 200, { ok: true, memory: memoryInfo() }, rid);
@@ -1305,7 +1326,7 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/v1/keys" && req.method === "POST") {
       if (!adminAuthorized(req)) return send(res, 401, { ok: false, error: "Admin authentication required" }, rid);
       const body = await readJson(req);
-      const created = await createApiKey(body.name || "app", body.scopes, body.limits);
+      const created = await createApiKey(body.name || "app", body.scopes, body.limits, body.modules);
       void bestEffortTelemetry(
         () => recordAudit({
           actorId: cfg.masterAuth.username || "admin",

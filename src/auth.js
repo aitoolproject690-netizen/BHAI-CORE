@@ -1,14 +1,27 @@
 import crypto from "node:crypto";
 import { getStore, updateStore } from "./store.js";
+import { expandModulePermissions, normalizeModuleIds } from "./modules.js";
 
 function hash(value) {
   return crypto.createHash("sha256").update(value).digest("hex");
 }
 
-export async function createApiKey(name = "default", scopes, limits = {}) {
+export async function createApiKey(name = "default", scopes, limits = {}, modules) {
   const raw = "bhai_" + crypto.randomBytes(24).toString("base64url");
   const id = hash(raw).slice(0, 16);
-  const cleanScopes = Array.isArray(scopes) && scopes.length ? [...new Set(scopes.map(String))] : undefined;
+  const hasModuleSelection = modules !== undefined;
+  const cleanModules = hasModuleSelection ? normalizeModuleIds(modules) : undefined;
+  if (hasModuleSelection && cleanModules.length === 0) {
+    throw Object.assign(new Error("At least one engine module must be selected"), {
+      code: "MODULE_SELECTION_REQUIRED",
+      status: 400
+    });
+  }
+  const legacyScopes = Array.isArray(scopes) && scopes.length ? scopes.map(String) : [];
+  const moduleScopes = cleanModules ? expandModulePermissions(cleanModules) : [];
+  const cleanScopes = moduleScopes.length || legacyScopes.length
+    ? [...new Set([...moduleScopes, ...legacyScopes])]
+    : undefined;
   const maxRequests = Number(limits.maxRequests);
   const maxInputChars = Number(limits.maxInputChars);
   const cleanLimits = {
@@ -20,11 +33,12 @@ export async function createApiKey(name = "default", scopes, limits = {}) {
       id, name: String(name || "default").slice(0, 120), hash: hash(raw),
       createdAt: new Date().toISOString(), active: true,
       scopes: cleanScopes,
+      modules: cleanModules,
       limits: cleanLimits
     };
     return store;
   });
-  return { id, key: raw, name: String(name || "default").slice(0, 120), limits: cleanLimits, scopes: cleanScopes };
+  return { id, key: raw, name: String(name || "default").slice(0, 120), limits: cleanLimits, scopes: cleanScopes, modules: cleanModules ?? null };
 }
 
 export async function revokeApiKey(id) {
@@ -53,7 +67,7 @@ export async function rotateApiKey(id) {
       createdAt: new Date().toISOString(), revokedAt: undefined,
       active: true, rotatedFrom: id
     };
-    result = { id: newId, key: raw, name: current.name, scopes: current.scopes, limits: current.limits || {} };
+    result = { id: newId, key: raw, name: current.name, scopes: current.scopes, modules: current.modules ?? null, limits: current.limits || {} };
     return store;
   });
   return result;
@@ -71,14 +85,14 @@ export async function authenticate(value) {
   const digest = hash(value);
   const store = await getStore();
   for (const item of Object.values(store.apiKeys)) {
-    if (item.active && hashesEqual(item.hash, digest)) return { id: item.id, name: item.name, scopes: item.scopes, limits: item.limits || {} };
+    if (item.active && hashesEqual(item.hash, digest)) return { id: item.id, name: item.name, scopes: item.scopes, modules: item.modules ?? null, limits: item.limits || {} };
   }
   return null;
 }
 
 export async function listApiKeys() {
   const store = await getStore();
-  return Object.values(store.apiKeys).map(({ hash, ...safe }) => safe);
+  return Object.values(store.apiKeys).map(({ hash, ...safe }) => ({ ...safe, modules: safe.modules ?? null }));
 }
 
 

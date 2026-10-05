@@ -361,7 +361,7 @@ const server = http.createServer(async (req, res) => {
             data.key,
             "",
             "Key ID: " + data.id,
-            "Modules: " + JSON.stringify(data.modules || modules)
+            "Modules: " + (Array.isArray(data.modules) ? JSON.stringify(data.modules) : JSON.stringify(modules))
           ].join(NL);
           void loadKeys();
         } catch (error) {
@@ -407,7 +407,7 @@ const server = http.createServer(async (req, res) => {
             details.className = "url";
             details.textContent =
               "Limits: " + JSON.stringify(key.limits || {}) +
-              " · Modules: " + JSON.stringify(key.modules || []);
+              " · Modules: " + (Array.isArray(key.modules) ? JSON.stringify(key.modules) : "ALL (legacy/default)");
 
             const row = document.createElement("div");
             row.className = "row";

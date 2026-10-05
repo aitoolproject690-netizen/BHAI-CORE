@@ -46,7 +46,10 @@ export function attachMobileNode(server) {
       let authenticated = false;
       let heartbeatTimer = null;
       const timer = setTimeout(() => {
-        if (!authenticated) ws.close(1008, "authentication required");
+        if (!authenticated) {
+          console.warn("BHAI mobile node auth timeout");
+          ws.close(1008, "authentication required");
+        }
       }, AUTH_TIMEOUT_MS);
 
       const startHeartbeat = () => {
@@ -67,13 +70,19 @@ export function attachMobileNode(server) {
 
       ws.on("message", raw => {
         let message;
-        try { message = JSON.parse(String(raw)); } catch { return ws.close(1003, "invalid json"); }
+        try { message = JSON.parse(String(raw)); } catch {
+          console.warn("BHAI mobile node invalid json before auth");
+          return ws.close(1003, "invalid json");
+        }
 
         if (!authenticated) {
+          console.log("BHAI mobile node auth message received:", String(message?.type || "unknown"));
           if (message?.type !== "auth" || !authenticatedToken(String(message.token || ""))) {
+            console.warn("BHAI mobile node auth rejected");
             return ws.close(1008, "authentication failed");
           }
           authenticated = true;
+          console.log("BHAI mobile node authentication accepted");
           clearTimeout(timer);
           if (active && active !== ws) active.close(1012, "replaced by newer node");
           active = ws;

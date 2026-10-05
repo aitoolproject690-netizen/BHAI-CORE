@@ -67,7 +67,7 @@ export async function rotateApiKey(id) {
       createdAt: new Date().toISOString(), revokedAt: undefined,
       active: true, rotatedFrom: id
     };
-    result = { id: newId, key: raw, name: current.name, scopes: current.scopes, limits: current.limits || {} };
+    result = { id: newId, key: raw, name: current.name, scopes: current.scopes, modules: current.modules ?? modulesForScopes(current.scopes), limits: current.limits || {} };
     return store;
   });
   return result;

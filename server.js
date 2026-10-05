@@ -49,6 +49,7 @@ import { createRenewalScheduler, renewalSchedulerInfo } from "./src/renewalSched
 import crypto from "node:crypto";
 import { checkRateLimit, rateLimitInfo } from "./src/rateLimit.js";
 import { readRequestBody } from "./src/requestBody.js";
+import { clientAddress } from "./src/requestIdentity.js";
 import { authenticateMaster } from "./src/masterAuth.js";
 import { sessionCookie, clearSessionCookie, authenticateSession } from "./src/dashboardAuth.js";
 import { hasApiAccess } from "./src/access.js";
@@ -133,6 +134,17 @@ async function bestEffortTelemetry(operation, label) {
 const server = http.createServer(async (req, res) => {
   const rid = requestId(req);
   const url = new URL(req.url, "http://" + (req.headers.host || "localhost"));
+  if (req.method === "OPTIONS") {
+    res.writeHead(204, {
+      "access-control-allow-origin": "*",
+      "access-control-allow-headers": "content-type, authorization, x-bhai-key, x-bhai-admin-key",
+      "access-control-allow-methods": "GET,POST,DELETE,OPTIONS",
+      "access-control-max-age": "600",
+      "cache-control": "no-store"
+    });
+    return res.end();
+  }
+
   const adminRateLimitPath = url.pathname === "/dashboard"
     || url.pathname === "/logout"
     || url.pathname === "/v1/usage"
@@ -142,10 +154,7 @@ const server = http.createServer(async (req, res) => {
     || url.pathname.startsWith("/v1/keys/")
     || url.pathname === "/v1/billing/admin/subscription";
   const adminRateLimitBypass = adminRateLimitPath && adminAuthorized(req);
-  const forwardedFor = String(req.headers["x-forwarded-for"] || "")
-    .split(",")[0]
-    .trim();
-  const clientIp = forwardedFor || String(req.socket.remoteAddress || "anonymous");
+  const clientIp = clientAddress(req);
   const rawRateIdentity = req.headers["x-bhai-key"]
     ? "api:" + crypto.createHash("sha256").update(String(req.headers["x-bhai-key"])).digest("hex").slice(0, 32)
     : "ip:" + clientIp;
@@ -159,16 +168,6 @@ const server = http.createServer(async (req, res) => {
   }
 
   try {
-    if (req.method === "OPTIONS") {
-      res.writeHead(204, {
-        "access-control-allow-origin": "*",
-        "access-control-allow-headers": "content-type, authorization, x-bhai-key, x-bhai-admin-key",
-        "access-control-allow-methods": "GET,POST,DELETE,OPTIONS",
-        "access-control-max-age": "600"
-      });
-      return res.end();
-    }
-
     const incomingHost = String(req.headers.host || "").toLowerCase();
     const routedHost = incomingHost.replace(/:\\d+$/, "");
     if (!routedHost.endsWith(".localhost") && routedHost !== "localhost" && !url.pathname.startsWith("/v1/") && !url.pathname.startsWith("/health") && !url.pathname.startsWith("/ready")) {
@@ -500,16 +499,6 @@ const server = http.createServer(async (req, res) => {
       return res.end(html);
     }
 
-    if (url.pathname === "/" && req.method === "GET") {
-      return send(res, 200, {
-        ok: true,
-        service: "BHAI-CORE",
-        status: "live",
-        version: "0.1.0",
-        endpoints: { health: "/health", ready: "/ready", api: "/v1" }
-      }, rid);
-    }
-
     if (url.pathname === "/v1/cloud/webhooks/github" && req.method === "POST") {
       const secret = process.env.BHAI_GITHUB_WEBHOOK_SECRET;
       if (!secret) return send(res, 503, { ok:false, error:"GitHub webhook secret is not configured" }, rid);
@@ -555,18 +544,18 @@ const server = http.createServer(async (req, res) => {
       : null;
     const masterAuthenticated = authenticateMaster(req, cfg.masterAuth.username, process.env.BHAI_CORE_PASSWORD);
     const sessionAuthenticated = authenticateSession(req, cfg.masterAuth.username);
+    const coreApiAuthenticated = authorized(req);
     if (!hasApiAccess({
       masterAuthEnabled: cfg.masterAuth.enabled,
       masterAuthenticated,
       sessionAuthenticated,
-      apiAuthenticated: Boolean(apiIdentity)
+      apiAuthenticated: Boolean(apiIdentity),
+      coreApiAuthenticated,
+      coreApiConfigured: Boolean(cfg.apiKey)
     })) {
       res.setHeader("www-authenticate", 'Basic realm="BHAI-CORE"');
       return send(res, 401, { ok: false, error: "Master authentication or valid BHAI API key required" }, rid);
     }
-
-    if (!authorized(req))
-      return send(res, 401, { ok: false, error: "Unauthorized" }, rid);
 
     if (url.pathname === "/v1/memory/info" && req.method === "GET")
       return send(res, 200, { ok: true, memory: memoryInfo() }, rid);

@@ -17,8 +17,17 @@ function safeEqual(a, b) {
   return left.length === right.length && crypto.timingSafeEqual(left, right);
 }
 
-function token() {
-  return String(process.env.BHAI_MOBILE_NODE_TOKEN || process.env.BHAI_ENGINE_API_KEY || "");
+function tokens() {
+  return [
+    process.env.BHAI_MOBILE_NODE_TOKEN,
+    process.env.BHAI_ENGINE_API_KEY
+  ]
+    .map(value => String(value || ""))
+    .filter(Boolean);
+}
+
+function authenticatedToken(value) {
+  return tokens().some(expected => safeEqual(value, expected));
 }
 
 function reject(socket, status = 404) {
@@ -61,7 +70,7 @@ export function attachMobileNode(server) {
         try { message = JSON.parse(String(raw)); } catch { return ws.close(1003, "invalid json"); }
 
         if (!authenticated) {
-          if (message?.type !== "auth" || !safeEqual(String(message.token || ""), token())) {
+          if (message?.type !== "auth" || !authenticatedToken(String(message.token || ""))) {
             return ws.close(1008, "authentication failed");
           }
           authenticated = true;
@@ -112,7 +121,7 @@ export function attachMobileNode(server) {
 
 export function mobileNodeInfo() {
   return {
-    configured: Boolean(token()),
+    configured: tokens().length > 0,
     connected: Boolean(active && active.readyState === WebSocket.OPEN),
     pending: pending.size
   };

@@ -11,7 +11,7 @@ function providerConfig(name, cfg) {
 export function isProviderConfigured(name, cfg = config()) {
   const entry = providerConfig(name, cfg);
   if (name === "engine") {
-    return Boolean(entry?.url && entry?.model && typeof providerAdapters[name] === "function");
+    return Boolean((entry?.url || entry?.fallbackUrl) && (entry?.model || entry?.fallbackModel) && typeof providerAdapters[name] === "function");
   }
   return Boolean(entry?.key && typeof providerAdapters[name] === "function");
 }

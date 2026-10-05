@@ -4,6 +4,7 @@ import { WebSocketServer, WebSocket } from "ws";
 const PATH = "/v1/mobile-node";
 const AUTH_TIMEOUT_MS = 5000;
 const REQUEST_TIMEOUT_MS = 65000;
+const HEARTBEAT_INTERVAL_MS = 10000;
 
 let active = null;
 let sequence = 0;
@@ -34,9 +35,18 @@ export function attachMobileNode(server) {
 
     wss.handleUpgrade(req, socket, head, ws => {
       let authenticated = false;
+      let heartbeatTimer = null;
       const timer = setTimeout(() => {
         if (!authenticated) ws.close(1008, "authentication required");
       }, AUTH_TIMEOUT_MS);
+
+      const startHeartbeat = () => {
+        if (heartbeatTimer) clearInterval(heartbeatTimer);
+        heartbeatTimer = setInterval(() => {
+          if (ws.readyState !== WebSocket.OPEN) return;
+          try { ws.ping(); } catch {}
+        }, HEARTBEAT_INTERVAL_MS);
+      };
 
       ws.on("error", error => {
         console.error("BHAI mobile node websocket:", error?.message || error);
@@ -54,7 +64,13 @@ export function attachMobileNode(server) {
           clearTimeout(timer);
           if (active && active !== ws) active.close(1012, "replaced by newer node");
           active = ws;
+          startHeartbeat();
           ws.send(JSON.stringify({ type: "auth_ok" }));
+          return;
+        }
+
+        if (message?.type === "heartbeat") {
+          try { ws.send(JSON.stringify({ type: "heartbeat_ack" })); } catch {}
           return;
         }
 
@@ -72,6 +88,7 @@ export function attachMobileNode(server) {
 
       ws.on("close", () => {
         clearTimeout(timer);
+        if (heartbeatTimer) clearInterval(heartbeatTimer);
         if (active === ws) active = null;
         for (const [id, waiter] of pending) {
           clearTimeout(waiter.timer);

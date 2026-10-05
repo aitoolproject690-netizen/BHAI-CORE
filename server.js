@@ -175,6 +175,13 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/health" && req.method === "GET")
       return send(res, 200, { ...health(), storage: storageInfo(), rateLimit: rateLimitInfo() }, rid);
 
+    // Browser root: open the authenticated dashboard instead of exposing API JSON.
+    if (url.pathname === "/" && req.method === "GET") {
+      res.writeHead(302, { location: cfg.masterAuth.enabled ? "/dashboard" : "/v1", "cache-control": "no-store" });
+      return res.end();
+    }
+
+
     if (url.pathname === "/ready" && req.method === "GET") {
       const result = readiness();
       return send(res, result.ready ? 200 : 503, result, rid);

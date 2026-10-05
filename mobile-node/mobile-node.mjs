@@ -1,6 +1,7 @@
 const CORE_URL = String(process.env.BHAI_CORE_URL || "").replace(/\/+$/, "");
 const NODE_TOKEN = String(process.env.BHAI_MOBILE_NODE_TOKEN || process.env.BHAI_ENGINE_API_KEY || "");
 const LOCAL_ENGINE = String(process.env.BHAI_LOCAL_ENGINE_URL || "http://127.0.0.1:18080").replace(/\/+$/, "");
+const LOCAL_ENGINE_API_KEY = String(process.env.BHAI_LOCAL_ENGINE_API_KEY || NODE_TOKEN);
 
 if (!CORE_URL) throw new Error("BHAI_CORE_URL is required");
 if (!NODE_TOKEN) throw new Error("BHAI_MOBILE_NODE_TOKEN or BHAI_ENGINE_API_KEY is required");
@@ -19,6 +20,14 @@ function scheduleReconnect() {
   }, 3000);
 }
 
+function localEngineHeaders(headers) {
+  const result = headers && typeof headers === "object" ? { ...headers } : {};
+  if (!result.authorization && LOCAL_ENGINE_API_KEY) {
+    result.authorization = "Bearer " + LOCAL_ENGINE_API_KEY;
+  }
+  return result;
+}
+
 async function handleRequest(message) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 65000);
@@ -27,7 +36,7 @@ async function handleRequest(message) {
     if (!path.startsWith("/v1/")) throw new Error("path not allowed");
     const response = await fetch(LOCAL_ENGINE + path, {
       method: String(message.method || "GET"),
-      headers: message.headers && typeof message.headers === "object" ? message.headers : {},
+      headers: localEngineHeaders(message.headers),
       body: message.body == null ? undefined : String(message.body),
       signal: controller.signal
     });

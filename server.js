@@ -52,6 +52,7 @@ import { readRequestBody } from "./src/requestBody.js";
 import { authenticateMaster } from "./src/masterAuth.js";
 import { sessionCookie, clearSessionCookie, authenticateSession } from "./src/dashboardAuth.js";
 import { hasApiAccess } from "./src/access.js";
+import { attachMobileNode } from "./src/mobileNode.js";
 
 const cfg = config();
 await ensureBootstrapApiKey(process.env.BHAI_CORE_BOOTSTRAP_API_KEY, process.env.BHAI_CORE_BOOTSTRAP_NAME || "BHAI-X");
@@ -1339,6 +1340,8 @@ if (process.env.BHAI_ACME_ENABLED === "true") renewalScheduler.start();
 server.listen(cfg.port, cfg.host, () => {
   console.log("BHAI-CORE listening on http://" + cfg.host + ":" + cfg.port);
 });
+
+attachMobileNode(server);
 
 const tlsServer = startTlsServer(server.listeners("request")[0]);
 if (tlsServer) {

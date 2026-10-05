@@ -135,6 +135,7 @@ export async function bhaiEngineChat(config = {}) {
       if (!text) throw new Error("BHAI engine returned no text");
       return {
         text,
+        model: target.model,
         raw: data,
         target_role: target.role,
         fallback_used: target.role === "fallback"
@@ -209,6 +210,7 @@ export async function bhaiEngineChatStream(config = {}) {
 
       return {
         text: fullText,
+        model: target.model,
         target_role: target.role,
         fallback_used: target.role === "fallback"
       };

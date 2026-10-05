@@ -169,3 +169,7 @@ BHAI-CORE can use a self-hosted, vendor-neutral BHAI engine before external prov
 The default provider order is now `engine,ollama,gemini,openai,anthropic,huggingface`. The engine is only considered configured when both its URL and model are present, so existing deployments keep working until a real self-hosted engine is connected.
 
 This separates the BHAI API/control plane from the model runtime. A future BHAI inference service can therefore replace Gemini without changing the public chat API or BHAI X integration. Ollama remains available as a local development bridge while the self-hosted model runtime is being built.
+
+## Audit verification
+
+Dashboard authentication, API-key access, and Render client-identity handling were re-verified on 2026-10-05.

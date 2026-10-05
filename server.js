@@ -115,6 +115,21 @@ async function readJson(req, maxBytes = 2_000_000) {
   }
 }
 
+const TELEMETRY_TIMEOUT_MS = 1500;
+
+async function bestEffortTelemetry(operation, label) {
+  try {
+    await Promise.race([
+      operation(),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error(label + " telemetry timed out")), TELEMETRY_TIMEOUT_MS)
+      )
+    ]);
+  } catch (error) {
+    console.error("BHAI-CORE " + label + " telemetry skipped:", error?.message || error);
+  }
+}
+
 const server = http.createServer(async (req, res) => {
   const rid = requestId(req);
   const url = new URL(req.url, "http://" + (req.headers.host || "localhost"));
@@ -283,8 +298,22 @@ const server = http.createServer(async (req, res) => {
         }
       }
 
+      const REQUEST_TIMEOUT_MS = 8000;
+
       async function apiJson(path, options = {}) {
-        const response = await fetch(path, { credentials: "same-origin", ...options });
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+        let response;
+        try {
+          response = await fetch(path, { credentials: "same-origin", ...options, signal: controller.signal });
+        } catch (error) {
+          if (error?.name === "AbortError") {
+            throw new Error("Request timed out. Server/storage may be waking up. Please retry.");
+          }
+          throw error;
+        } finally {
+          clearTimeout(timer);
+        }
         const data = await readJsonResponse(response);
         if (response.status === 401) {
           location.href = "/login";
@@ -322,7 +351,7 @@ const server = http.createServer(async (req, res) => {
             "",
             "Key ID: " + data.id
           ].join(NL);
-          await loadKeys();
+          void loadKeys();
         } catch (error) {
           console.error("Create API key failed", error);
           out.textContent = "Create API key failed: " + String(error.message || error);
@@ -1277,8 +1306,18 @@ const server = http.createServer(async (req, res) => {
       if (!adminAuthorized(req)) return send(res, 401, { ok: false, error: "Admin authentication required" }, rid);
       const body = await readJson(req);
       const created = await createApiKey(body.name || "app", body.scopes, body.limits);
-      await recordAudit({ actorId: cfg.masterAuth.username || "admin", action: "api_key.create", tool: "keys", status: "success", requestId: rid, metadata: { keyId: created.id, name: created.name, limits: created.limits, scopes: created.scopes } });
-      return send(res, 201, { ok: true, ...created }, rid);
+      void bestEffortTelemetry(
+        () => recordAudit({
+          actorId: cfg.masterAuth.username || "admin",
+          action: "api_key.create",
+          tool: "keys",
+          status: "success",
+          requestId: rid,
+          metadata: { keyId: created.id, name: created.name, limits: created.limits, scopes: created.scopes }
+        }),
+        "audit"
+      );
+      return send(res, 201, { ok: true, ...created, auditQueued: true }, rid);
     }
 
     if (url.pathname.match(/^\/v1\/keys\/([^/]+)\/rotate$/) && req.method === "POST") {
@@ -1490,7 +1529,10 @@ const server = http.createServer(async (req, res) => {
 
     return send(res, 404, { ok: false, error: "Not found" }, rid);
   } catch (error) {
-    await recordUsage({ key: req.headers["x-bhai-key"] || "anonymous", failed: true });
+    await bestEffortTelemetry(
+      () => recordUsage({ key: req.headers["x-bhai-key"] || "anonymous", failed: true }),
+      "usage"
+    );
     const classified = classifyError(error);
     const status = error.code === "BUDGET_EXCEEDED" || error.code === "BILLING_QUOTA_EXCEEDED"
       ? 429

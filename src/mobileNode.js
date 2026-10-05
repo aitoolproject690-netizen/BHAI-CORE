@@ -48,6 +48,10 @@ export function attachMobileNode(server) {
         }, HEARTBEAT_INTERVAL_MS);
       };
 
+      ws.on("pong", () => {
+        console.log("BHAI mobile node pong received");
+      });
+
       ws.on("error", error => {
         console.error("BHAI mobile node websocket:", error?.message || error);
       });
@@ -86,7 +90,8 @@ export function attachMobileNode(server) {
         });
       });
 
-      ws.on("close", () => {
+      ws.on("close", (code, reason) => {
+        console.log("BHAI mobile node closed:", Number(code), String(reason || ""));
         clearTimeout(timer);
         if (heartbeatTimer) clearInterval(heartbeatTimer);
         if (active === ws) active = null;

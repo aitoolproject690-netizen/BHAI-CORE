@@ -77,7 +77,7 @@ export async function generate({ messages, provider, temperature = 0.7, maxAttem
       return {
         ok: true,
         provider: name,
-        model: providerConfig(name, cfg).model,
+        model: result.model || providerConfig(name, cfg).model,
         text: result.text,
         attempts: i + 1,
         retries,

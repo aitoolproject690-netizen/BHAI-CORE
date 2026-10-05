@@ -562,19 +562,17 @@ const server = http.createServer(async (req, res) => {
       return send(res, 401, { ok: false, error: "Master authentication or valid BHAI API key required" }, rid);
     }
     const requestedModule = moduleForRequest(url.pathname, req.method);
-    if (requestedModule && apiIdentity && !masterAuthenticated && !sessionAuthenticated) {
-      const missingPermissions = modulePermissions(requestedModule).filter(permission => !hasPermission(apiIdentity, permission));
-      if (missingPermissions.length) {
+    if (requestedModule && apiIdentity && !masterAuthenticated && !sessionAuthenticated && Array.isArray(apiIdentity.modules)) {
+      if (!apiIdentity.modules.includes(requestedModule)) {
         return send(res, 403, {
           ok: false,
           error: "API key does not include this Engine Module",
           code: "MODULE_ACCESS_DENIED",
           module: requestedModule,
-          missingPermissions
+          modules: apiIdentity.modules
         }, rid);
       }
     }
-
     if (url.pathname === "/v1/modules" && req.method === "GET") {
       return send(res, 200, { ok: true, modules: moduleCatalog() }, rid);
     }

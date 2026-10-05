@@ -2,6 +2,7 @@ const CORE_URL = String(process.env.BHAI_CORE_URL || "").replace(/\/+$/, "");
 const NODE_TOKEN = String(process.env.BHAI_MOBILE_NODE_TOKEN || process.env.BHAI_ENGINE_API_KEY || "");
 const LOCAL_ENGINE = String(process.env.BHAI_LOCAL_ENGINE_URL || "http://127.0.0.1:18080").replace(/\/+$/, "");
 const LOCAL_ENGINE_API_KEY = String(process.env.BHAI_LOCAL_ENGINE_API_KEY || NODE_TOKEN);
+const HEARTBEAT_INTERVAL_MS = 10000;
 
 if (!CORE_URL) throw new Error("BHAI_CORE_URL is required");
 if (!NODE_TOKEN) throw new Error("BHAI_MOBILE_NODE_TOKEN or BHAI_ENGINE_API_KEY is required");
@@ -11,6 +12,7 @@ const wsUrl = CORE_URL.replace(/^https:/i, "wss:").replace(/^http:/i, "ws:") + "
 let socket;
 let stopping = false;
 let reconnectTimer;
+let heartbeatTimer;
 
 function scheduleReconnect() {
   if (stopping || reconnectTimer) return;
@@ -64,6 +66,11 @@ function connect() {
   socket.addEventListener("open", () => {
     console.log("BHAI mobile node connected");
     socket.send(JSON.stringify({ type: "auth", token: NODE_TOKEN }));
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    heartbeatTimer = setInterval(() => {
+      if (socket?.readyState !== WebSocket.OPEN) return;
+      try { socket.send(JSON.stringify({ type: "heartbeat" })); } catch {}
+    }, HEARTBEAT_INTERVAL_MS);
   });
   socket.addEventListener("message", async event => {
     let message;
@@ -76,12 +83,14 @@ function connect() {
     console.error("BHAI mobile node websocket:", error?.message || error);
   });
   socket.addEventListener("close", () => {
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
     console.log("BHAI mobile node disconnected; retrying");
     scheduleReconnect();
   });
 }
 
-process.on("SIGTERM", () => { stopping = true; socket?.close(); });
-process.on("SIGINT", () => { stopping = true; socket?.close(); });
+process.on("SIGTERM", () => { stopping = true; if (heartbeatTimer) clearInterval(heartbeatTimer); socket?.close(); });
+process.on("SIGINT", () => { stopping = true; if (heartbeatTimer) clearInterval(heartbeatTimer); socket?.close(); });
 
 connect();

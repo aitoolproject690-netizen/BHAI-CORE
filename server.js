@@ -117,10 +117,20 @@ async function readJson(req, maxBytes = 2_000_000) {
 
 const server = http.createServer(async (req, res) => {
   const rid = requestId(req);
+  const url = new URL(req.url, "http://" + (req.headers.host || "localhost"));
+  const adminRateLimitPath = url.pathname === "/dashboard"
+    || url.pathname === "/logout"
+    || url.pathname === "/v1/usage"
+    || url.pathname === "/v1/audit"
+    || url.pathname === "/v1/metrics"
+    || url.pathname === "/v1/keys"
+    || url.pathname.startsWith("/v1/keys/")
+    || url.pathname === "/v1/billing/admin/subscription";
+  const adminRateLimitBypass = adminRateLimitPath && adminAuthorized(req);
   const rawRateIdentity = req.headers["x-bhai-key"]
     ? "api:" + crypto.createHash("sha256").update(String(req.headers["x-bhai-key"])).digest("hex").slice(0, 32)
     : "ip:" + String(req.socket.remoteAddress || "anonymous");
-  const rate = checkRateLimit(rawRateIdentity);
+  const rate = checkRateLimit(rawRateIdentity, { bypass: adminRateLimitBypass });
   const rateCfg = rateLimitInfo();
   res.setHeader("x-ratelimit-limit", String(rateCfg.maxRequests));
   res.setHeader("x-ratelimit-remaining", String(Math.max(0, Number(rate.remaining ?? 0))));
@@ -139,8 +149,6 @@ const server = http.createServer(async (req, res) => {
       });
       return res.end();
     }
-
-    const url = new URL(req.url, "http://" + (req.headers.host || "localhost"));
 
     const incomingHost = String(req.headers.host || "").toLowerCase();
     const routedHost = incomingHost.replace(/:\\d+$/, "");

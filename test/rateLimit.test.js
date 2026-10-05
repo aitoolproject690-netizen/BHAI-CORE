@@ -7,3 +7,6 @@ test("invalid rate limit configuration falls back safely",()=>{resetRateLimits()
 
 
 test("api-key identities can be independently bucketed",()=>{resetRateLimits();const old=process.env.BHAI_RATE_LIMIT_MAX;process.env.BHAI_RATE_LIMIT_MAX="1";assert.equal(checkRateLimit("api:key-a").allowed,true);assert.equal(checkRateLimit("api:key-a").allowed,false);assert.equal(checkRateLimit("api:key-b").allowed,true);if(old===undefined)delete process.env.BHAI_RATE_LIMIT_MAX;else process.env.BHAI_RATE_LIMIT_MAX=old;});
+
+
+test("explicit bypass does not consume the rate-limit bucket",()=>{resetRateLimits();const old=process.env.BHAI_RATE_LIMIT_MAX;process.env.BHAI_RATE_LIMIT_MAX="1";const bypassed=checkRateLimit("admin", { bypass: true });assert.equal(bypassed.allowed,true);assert.equal(bypassed.bypassed,true);assert.equal(checkRateLimit("admin").allowed,true);assert.equal(checkRateLimit("admin").allowed,false);if(old===undefined)delete process.env.BHAI_RATE_LIMIT_MAX;else process.env.BHAI_RATE_LIMIT_MAX=old;});

@@ -24,8 +24,9 @@ function evictExpired(now, windowMs) {
   }
 }
 
-export function checkRateLimit(key) {
+export function checkRateLimit(key, options = {}) {
   const cfg = rateLimitInfo();
+  if (options?.bypass) return { allowed: true, remaining: cfg.maxRequests, bypassed: true };
   if (!cfg.enabled) return { allowed: true };
 
   const now = Date.now();

@@ -6,12 +6,14 @@ function timeoutSignal(ms = 60000) {
 function endpoint(baseUrl) {
   const base = String(baseUrl || "").trim().replace(/\/+$/, "");
   if (!base) throw new Error("BHAI engine URL is not configured");
+  if (isMobileTarget(base)) return "/v1/chat/completions";
   return base.endsWith("/v1") ? base + "/chat/completions" : base + "/v1/chat/completions";
 }
 
 function modelsEndpoint(baseUrl) {
   const base = String(baseUrl || "").trim().replace(/\/+$/, "");
   if (!base) throw new Error("BHAI engine URL is not configured");
+  if (isMobileTarget(base)) return "/v1/models";
   return base.endsWith("/v1") ? base + "/models" : base + "/v1/models";
 }
 
@@ -25,16 +27,12 @@ function isMobileTarget(url) {
   return String(url || "").startsWith("mobile://");
 }
 
-function targetPath(url) {
-  return new URL(String(url).replace(/^mobile:\/\//, "http://")).pathname;
-}
-
 async function requestTarget(target, path, options = {}) {
   if (!isMobileTarget(target.url)) {
     return fetch(path, options);
   }
   return requestMobileNode({
-    path: new URL(path).pathname,
+    path: String(path || "/"),
     method: options.method || "GET",
     headers: options.headers || {},
     body: options.body || null

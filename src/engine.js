@@ -75,6 +75,8 @@ export async function bhaiEngineProbe(config = {}) {
   if (!targets.length) throw new Error("BHAI engine URL is not configured");
 
   const errors = [];
+  let firstReachableMismatch = null;
+
   for (const target of targets) {
     try {
       const response = await fetch(modelsEndpoint(target.url), {
@@ -101,11 +103,24 @@ export async function bhaiEngineProbe(config = {}) {
         };
       }
 
+      if (!firstReachableMismatch) {
+        firstReachableMismatch = {
+          ok: false,
+          reachable: true,
+          model: targetModel,
+          model_available: false,
+          available_models: availableModels.slice(0, 20),
+          target_role: target.role,
+          fallback_used: target.role === "fallback"
+        };
+      }
       errors.push(target.role + ": model unavailable");
     } catch (error) {
       errors.push(target.role + ": " + String(error?.message || error).slice(0, 240));
     }
   }
+
+  if (firstReachableMismatch) return firstReachableMismatch;
 
   const error = new Error("All BHAI engine targets failed: " + errors.join(" | "));
   error.status = 503;

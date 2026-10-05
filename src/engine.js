@@ -1,3 +1,4 @@
+import { requestMobileNode } from "./mobileNode.js";
 function timeoutSignal(ms = 60000) {
   return AbortSignal.timeout ? AbortSignal.timeout(ms) : undefined;
 }
@@ -18,6 +19,26 @@ function headers(key) {
   const result = { "content-type": "application/json" };
   if (key) result.authorization = "Bearer " + key;
   return result;
+}
+
+function isMobileTarget(url) {
+  return String(url || "").startsWith("mobile://");
+}
+
+function targetPath(url) {
+  return new URL(String(url).replace(/^mobile:\/\//, "http://")).pathname;
+}
+
+async function requestTarget(target, path, options = {}) {
+  if (!isMobileTarget(target.url)) {
+    return fetch(path, options);
+  }
+  return requestMobileNode({
+    path: new URL(path).pathname,
+    method: options.method || "GET",
+    headers: options.headers || {},
+    body: options.body || null
+  });
 }
 
 export function engineTargets({
@@ -79,7 +100,7 @@ export async function bhaiEngineProbe(config = {}) {
 
   for (const target of targets) {
     try {
-      const response = await fetch(modelsEndpoint(target.url), {
+      const response = await requestTarget(target, modelsEndpoint(target.url), {
         method: "GET",
         headers: headers(target.key),
         signal: timeoutSignal()
@@ -134,7 +155,7 @@ export async function bhaiEngineChat(config = {}) {
   const errors = [];
   for (const target of targets) {
     try {
-      const response = await fetch(endpoint(target.url), {
+      const response = await requestTarget(target, endpoint(target.url), {
         method: "POST",
         headers: headers(target.key),
         body: JSON.stringify({
@@ -175,7 +196,7 @@ export async function bhaiEngineChatStream(config = {}) {
   for (const target of targets) {
     let emitted = false;
     try {
-      const response = await fetch(endpoint(target.url), {
+      const response = await requestTarget(target, endpoint(target.url), {
         method: "POST",
         headers: headers(target.key),
         body: JSON.stringify({
@@ -188,6 +209,34 @@ export async function bhaiEngineChatStream(config = {}) {
       });
 
       if (!response.ok) await readJson(response);
+
+      if (isMobileTarget(target.url)) {
+        const raw = await response.text();
+        const lines = String(raw).split("\n");
+        let fullText = "";
+        for (const line of lines) {
+          if (!line.startsWith("data:")) continue;
+          const payload = line.slice(5).trim();
+          if (!payload || payload === "[DONE]") continue;
+          try {
+            const data = JSON.parse(payload);
+            const token = data?.choices?.[0]?.delta?.content || data?.output?.delta || "";
+            if (token) {
+              emitted = true;
+              fullText += token;
+              await config.onToken(token);
+            }
+          } catch {}
+        }
+        if (!fullText) throw new Error("BHAI mobile engine returned no stream text");
+        return {
+          text: fullText,
+          model: target.model,
+          target_role: target.role,
+          fallback_used: target.role === "fallback"
+        };
+      }
+
       if (!response.body) throw new Error("BHAI engine returned no stream body");
 
       const reader = response.body.getReader();

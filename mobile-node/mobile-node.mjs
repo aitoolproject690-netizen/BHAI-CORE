@@ -75,6 +75,10 @@ function connect() {
   socket.addEventListener("message", async event => {
     let message;
     try { message = JSON.parse(String(event.data)); } catch { return; }
+    if (message?.type === "heartbeat_ack") {
+      console.log("BHAI mobile node heartbeat ok");
+      return;
+    }
     if (message?.type !== "request") return;
     const response = await handleRequest(message);
     if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(response));
@@ -82,7 +86,8 @@ function connect() {
   socket.addEventListener("error", error => {
     console.error("BHAI mobile node websocket:", error?.message || error);
   });
-  socket.addEventListener("close", () => {
+  socket.addEventListener("close", event => {
+    console.log("BHAI mobile node close:", Number(event.code || 0), String(event.reason || ""));
     if (heartbeatTimer) clearInterval(heartbeatTimer);
     heartbeatTimer = null;
     console.log("BHAI mobile node disconnected; retrying");

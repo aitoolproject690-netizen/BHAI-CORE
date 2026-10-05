@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { getStore, updateStore } from "./store.js";
-import { expandModulePermissions, modulesForScopes, normalizeModuleIds } from "./modules.js";
+import { expandModulePermissions, normalizeModuleIds } from "./modules.js";
 
 function hash(value) {
   return crypto.createHash("sha256").update(value).digest("hex");
@@ -38,7 +38,7 @@ export async function createApiKey(name = "default", scopes, limits = {}, module
     };
     return store;
   });
-  return { id, key: raw, name: String(name || "default").slice(0, 120), limits: cleanLimits, scopes: cleanScopes, modules: cleanModules ?? modulesForScopes(cleanScopes) };
+  return { id, key: raw, name: String(name || "default").slice(0, 120), limits: cleanLimits, scopes: cleanScopes, modules: cleanModules ?? null };
 }
 
 export async function revokeApiKey(id) {
@@ -67,7 +67,7 @@ export async function rotateApiKey(id) {
       createdAt: new Date().toISOString(), revokedAt: undefined,
       active: true, rotatedFrom: id
     };
-    result = { id: newId, key: raw, name: current.name, scopes: current.scopes, modules: current.modules ?? modulesForScopes(current.scopes), limits: current.limits || {} };
+    result = { id: newId, key: raw, name: current.name, scopes: current.scopes, modules: current.modules ?? null, limits: current.limits || {} };
     return store;
   });
   return result;
@@ -85,14 +85,14 @@ export async function authenticate(value) {
   const digest = hash(value);
   const store = await getStore();
   for (const item of Object.values(store.apiKeys)) {
-    if (item.active && hashesEqual(item.hash, digest)) return { id: item.id, name: item.name, scopes: item.scopes, modules: item.modules ?? modulesForScopes(item.scopes), limits: item.limits || {} };
+    if (item.active && hashesEqual(item.hash, digest)) return { id: item.id, name: item.name, scopes: item.scopes, modules: item.modules ?? null, limits: item.limits || {} };
   }
   return null;
 }
 
 export async function listApiKeys() {
   const store = await getStore();
-  return Object.values(store.apiKeys).map(({ hash, ...safe }) => ({ ...safe, modules: safe.modules ?? modulesForScopes(safe.scopes) }));
+  return Object.values(store.apiKeys).map(({ hash, ...safe }) => ({ ...safe, modules: safe.modules ?? null }));
 }
 
 

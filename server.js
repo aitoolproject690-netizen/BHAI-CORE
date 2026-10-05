@@ -544,6 +544,37 @@ const server = http.createServer(async (req, res) => {
       return send(res, 202, { ok:true, event:"push", repository, branch, commit, triggered:hooks.length }, rid);
     }
 
+    if (url.pathname === "/v1/engine/health" && req.method === "GET") {
+      const configured = Boolean(String(cfg.engine.url || "").trim() && String(cfg.engine.model || "").trim());
+      if (!configured) {
+        return send(res, 503, {
+          ok: false,
+          provider: "engine",
+          configured: false,
+          reachable: false,
+          model: cfg.engine.model,
+          error: "BHAI engine is not configured"
+        }, rid);
+      }
+      try {
+        const probe = await bhaiEngineProbe(cfg.engine);
+        return send(res, probe.ok ? 200 : 503, {
+          provider: "engine",
+          configured: true,
+          ...probe
+        }, rid);
+      } catch (error) {
+        return send(res, Number(error?.status) >= 400 ? Number(error.status) : 503, {
+          ok: false,
+          provider: "engine",
+          configured: true,
+          reachable: false,
+          model: cfg.engine.model,
+          error: String(error?.message || "BHAI engine probe failed").slice(0, 500)
+        }, rid);
+      }
+    }
+
     const apiIdentity = req.headers["x-bhai-key"]
       ? await authenticate(req.headers["x-bhai-key"])
       : null;
@@ -708,37 +739,6 @@ const server = http.createServer(async (req, res) => {
 
     if (url.pathname === "/v1/providers" && req.method === "GET")
       return send(res, 200, { ok: true, providers: getProviderStatus() }, rid);
-
-    if (url.pathname === "/v1/engine/health" && req.method === "GET") {
-      const configured = Boolean(String(cfg.engine.url || "").trim() && String(cfg.engine.model || "").trim());
-      if (!configured) {
-        return send(res, 503, {
-          ok: false,
-          provider: "engine",
-          configured: false,
-          reachable: false,
-          model: cfg.engine.model,
-          error: "BHAI engine is not configured"
-        }, rid);
-      }
-      try {
-        const probe = await bhaiEngineProbe(cfg.engine);
-        return send(res, probe.ok ? 200 : 503, {
-          provider: "engine",
-          configured: true,
-          ...probe
-        }, rid);
-      } catch (error) {
-        return send(res, Number(error?.status) >= 400 ? Number(error.status) : 503, {
-          ok: false,
-          provider: "engine",
-          configured: true,
-          reachable: false,
-          model: cfg.engine.model,
-          error: String(error?.message || "BHAI engine probe failed").slice(0, 500)
-        }, rid);
-      }
-    }
 
     if (url.pathname === "/v1/models" && req.method === "GET") {
       const probe = url.searchParams.get("probe") === "true";

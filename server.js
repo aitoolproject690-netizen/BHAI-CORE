@@ -261,12 +261,193 @@ const server = http.createServer(async (req, res) => {
       </div></div>
       <div class="note">🔒 Master credentials are only used for the request. The generated API key is shown once; save it securely. Provider keys are never displayed here.</div>
       <script>
-      document.getElementById("create").onclick=async()=>{const n=document.getElementById("n").value||"my-app",out=document.getElementById("out");out.textContent="Creating…";try{const r=await fetch("/v1/keys",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({name:n,limits:{maxRequests:Number(document.getElementById("limitReq").value)||undefined,maxInputChars:Number(document.getElementById("limitChars").value)||undefined}})});const d=await r.json();if(r.status===401){location.href="/login";return}out.textContent=r.ok?"API KEY (save now):\n"+d.key+"\n\nKey ID: "+d.id:JSON.stringify(d,null,2);loadKeys()}catch(e){out.textContent=String(e)}};document.getElementById("logout").onclick=async()=>{await fetch("/logout",{method:"POST"});location.href="/login"};
-async function loadKeys(){const box=document.getElementById("keys");box.textContent="Loading…";try{const r=await fetch("/v1/keys");if(r.status===401){location.href="/login";return}const d=await r.json();if(!r.ok)throw new Error(d.error||"Failed");if(!d.keys.length){box.innerHTML="<p>No API keys yet.</p>";return}box.innerHTML=d.keys.map(k=>'<div class="card" style="margin-top:10px"><b>'+k.name+' <span class="pill '+(k.active?'ready':'')+'">'+(k.active?'ACTIVE':'REVOKED')+'</span></b><span class="url">ID: '+k.id+' · Created: '+k.createdAt+'</span><span class="url">Limits: '+JSON.stringify(k.limits||{})+' · Scopes: '+JSON.stringify(k.scopes||[])+'</span><div class="row" style="margin-top:10px"><button onclick="showUsage(\''+k.id+'\')">Usage</button>'+(k.active?'<button onclick="rotateKey(\''+k.id+'\')">Rotate</button><button onclick="revokeKey(\''+k.id+'\')" style="background:#2d2330;border-color:#563746">Revoke</button>':'')+'</div></div>').join("")}catch(e){box.textContent=String(e.message||e)}} 
-async function showUsage(id){const r=await fetch("/v1/keys/"+id+"/usage");const d=await r.json();document.getElementById("out").textContent=r.ok?"Usage for "+id+":\n"+JSON.stringify(d.usage,null,2):JSON.stringify(d,null,2)}
-async function rotateKey(id){if(!confirm("Rotate this key? Old key will stop working."))return;const r=await fetch("/v1/keys/"+id+"/rotate",{method:"POST"});const d=await r.json();document.getElementById("out").textContent=r.ok?"NEW API KEY (save now):\n"+d.key+"\n\nKey ID: "+d.id:JSON.stringify(d,null,2);loadKeys()}
-async function revokeKey(id){if(!confirm("Revoke this key?"))return;const r=await fetch("/v1/keys/"+id,{method:"DELETE"});const d=await r.json();document.getElementById("out").textContent=JSON.stringify(d,null,2);loadKeys()}
-document.getElementById("refreshKeys").onclick=loadKeys;loadKeys();</script></main></body></html>`;
+      const $ = id => document.getElementById(id);
+      const NL = String.fromCharCode(10);
+      const out = $("out");
+
+      async function readJsonResponse(response) {
+        const text = await response.text();
+        if (!text) return {};
+        try {
+          return JSON.parse(text);
+        } catch {
+          return { raw: text };
+        }
+      }
+
+      async function apiJson(path, options = {}) {
+        const response = await fetch(path, { credentials: "same-origin", ...options });
+        const data = await readJsonResponse(response);
+        if (response.status === 401) {
+          location.href = "/login";
+          throw new Error("Dashboard session expired");
+        }
+        if (!response.ok) {
+          throw new Error(
+            String(data.error || data.message || data.raw || ("HTTP " + response.status))
+          );
+        }
+        return data;
+      }
+
+      async function createApiKey() {
+        const button = $("create");
+        const name = $("n").value.trim() || "my-app";
+        button.disabled = true;
+        out.textContent = "Creating…";
+        try {
+          const data = await apiJson("/v1/keys", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              name,
+              limits: {
+                maxRequests: Number($("limitReq").value) || undefined,
+                maxInputChars: Number($("limitChars").value) || undefined
+              }
+            })
+          });
+          if (!data.key || !data.id) throw new Error("API key response is incomplete");
+          out.textContent = [
+            "API KEY (save now):",
+            data.key,
+            "",
+            "Key ID: " + data.id
+          ].join(NL);
+          await loadKeys();
+        } catch (error) {
+          console.error("Create API key failed", error);
+          out.textContent = "Create API key failed: " + String(error.message || error);
+        } finally {
+          button.disabled = false;
+        }
+      }
+
+      async function loadKeys() {
+        const box = $("keys");
+        box.textContent = "Loading…";
+        try {
+          const data = await apiJson("/v1/keys");
+          const keys = Array.isArray(data.keys) ? data.keys : [];
+          if (!keys.length) {
+            const empty = document.createElement("p");
+            empty.textContent = "No API keys yet.";
+            box.replaceChildren(empty);
+            return;
+          }
+
+          const fragment = document.createDocumentFragment();
+          for (const key of keys) {
+            const card = document.createElement("div");
+            card.className = "card";
+            card.style.marginTop = "10px";
+
+            const title = document.createElement("b");
+            title.textContent = String(key.name || "unnamed");
+            const pill = document.createElement("span");
+            pill.className = "pill" + (key.active ? " ready" : "");
+            pill.textContent = key.active ? "ACTIVE" : "REVOKED";
+            title.appendChild(document.createTextNode(" "));
+            title.appendChild(pill);
+
+            const meta = document.createElement("span");
+            meta.className = "url";
+            meta.textContent = "ID: " + String(key.id || "") + " · Created: " + String(key.createdAt || "");
+
+            const details = document.createElement("span");
+            details.className = "url";
+            details.textContent =
+              "Limits: " + JSON.stringify(key.limits || {}) +
+              " · Scopes: " + JSON.stringify(key.scopes || []);
+
+            const row = document.createElement("div");
+            row.className = "row";
+            row.style.marginTop = "10px";
+
+            const usageButton = document.createElement("button");
+            usageButton.type = "button";
+            usageButton.textContent = "Usage";
+            usageButton.addEventListener("click", () => showUsage(key.id));
+            row.appendChild(usageButton);
+
+            if (key.active) {
+              const rotateButton = document.createElement("button");
+              rotateButton.type = "button";
+              rotateButton.textContent = "Rotate";
+              rotateButton.addEventListener("click", () => rotateKey(key.id));
+              row.appendChild(rotateButton);
+
+              const revokeButton = document.createElement("button");
+              revokeButton.type = "button";
+              revokeButton.textContent = "Revoke";
+              revokeButton.style.background = "#2d2330";
+              revokeButton.style.borderColor = "#563746";
+              revokeButton.addEventListener("click", () => revokeKey(key.id));
+              row.appendChild(revokeButton);
+            }
+
+            card.appendChild(title);
+            card.appendChild(meta);
+            card.appendChild(details);
+            card.appendChild(row);
+            fragment.appendChild(card);
+          }
+          box.replaceChildren(fragment);
+        } catch (error) {
+          box.textContent = String(error.message || error);
+        }
+      }
+
+      async function showUsage(id) {
+        try {
+          const data = await apiJson("/v1/keys/" + encodeURIComponent(id) + "/usage");
+          out.textContent = ["Usage for " + id + ":", JSON.stringify(data.usage || {}, null, 2)].join(NL);
+        } catch (error) {
+          out.textContent = "Usage lookup failed: " + String(error.message || error);
+        }
+      }
+
+      async function rotateKey(id) {
+        if (!confirm("Rotate this key? Old key will stop working.")) return;
+        try {
+          const data = await apiJson("/v1/keys/" + encodeURIComponent(id) + "/rotate", { method: "POST" });
+          if (!data.key || !data.id) throw new Error("API key response is incomplete");
+          out.textContent = [
+            "NEW API KEY (save now):",
+            data.key,
+            "",
+            "Key ID: " + data.id
+          ].join(NL);
+          await loadKeys();
+        } catch (error) {
+          out.textContent = "Rotate failed: " + String(error.message || error);
+        }
+      }
+
+      async function revokeKey(id) {
+        if (!confirm("Revoke this key?")) return;
+        try {
+          const data = await apiJson("/v1/keys/" + encodeURIComponent(id), { method: "DELETE" });
+          out.textContent = JSON.stringify(data, null, 2);
+          await loadKeys();
+        } catch (error) {
+          out.textContent = "Revoke failed: " + String(error.message || error);
+        }
+      }
+
+      $("create").type = "button";
+      $("create").addEventListener("click", createApiKey);
+      $("logout").type = "button";
+      $("logout").addEventListener("click", async () => {
+        try {
+          await fetch("/logout", { method: "POST", credentials: "same-origin" });
+        } catch {}
+        location.href = "/login";
+      });
+      $("refreshKeys").type = "button";
+      $("refreshKeys").addEventListener("click", loadKeys);
+      loadKeys();
+      </script></main></body></html>`;
       res.writeHead(200, {"content-type":"text/html; charset=utf-8","cache-control":"no-store"});
       return res.end(html);
     }

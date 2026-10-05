@@ -142,9 +142,13 @@ const server = http.createServer(async (req, res) => {
     || url.pathname.startsWith("/v1/keys/")
     || url.pathname === "/v1/billing/admin/subscription";
   const adminRateLimitBypass = adminRateLimitPath && adminAuthorized(req);
+  const forwardedFor = String(req.headers["x-forwarded-for"] || "")
+    .split(",")[0]
+    .trim();
+  const clientIp = forwardedFor || String(req.socket.remoteAddress || "anonymous");
   const rawRateIdentity = req.headers["x-bhai-key"]
     ? "api:" + crypto.createHash("sha256").update(String(req.headers["x-bhai-key"])).digest("hex").slice(0, 32)
-    : "ip:" + String(req.socket.remoteAddress || "anonymous");
+    : "ip:" + clientIp;
   const rate = checkRateLimit(rawRateIdentity, { bypass: adminRateLimitBypass });
   const rateCfg = rateLimitInfo();
   res.setHeader("x-ratelimit-limit", String(rateCfg.maxRequests));

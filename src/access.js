@@ -2,8 +2,13 @@ export function hasApiAccess({
   masterAuthEnabled,
   masterAuthenticated = false,
   sessionAuthenticated = false,
-  apiAuthenticated = false
+  apiAuthenticated = false,
+  coreApiAuthenticated = false,
+  coreApiConfigured = false
 } = {}) {
-  if (!masterAuthEnabled) return true;
-  return Boolean(masterAuthenticated || sessionAuthenticated || apiAuthenticated);
+  if (masterAuthEnabled) {
+    return Boolean(masterAuthenticated || sessionAuthenticated || apiAuthenticated || coreApiAuthenticated);
+  }
+  if (coreApiConfigured) return Boolean(coreApiAuthenticated);
+  return true;
 }

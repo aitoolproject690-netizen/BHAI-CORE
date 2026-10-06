@@ -173,7 +173,7 @@ export async function bhaiEngineChat(config = {}) {
         body: JSON.stringify({
           model: target.model,
           messages,
-          temperature: localModel ? 0 : (config.temperature ?? 0.2),
+          temperature: localModel ? 0.2 : (config.temperature ?? 0.2),
           max_tokens: localModel ? Math.min(Number(config.max_tokens ?? 64), 64) : (config.max_tokens ?? 256),
           stream: false
         }),

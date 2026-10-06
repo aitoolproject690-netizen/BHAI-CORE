@@ -165,10 +165,7 @@ export async function bhaiEngineChat(config = {}) {
       // BHAI-X system/tool context overwhelms this tiny local model and can
       // produce prompt-copy/garbled tokens. Preserve the latest user request.
       const messages = localModel
-        ? [
-            { role: "system", content: "Answer the user's request directly and briefly. Do not repeat the prompt." },
-            ...(sourceMessages.filter(m => m?.role === "user").slice(-1))
-          ]
+        ? sourceMessages.filter(m => m?.role === "user").slice(-1)
         : sourceMessages;
       const response = await requestTarget(target, endpoint(target.url), {
         method: "POST",
@@ -176,7 +173,7 @@ export async function bhaiEngineChat(config = {}) {
         body: JSON.stringify({
           model: target.model,
           messages,
-          temperature: config.temperature ?? 0.2,
+          temperature: localModel ? 0 : (config.temperature ?? 0.2),
           max_tokens: localModel ? Math.min(Number(config.max_tokens ?? 64), 64) : (config.max_tokens ?? 256),
           stream: false
         }),

@@ -12,6 +12,20 @@ Independent AI foundation for the BHAI ecosystem.
 - Owner-scoped cloud/domain infrastructure
 - No lock-in to Render, Replit, or one AI provider
 
+## Self-hosted deployment (no Render dependency)
+
+BHAI-CORE includes a single-host Docker deployment bundle. The same process can expose the public Core API and the built-in `/v1/mobile-node` WebSocket relay, so a user-owned VPS can replace the Render Core + separate relay pair.
+
+Build and run on your own Linux host:
+
+```bash
+cp ops/self-host.env.example .env
+# Edit .env and set strong private values.
+docker compose -f docker-compose.selfhost.yml up -d --build
+```
+
+The container keeps the JSON store on the named `bhai-core-data` volume. For this phone-engine layout, set `BHAI_ENGINE_URL=mobile://local` and point the Mobile Node at the host's BHAI-CORE URL. The API and node tokens must be unique strong secrets and must never be committed.
+
 ## Endpoints
 
 Core:

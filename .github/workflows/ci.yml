@@ -47,4 +47,27 @@ jobs:
           BHAI_STORE_PG_SSL: "false"
         run: node --test test/postgresStore.integration.test.js
 
+      - name: Build self-hosted Docker image
+        run: docker build --tag bhai-core-ci .
+      - name: Smoke-test self-hosted container
+        run: |
+          set -e
+          docker run --detach --name bhai-core-ci-run \
+            -e HOST=0.0.0.0 \
+            -e PORT=10000 \
+            -e BHAI_STORE_BACKEND=json \
+            -e BHAI_STORE_FILE=/tmp/bhai-core-store.json \
+            -p 10000:10000 \
+            bhai-core-ci
+          trap 'docker rm -f bhai-core-ci-run >/dev/null 2>&1 || true' EXIT
+          for i in $(seq 1 30); do
+            if curl --fail --silent --show-error http://127.0.0.1:10000/health >/tmp/bhai-core-health.json; then
+              node -e 'const fs=require("fs"); const d=JSON.parse(fs.readFileSync("/tmp/bhai-core-health.json","utf8")); if(d.ok!==true) process.exit(1); console.log(JSON.stringify({ok:d.ok,service:d.service,storage:d.storage?.backend}));'
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs bhai-core-ci-run
+          exit 1
+
 # CI trigger verification

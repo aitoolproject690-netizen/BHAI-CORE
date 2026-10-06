@@ -1,0 +1,24 @@
+services:
+  caddy:
+    image: caddy:2.11.6-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      BHAI_DOMAIN: ${BHAI_DOMAIN:?Set BHAI_DOMAIN to your public DNS name}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - bhai-public
+
+volumes:
+  caddy-data:
+  caddy-config:
+
+networks:
+  bhai-public:
+    external: true
+    name: bhai-public

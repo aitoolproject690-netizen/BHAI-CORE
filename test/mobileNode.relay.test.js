@@ -70,13 +70,13 @@ test("mobile relay v1 authenticates and relays a bounded request", async () => {
       id: relayRequest.id,
       ok: true,
       status: 200,
-      text: JSON.stringify({ ok: true, source: "mobile-node-test" })
+      body: JSON.stringify({ ok: true, source: "mobile-node-test" })
     }));
 
     const response = await requestPromise;
     assert.equal(response.ok, true);
     assert.equal(response.status, 200);
-    assert.match(response.text, /mobile-node-test/);
+    assert.match(await response.text(), /mobile-node-test/);
   } finally {
     ws.close();
     await new Promise(resolve => setTimeout(resolve, 50));

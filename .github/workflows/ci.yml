@@ -48,3 +48,5 @@ jobs:
         run: node --test test/postgresStore.integration.test.js
 
 # CI trigger verification
+
+# CI verification for local SmolLM2 relay fix

@@ -165,7 +165,8 @@ export async function bhaiEngineChat(config = {}) {
         body: JSON.stringify({
           model: target.model,
           messages: config.messages,
-          temperature: config.temperature ?? 0.7,
+          temperature: config.temperature ?? 0.2,
+          top_k: config.top_k ?? 1,
           stream: false
         }),
         signal: timeoutSignal()
@@ -206,7 +207,8 @@ export async function bhaiEngineChatStream(config = {}) {
         body: JSON.stringify({
           model: target.model,
           messages: config.messages,
-          temperature: config.temperature ?? 0.7,
+          temperature: config.temperature ?? 0.2,
+          top_k: config.top_k ?? 1,
           stream: true
         }),
         signal: timeoutSignal()

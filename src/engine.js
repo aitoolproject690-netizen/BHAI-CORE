@@ -1,4 +1,5 @@
 import { requestMobileNode } from "./mobileNode.js";
+import { requestMobileRelay } from "./mobileRelay.js";
 function timeoutSignal(ms = 60000) {
   return AbortSignal.timeout ? AbortSignal.timeout(ms) : undefined;
 }
@@ -27,13 +28,28 @@ function isMobileTarget(url) {
   return String(url || "").startsWith("mobile://");
 }
 
+function isMobileRelayTarget(url) {
+  return String(url || "").startsWith("mobile://relay");
+}
+
 async function requestTarget(target, path, options = {}) {
+  if (isMobileRelayTarget(target.url)) {
+    const forwardedHeaders = { ...(options.headers || {}) };
+    delete forwardedHeaders.authorization;
+    delete forwardedHeaders.Authorization;
+    return requestMobileRelay({
+      path: String(path || "/"),
+      method: options.method || "GET",
+      headers: forwardedHeaders,
+      body: options.body || null,
+      signal: options.signal
+    });
+  }
+
   if (!isMobileTarget(target.url)) {
     return fetch(path, options);
   }
-  // The mobile node owns authentication to the local engine.
-  // Do not forward BHAI-CORE's engine key to the phone; the node injects
-  // its local Authorization header before calling llama-server.
+
   const forwardedHeaders = { ...(options.headers || {}) };
   delete forwardedHeaders.authorization;
   delete forwardedHeaders.Authorization;

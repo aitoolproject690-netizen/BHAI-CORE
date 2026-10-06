@@ -56,6 +56,9 @@ jobs:
         run: |
           BHAI_MOBILE_NODE_TOKEN=ci-node-token BHAI_CORE_BOOTSTRAP_API_KEY=ci-bootstrap BHAI_CORE_USERNAME=ci-admin BHAI_CORE_PASSWORD=ci-password docker compose -f docker-compose.selfhost.yml config -q
           BHAI_DOMAIN=example.test docker compose -f docker-compose.public.yml config -q
+      - name: Validate Caddy configuration
+        run: |
+          docker run --rm -e BHAI_DOMAIN=example.test -v "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2.11.6-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
       - name: Build self-hosted Docker image
         run: docker build --tag bhai-core-ci .
       - name: Smoke-test self-hosted container

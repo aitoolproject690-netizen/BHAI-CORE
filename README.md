@@ -187,3 +187,9 @@ This separates the BHAI API/control plane from the model runtime. A future BHAI 
 ## Audit verification
 
 Dashboard authentication, API-key access, and Render client-identity handling were re-verified on 2026-10-05.
+
+## Public self-host gateway
+
+For a user-owned Linux/VPS host, Caddy can terminate public HTTPS and route one domain: `/v1/*` plus Core health/dashboard routes go to BHAI-CORE, while the BHAI-X web app stays on the same origin. Caddy also proxies WebSocket upgrades for the mobile-node connection.
+
+Start the Core stack first so the shared `bhai-public` Docker network exists, then run `docker compose -f docker-compose.public.yml up -d`. Point the chosen DNS name at the host and set `BHAI_DOMAIN` in the gateway environment. Caddy obtains and renews public certificates automatically for qualifying DNS names.

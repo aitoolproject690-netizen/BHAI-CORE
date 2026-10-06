@@ -47,6 +47,10 @@ jobs:
           BHAI_STORE_PG_SSL: "false"
         run: node --test test/postgresStore.integration.test.js
 
+      - name: Validate self-hosted Compose files
+        run: |
+          BHAI_MOBILE_NODE_TOKEN=ci-node-token BHAI_CORE_BOOTSTRAP_API_KEY=ci-bootstrap BHAI_CORE_USERNAME=ci-admin BHAI_CORE_PASSWORD=ci-password docker compose -f docker-compose.selfhost.yml config -q
+          BHAI_DOMAIN=example.test docker compose -f docker-compose.public.yml config -q
       - name: Build self-hosted Docker image
         run: docker build --tag bhai-core-ci .
       - name: Smoke-test self-hosted container

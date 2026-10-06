@@ -1,0 +1,5 @@
+{$BHAI_DOMAIN} {
+  @core path /v1/* /health /ready /dashboard /login /logout
+  reverse_proxy @core bhai-core:10000
+  reverse_proxy bhai-x:10000
+}

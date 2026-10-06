@@ -46,3 +46,5 @@ jobs:
           BHAI_STORE_PG_TABLE: bhai_core_ci_store
           BHAI_STORE_PG_SSL: "false"
         run: node --test test/postgresStore.integration.test.js
+
+# CI trigger verification

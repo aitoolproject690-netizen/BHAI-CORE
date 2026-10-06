@@ -159,14 +159,25 @@ export async function bhaiEngineChat(config = {}) {
   const errors = [];
   for (const target of targets) {
     try {
+      const localModel = /smollm2/i.test(String(target.model || ""));
+      const sourceMessages = Array.isArray(config.messages) ? config.messages : [];
+      // SmolLM2 135M is intentionally kept in a compact prompt mode. Large
+      // BHAI-X system/tool context overwhelms this tiny local model and can
+      // produce prompt-copy/garbled tokens. Preserve the latest user request.
+      const messages = localModel
+        ? [
+            { role: "system", content: "Answer the user's request directly and briefly. Do not repeat the prompt." },
+            ...(sourceMessages.filter(m => m?.role === "user").slice(-1))
+          ]
+        : sourceMessages;
       const response = await requestTarget(target, endpoint(target.url), {
         method: "POST",
         headers: headers(target.key),
         body: JSON.stringify({
           model: target.model,
-          messages: config.messages,
+          messages,
           temperature: config.temperature ?? 0.2,
-          max_tokens: config.max_tokens ?? 256,
+          max_tokens: localModel ? Math.min(Number(config.max_tokens ?? 64), 64) : (config.max_tokens ?? 256),
           stream: false
         }),
         signal: timeoutSignal()
@@ -201,14 +212,22 @@ export async function bhaiEngineChatStream(config = {}) {
   for (const target of targets) {
     let emitted = false;
     try {
+      const localModel = /smollm2/i.test(String(target.model || ""));
+      const sourceMessages = Array.isArray(config.messages) ? config.messages : [];
+      const messages = localModel
+        ? [
+            { role: "system", content: "Answer the user's request directly and briefly. Do not repeat the prompt." },
+            ...(sourceMessages.filter(m => m?.role === "user").slice(-1))
+          ]
+        : sourceMessages;
       const response = await requestTarget(target, endpoint(target.url), {
         method: "POST",
         headers: headers(target.key),
         body: JSON.stringify({
           model: target.model,
-          messages: config.messages,
+          messages,
           temperature: config.temperature ?? 0.2,
-          max_tokens: config.max_tokens ?? 256,
+          max_tokens: localModel ? Math.min(Number(config.max_tokens ?? 64), 64) : (config.max_tokens ?? 256),
           stream: true
         }),
         signal: timeoutSignal()

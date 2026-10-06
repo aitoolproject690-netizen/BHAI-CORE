@@ -31,10 +31,16 @@ async function requestTarget(target, path, options = {}) {
   if (!isMobileTarget(target.url)) {
     return fetch(path, options);
   }
+  // The mobile node owns authentication to the local engine.
+  // Do not forward BHAI-CORE's engine key to the phone; the node injects
+  // its local Authorization header before calling llama-server.
+  const forwardedHeaders = { ...(options.headers || {}) };
+  delete forwardedHeaders.authorization;
+  delete forwardedHeaders.Authorization;
   return requestMobileNode({
     path: String(path || "/"),
     method: options.method || "GET",
-    headers: options.headers || {},
+    headers: forwardedHeaders,
     body: options.body || null
   });
 }

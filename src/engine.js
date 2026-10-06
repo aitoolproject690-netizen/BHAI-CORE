@@ -211,11 +211,10 @@ export async function bhaiEngineChatStream(config = {}) {
     try {
       const localModel = /smollm2/i.test(String(target.model || ""));
       const sourceMessages = Array.isArray(config.messages) ? config.messages : [];
+      // Keep the streaming path identical to the proven non-streaming
+      // local SmolLM2 path: only the latest user turn and greedy decoding.
       const messages = localModel
-        ? [
-            { role: "system", content: "Answer the user's request directly and briefly. Do not repeat the prompt." },
-            ...(sourceMessages.filter(m => m?.role === "user").slice(-1))
-          ]
+        ? sourceMessages.filter(m => m?.role === "user").slice(-1)
         : sourceMessages;
       const response = await requestTarget(target, endpoint(target.url), {
         method: "POST",
@@ -223,7 +222,7 @@ export async function bhaiEngineChatStream(config = {}) {
         body: JSON.stringify({
           model: target.model,
           messages,
-          temperature: config.temperature ?? 0.2,
+          temperature: localModel ? 0 : (config.temperature ?? 0.2),
           max_tokens: localModel ? Math.min(Number(config.max_tokens ?? 64), 64) : (config.max_tokens ?? 256),
           stream: true
         }),

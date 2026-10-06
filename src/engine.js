@@ -166,7 +166,7 @@ export async function bhaiEngineChat(config = {}) {
           model: target.model,
           messages: config.messages,
           temperature: config.temperature ?? 0.2,
-          top_k: config.top_k ?? 1,
+          max_tokens: config.max_tokens ?? 256,
           stream: false
         }),
         signal: timeoutSignal()
@@ -208,7 +208,7 @@ export async function bhaiEngineChatStream(config = {}) {
           model: target.model,
           messages: config.messages,
           temperature: config.temperature ?? 0.2,
-          top_k: config.top_k ?? 1,
+          max_tokens: config.max_tokens ?? 256,
           stream: true
         }),
         signal: timeoutSignal()

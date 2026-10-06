@@ -1,4 +1,13 @@
 {$BHAI_DOMAIN} {
+  encode zstd gzip
+
+  header {
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "DENY"
+    Referrer-Policy "no-referrer"
+    Strict-Transport-Security "max-age=31536000"
+  }
+
   @core path /v1/* /health /ready /dashboard /login /logout
   reverse_proxy @core bhai-core:10000
   reverse_proxy bhai-x:10000

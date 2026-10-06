@@ -193,3 +193,35 @@ Dashboard authentication, API-key access, and Render client-identity handling we
 For a user-owned Linux/VPS host, Caddy can terminate public HTTPS and route one domain: `/v1/*` plus Core health/dashboard routes go to BHAI-CORE, while the BHAI-X web app stays on the same origin. Caddy also proxies WebSocket upgrades for the mobile-node connection.
 
 Start the Core stack first so the shared `bhai-public` Docker network exists, then run `docker compose -f docker-compose.public.yml up -d`. Point the chosen DNS name at the host and set `BHAI_DOMAIN` in the gateway environment. Caddy obtains and renews public certificates automatically for qualifying DNS names.
+
+
+## BHAI Garage lifecycle tooling
+
+A user-owned Linux host can bootstrap the full BHAI Garage from this repository without a managed hosting provider. The installer clones the current BHAI-CORE and BHAI-X repositories, generates fresh Core/admin/database secrets, keeps them in host-local files with mode 600, starts the Core and BHAI-X stacks, and puts Caddy in front as the only public entrypoint.
+
+```bash
+export BHAI_DOMAIN=ai.example.com
+bash ops/install-garage.sh
+```
+
+The installer asks only for the existing Mobile Node token and writes generated credentials to /opt/bhai-garage/credentials.txt (or the selected GARAGE_ROOT). It never commits those secrets.
+
+For later updates:
+
+```bash
+bash ops/update-garage.sh
+```
+
+Before upgrades or migrations, create a backup:
+
+```bash
+bash ops/backup-garage.sh
+```
+
+Restore from a backup archive:
+
+```bash
+bash ops/restore-garage.sh /opt/bhai-garage/backups/YYYYMMDDTHHMMSSZ.tar.gz
+```
+
+The self-hosted Core and BHAI-X services do not publish port 10000 directly on the host. Caddy is the public edge and routes Core API/WebSocket traffic and the BHAI-X web app through the same HTTPS origin. BHAI-X uses the internal Docker address http://bhai-core:10000 by default, so its control-plane connection does not depend on a public Core URL.

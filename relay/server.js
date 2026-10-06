@@ -75,10 +75,6 @@ export function createRelayServer({
   nodeToken = process.env.BHAI_RELAY_NODE_TOKEN || "",
   clientToken = process.env.BHAI_RELAY_CLIENT_TOKEN || ""
 } = {}) {
-  if (!nodeToken || !clientToken) {
-    throw new Error("BHAI_RELAY_NODE_TOKEN and BHAI_RELAY_CLIENT_TOKEN are required");
-  }
-
   const pending = new Map();
   let active = null;
   let activeConnectedAt = 0;
@@ -191,12 +187,17 @@ export function createRelayServer({
       return jsonResponse(res, 200, {
         ok: true,
         service: "BHAI-RELAY",
+        configured: Boolean(nodeToken && clientToken),
         connected: nodeConnected()
       });
     }
 
     if (url.pathname !== REQUEST_PATH || req.method !== "POST") {
       return jsonResponse(res, 404, { ok: false, error: "not_found" });
+    }
+
+    if (!clientToken) {
+      return jsonResponse(res, 503, { ok: false, error: "relay_not_configured" });
     }
 
     const auth = String(req.headers.authorization || "");
@@ -233,6 +234,7 @@ export function createRelayServer({
   server.on("upgrade", (req, socket, head) => {
     const url = new URL(req.url || "/", "http://" + (req.headers.host || "localhost"));
     if (url.pathname !== RELAY_PATH) return rejectUpgrade(socket);
+    if (!nodeToken) return rejectUpgrade(socket, 503);
 
     wss.handleUpgrade(req, socket, head, ws => {
       let authenticated = false;

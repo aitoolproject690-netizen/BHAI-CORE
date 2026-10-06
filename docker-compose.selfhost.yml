@@ -4,8 +4,8 @@ services:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
-    ports:
-      - "10000:10000"
+    expose:
+      - "10000"
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0

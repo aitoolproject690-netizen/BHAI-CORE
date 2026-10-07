@@ -1,0 +1,37 @@
+name: Live Mobile Engine Proof
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/live-engine-proof.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live-proof:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for deployed Core and prove live inference
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="https://bhai-core.onrender.com/v1/engine/health?inference=true"
+
+          for attempt in $(seq 1 24); do
+            echo "Live inference proof attempt $attempt/24"
+            body="$(curl --fail --silent --show-error --max-time 25 "$url" || true)"
+            echo "$body"
+
+            if echo "$body" | grep -F '"ok":true' >/dev/null               && echo "$body" | grep -F '"inference":true' >/dev/null               && echo "$body" | grep -F '"model":"smollm2.gguf"' >/dev/null               && echo "$body" | grep -F '"target_role":"primary"' >/dev/null               && echo "$body" | grep -F '"fallback_used":false' >/dev/null               && echo "$body" | grep -F '"text":"BHAI_LOCAL_INFERENCE_OK"' >/dev/null; then
+              echo "LIVE ENGINE PROOF: PASS"
+              exit 0
+            fi
+
+            sleep 5
+          done
+
+          echo "LIVE ENGINE PROOF: FAIL"
+          exit 1

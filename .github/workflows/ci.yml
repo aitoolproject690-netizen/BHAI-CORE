@@ -43,6 +43,7 @@ jobs:
           bash -n ops/backup-garage.sh
           bash -n ops/restore-garage.sh
           bash -n ops/mobile-gateway-start.sh
+          bash -n ops/mobile-gateway-service.sh
       - name: Unit tests
         run: npm test
       - name: PostgreSQL integration test

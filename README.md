@@ -236,5 +236,9 @@ For Termux, use `ops/mobile-gateway-start.sh` for a foreground run or `ops/mobil
 
 The gateway supports TLS through certificate/key files. Plain HTTP is only for controlled connectivity testing because credentials and prompts would otherwise cross the network unencrypted.
 
-BHAI-CORE can target the gateway with an IPv6 literal such as `http://[YOUR_IPV6]:19180` for testing or the equivalent HTTPS URL for production. The current Render relay remains independent until the direct IPv6 path is proven end-to-end.
+For the no-domain direct phone path, the gateway supports a persistent self-signed certificate plus BHAI-CORE certificate-fingerprint pinning. Run `ops/mobile-gateway-tls.sh init` once on the phone, then configure the Core engine with:
+`BHAI_ENGINE_URL=https://[YOUR_IPV6]:19180`
+and `BHAI_ENGINE_TLS_FINGERPRINT=<gateway certificate SHA-256 fingerprint>`. This keeps the engine key off the public edge and removes the need for a third-party relay in the direct path.
+
+BHAI-CORE can target the gateway with an IPv6 literal such as `http://[YOUR_IPV6]:19180` for testing or the equivalent pinned HTTPS URL for production. The current Render relay remains independent until the direct IPv6 path is proven end-to-end.
 

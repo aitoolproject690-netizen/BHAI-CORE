@@ -5,6 +5,7 @@ const PATH = "/v1/mobile-node";
 const AUTH_TIMEOUT_MS = 5000;
 const REQUEST_TIMEOUT_MS = 65000;
 const HEARTBEAT_INTERVAL_MS = 10000;
+const CONNECT_WAIT_TIMEOUT_MS = 12000;
 const MAX_WS_PAYLOAD = 256 * 1024;
 const MAX_BODY = 192 * 1024;
 const MAX_PATH = 2048;
@@ -16,6 +17,7 @@ let activeConnectedAt = 0;
 let activeLastSeenAt = 0;
 let sequence = 0;
 const pending = new Map();
+const connectionWaiters = new Set();
 
 function safeEqual(a, b) {
   if (typeof a !== "string" || typeof b !== "string" || !b) return false;
@@ -130,6 +132,12 @@ export function attachMobileNode(server) {
           activeLastSeenAt = activeConnectedAt;
           startHeartbeat();
           ws.send(JSON.stringify({ type: "auth_ok" }));
+          for (const waiter of connectionWaiters) {
+            clearTimeout(waiter.timer);
+            waiter.resolve(ws);
+          }
+          connectionWaiters.clear();
+          console.log("BHAI mobile node authenticated");
           return;
         }
 
@@ -190,21 +198,26 @@ export function mobileNodeInfo() {
   };
 }
 
-export function requestMobileNode({ path, method = "GET", headers = {}, body = null } = {}) {
-  if (!active || active.readyState !== WebSocket.OPEN) {
-    return Promise.reject(Object.assign(new Error("BHAI mobile node is not connected"), { status: 503 }));
-  }
+async function waitForActive(timeoutMs = CONNECT_WAIT_TIMEOUT_MS) {
+  if (active && active.readyState === WebSocket.OPEN) return active;
 
-  const normalizedMethod = String(method || "GET").toUpperCase();
-  if (!ALLOWED_METHODS.has(normalizedMethod) || !validRequestPath(path) || !validHeaders(headers)) {
-    return Promise.reject(Object.assign(new Error("Invalid mobile node request"), { status: 400 }));
-  }
+  return new Promise((resolve, reject) => {
+    const waiter = {
+      timer: setTimeout(() => {
+        connectionWaiters.delete(waiter);
+        reject(Object.assign(new Error("BHAI mobile node is not connected"), { status: 503 }));
+      }, timeoutMs),
+      resolve: socket => resolve(socket),
+      reject
+    };
+    connectionWaiters.add(waiter);
+  });
+}
 
-  if (body !== null && String(body).length > MAX_BODY) {
-    return Promise.reject(Object.assign(new Error("Mobile node request body too large"), { status: 413 }));
-  }
-
+async function sendMobileNodeRequest({ path, method, headers, body }) {
+  const socket = await waitForActive();
   const id = "mn-" + Date.now().toString(36) + "-" + (++sequence).toString(36);
+
   return new Promise((resolve, rejectPromise) => {
     const timer = setTimeout(() => {
       pending.delete(id);
@@ -214,10 +227,10 @@ export function requestMobileNode({ path, method = "GET", headers = {}, body = n
     pending.set(id, { resolve, reject: rejectPromise, timer });
 
     try {
-      active.send(JSON.stringify({
+      socket.send(JSON.stringify({
         type: "request",
         id,
-        method: normalizedMethod,
+        method,
         path,
         headers,
         body
@@ -228,4 +241,26 @@ export function requestMobileNode({ path, method = "GET", headers = {}, body = n
       rejectPromise(error);
     }
   });
+}
+
+export async function requestMobileNode({ path, method = "GET", headers = {}, body = null } = {}) {
+  const normalizedMethod = String(method || "GET").toUpperCase();
+  if (!ALLOWED_METHODS.has(normalizedMethod) || !validRequestPath(path) || !validHeaders(headers)) {
+    throw Object.assign(new Error("Invalid mobile node request"), { status: 400 });
+  }
+
+  if (body !== null && String(body).length > MAX_BODY) {
+    throw Object.assign(new Error("Mobile node request body too large"), { status: 413 });
+  }
+
+  try {
+    return await sendMobileNodeRequest({ path, method: normalizedMethod, headers, body });
+  } catch (firstError) {
+    if (Number(firstError?.status || 0) >= 400 && Number(firstError?.status || 0) < 500) throw firstError;
+    console.warn("BHAI mobile node request retrying after connection issue", JSON.stringify({
+      status: Number(firstError?.status || 0) || null,
+      error: String(firstError?.message || firstError).slice(0, 200)
+    }));
+    return sendMobileNodeRequest({ path, method: normalizedMethod, headers, body });
+  }
 }

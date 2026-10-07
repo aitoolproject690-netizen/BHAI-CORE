@@ -230,9 +230,9 @@ The self-hosted Core and BHAI-X services do not publish port 10000 directly on t
 
 BHAI-CORE includes an authenticated phone-side gateway for a local OpenAI-compatible engine. It listens on IPv6 while keeping `llama-server` bound to loopback only.
 
-The gateway exposes only `/v1/models`, `/v1/chat/completions`, and `/v1/chat/completions/stream`; public authentication and the local engine credential are separate. Request/response limits, timeout, per-client rate limiting, and bounded concurrency are enforced.
+The gateway exposes only `/v1/models` and `/v1/chat/completions`; streaming uses the standard `stream:true` request flag. Public authentication and the local engine credential are separate. Request/response limits, timeout, per-client rate limiting, and bounded concurrency are enforced.
 
-For Termux, use `ops/mobile-gateway-start.sh`. Keep the gateway token in `~/.config/bhai/mobile-gateway-key` and the local engine key in `~/.config/bhai/engine-key`. Never publish port 18080 directly.
+For Termux, use `ops/mobile-gateway-start.sh` for a foreground run or `ops/mobile-gateway-service.sh` for a persistent background service. Keep the gateway token in `~/.config/bhai/mobile-gateway-key` and the local engine key in `~/.config/bhai/engine-key`. Never publish port 18080 directly.
 
 The gateway supports TLS through certificate/key files. Plain HTTP is only for controlled connectivity testing because credentials and prompts would otherwise cross the network unencrypted.
 

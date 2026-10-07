@@ -9,6 +9,13 @@ export BHAI_MOBILE_GATEWAY_TOKEN_FILE="${BHAI_MOBILE_GATEWAY_TOKEN_FILE:-$HOME/.
 export BHAI_LOCAL_ENGINE_KEY_FILE="${BHAI_LOCAL_ENGINE_KEY_FILE:-$HOME/.config/bhai/engine-key}"
 export BHAI_LOCAL_ENGINE_URL="${BHAI_LOCAL_ENGINE_URL:-http://127.0.0.1:18080}"
 
+TLS_DIR="${BHAI_MOBILE_GATEWAY_TLS_DIR:-$HOME/.config/bhai/mobile-gateway/tls}"
+if [[ -z "${BHAI_MOBILE_GATEWAY_TLS:-}" ]] && [[ -r "$TLS_DIR/server.crt" ]] && [[ -r "$TLS_DIR/server.key" ]]; then
+  export BHAI_MOBILE_GATEWAY_TLS="true"
+  export BHAI_MOBILE_GATEWAY_TLS_CERT_FILE="$TLS_DIR/server.crt"
+  export BHAI_MOBILE_GATEWAY_TLS_KEY_FILE="$TLS_DIR/server.key"
+fi
+
 [[ -r "$BHAI_MOBILE_GATEWAY_TOKEN_FILE" ]] || {
   echo "Missing gateway token file: $BHAI_MOBILE_GATEWAY_TOKEN_FILE" >&2
   exit 1

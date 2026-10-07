@@ -6,9 +6,10 @@ test("master auth disabled keeps existing open access when no core API key is co
   assert.equal(hasApiAccess({ masterAuthEnabled: false, coreApiConfigured: false }), true);
 });
 
-test("valid core API key is required when master auth is disabled and core key is configured", () => {
+test("legacy core bearer key or valid BHAI API key is accepted when master auth is disabled and core key is configured", () => {
   assert.equal(hasApiAccess({ masterAuthEnabled: false, coreApiConfigured: true, coreApiAuthenticated: true }), true);
-  assert.equal(hasApiAccess({ masterAuthEnabled: false, coreApiConfigured: true, coreApiAuthenticated: false }), false);
+  assert.equal(hasApiAccess({ masterAuthEnabled: false, coreApiConfigured: true, apiAuthenticated: true, coreApiAuthenticated: false }), true);
+  assert.equal(hasApiAccess({ masterAuthEnabled: false, coreApiConfigured: true, apiAuthenticated: false, coreApiAuthenticated: false }), false);
 });
 
 test("valid BHAI API key is accepted when master auth is enabled even without legacy core API key", () => {

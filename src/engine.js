@@ -291,10 +291,22 @@ export async function bhaiEngineChat(config = {}) {
         fallback_used: target.role === "fallback"
       };
     } catch (error) {
-      errors.push(target.role + ": " + String(error?.message || error).slice(0, 240));
+      const message = String(error?.message || error).slice(0, 240);
+      console.warn("BHAI engine target failed", JSON.stringify({
+        role: target.role,
+        target_type: isMobileRelayTarget(target.url)
+          ? "mobile-relay"
+          : isMobileTarget(target.url)
+            ? "mobile-node"
+            : "https",
+        status: Number(error?.status || 0) || null,
+        error: message
+      }));
+      errors.push(target.role + ": " + message);
     }
   }
 
+  console.error("BHAI engine exhausted all targets", JSON.stringify({ errors }));
   const error = new Error("All BHAI engine targets failed: " + errors.join(" | "));
   error.status = 503;
   throw error;

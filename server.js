@@ -2,7 +2,7 @@ import http from "node:http";
 import { startTlsServer, tlsInfo } from "./src/tls.js";
 import { config } from "./src/config.js";
 import { generate, getProviderStatus } from "./src/router.js";
-import { bhaiEngineProbe } from "./src/engine.js";
+import { bhaiEngineProbe, bhaiEngineChat } from "./src/engine.js";
 import { publicError } from "./src/errors.js";
 import { requestId } from "./src/requestId.js";
 import { recordUsage, getUsage, allUsage, allProviderUsage } from "./src/usage.js";
@@ -557,6 +557,25 @@ const server = http.createServer(async (req, res) => {
         }, rid);
       }
       try {
+        if (url.searchParams.get("inference") === "true") {
+          const result = await bhaiEngineChat({
+            ...cfg.engine,
+            messages: [{ role: "user", content: "Reply with exactly BHAI_LOCAL_INFERENCE_OK" }],
+            temperature: 0,
+            max_tokens: 16
+          });
+          return send(res, 200, {
+            ok: true,
+            provider: "engine",
+            configured: true,
+            reachable: true,
+            inference: true,
+            model: result.model || cfg.engine.model,
+            text: String(result.text || "").slice(0, 200),
+            target_role: result.target_role || "primary",
+            fallback_used: result.fallback_used === true
+          }, rid);
+        }
         const probe = await bhaiEngineProbe(cfg.engine);
         return send(res, probe.ok ? 200 : 503, {
           provider: "engine",
@@ -569,6 +588,7 @@ const server = http.createServer(async (req, res) => {
           provider: "engine",
           configured: true,
           reachable: false,
+          inference: url.searchParams.get("inference") === "true",
           model: cfg.engine.model,
           error: String(error?.message || "BHAI engine probe failed").slice(0, 500)
         }, rid);

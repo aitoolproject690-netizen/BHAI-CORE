@@ -225,3 +225,16 @@ bash ops/restore-garage.sh /opt/bhai-garage/backups/YYYYMMDDTHHMMSSZ.tar.gz
 ```
 
 The self-hosted Core and BHAI-X services do not publish port 10000 directly on the host. Caddy is the public edge and routes Core API/WebSocket traffic and the BHAI-X web app through the same HTTPS origin. BHAI-X uses the internal Docker address http://bhai-core:10000 by default, so its control-plane connection does not depend on a public Core URL.
+
+## Phone-side IPv6 engine gateway
+
+BHAI-CORE includes an authenticated phone-side gateway for a local OpenAI-compatible engine. It listens on IPv6 while keeping `llama-server` bound to loopback only.
+
+The gateway exposes only `/v1/models`, `/v1/chat/completions`, and `/v1/chat/completions/stream`; public authentication and the local engine credential are separate. Request/response limits, timeout, per-client rate limiting, and bounded concurrency are enforced.
+
+For Termux, use `ops/mobile-gateway-start.sh`. Keep the gateway token in `~/.config/bhai/mobile-gateway-key` and the local engine key in `~/.config/bhai/engine-key`. Never publish port 18080 directly.
+
+The gateway supports TLS through certificate/key files. Plain HTTP is only for controlled connectivity testing because credentials and prompts would otherwise cross the network unencrypted.
+
+BHAI-CORE can target the gateway with an IPv6 literal such as `http://[YOUR_IPV6]:19180` for testing or the equivalent HTTPS URL for production. The current Render relay remains independent until the direct IPv6 path is proven end-to-end.
+

@@ -9,6 +9,6 @@ export function hasApiAccess({
   if (masterAuthEnabled) {
     return Boolean(masterAuthenticated || sessionAuthenticated || apiAuthenticated || coreApiAuthenticated);
   }
-  if (coreApiConfigured) return Boolean(coreApiAuthenticated);
+  if (coreApiConfigured) return Boolean(coreApiAuthenticated || apiAuthenticated);
   return true;
 }

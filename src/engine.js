@@ -59,9 +59,7 @@ function pinnedHttpsRequest(url, options = {}, fingerprint) {
         return;
       }
 
-      const webBody = response.body === null || response.body === undefined
-        ? null
-        : Readable.toWeb(response);
+      const webBody = Readable.toWeb(response);
       const wrapped = new Response(webBody, {
         status: response.statusCode || 502,
         headers: response.headers
@@ -144,7 +142,9 @@ export function engineTargets({
   model = "",
   fallbackUrl = "",
   fallbackKey = "",
-  fallbackModel = ""
+  fallbackModel = "",
+  tlsFingerprint = "",
+  fallbackTlsFingerprint = ""
 } = {}) {
   const targets = [];
   const push = (baseUrl, apiKey, targetModel, role) => {

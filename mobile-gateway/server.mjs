@@ -116,6 +116,9 @@ export function createMobileGateway(options = {}) {
   if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error("Invalid BHAI_MOBILE_GATEWAY_PORT");
   if (!Number.isInteger(maxConcurrent) || maxConcurrent < 1 || maxConcurrent > 32) throw new Error("Invalid max concurrency");
   if (tls && (!certFile || !keyFile)) throw new Error("TLS requires certificate and key files");
+  const tlsFingerprint = tls
+    ? new crypto.X509Certificate(fs.readFileSync(certFile)).fingerprint256
+    : "";
 
   const handler = async (req, res) => {
     const path = cleanPath(new URL(req.url || "/", "http://gateway.local").pathname);
@@ -129,7 +132,8 @@ export function createMobileGateway(options = {}) {
         configured: Boolean(token && engineKey),
         protocol,
         host,
-        port
+        port,
+        tls_fingerprint: tlsFingerprint || undefined
       });
     }
 

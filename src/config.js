@@ -45,9 +45,11 @@ export function config() {
       url: env("BHAI_ENGINE_URL"),
       key: env("BHAI_ENGINE_API_KEY"),
       model: env("BHAI_ENGINE_MODEL", "bhai-local"),
+      tlsFingerprint: env("BHAI_ENGINE_TLS_FINGERPRINT"),
       fallbackUrl: env("BHAI_ENGINE_FALLBACK_URL"),
       fallbackKey: env("BHAI_ENGINE_FALLBACK_API_KEY"),
-      fallbackModel: env("BHAI_ENGINE_FALLBACK_MODEL", env("BHAI_ENGINE_MODEL", "bhai-local"))
+      fallbackModel: env("BHAI_ENGINE_FALLBACK_MODEL", env("BHAI_ENGINE_MODEL", "bhai-local")),
+      fallbackTlsFingerprint: env("BHAI_ENGINE_FALLBACK_TLS_FINGERPRINT")
     },
     providers: {
       ollama: {

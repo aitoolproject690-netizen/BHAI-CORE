@@ -1,3 +1,7 @@
+import crypto from "node:crypto";
+import https from "node:https";
+import { Readable } from "node:stream";
+
 import { requestMobileNode } from "./mobileNode.js";
 import { requestMobileRelay } from "./mobileRelay.js";
 function timeoutSignal(ms = 60000) {
@@ -24,6 +28,77 @@ function headers(key) {
   return result;
 }
 
+function normalizeFingerprint(value) {
+  const normalized = String(value || "").trim().replace(/[^a-fA-F0-9]/g, "").toLowerCase();
+  if (!normalized) return "";
+  if (!/^[a-f0-9]{64}$/.test(normalized)) {
+    throw new Error("Invalid BHAI_ENGINE_TLS_FINGERPRINT");
+  }
+  return normalized;
+}
+
+function pinnedHttpsRequest(url, options = {}, fingerprint) {
+  const expected = normalizeFingerprint(fingerprint);
+  if (!expected) throw new Error("Pinned HTTPS requires BHAI_ENGINE_TLS_FINGERPRINT");
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const parsed = new URL(url);
+    const request = https.request(parsed, {
+      method: options.method || "GET",
+      headers: options.headers || {},
+      rejectUnauthorized: false,
+      minVersion: "TLSv1.2"
+    }, response => {
+      const cert = response.socket?.getPeerCertificate?.();
+      const actual = String(cert?.fingerprint256 || "").replace(/:/g, "").toLowerCase();
+      if (actual !== expected) {
+        response.resume();
+        const error = new Error("BHAI engine TLS fingerprint mismatch");
+        request.destroy(error);
+        return;
+      }
+
+      const webBody = Readable.toWeb(response);
+      const wrapped = new Response(webBody, {
+        status: response.statusCode || 502,
+        headers: response.headers
+      });
+      settled = true;
+      resolve(wrapped);
+    });
+
+    const fail = error => {
+      if (!settled) {
+        settled = true;
+        reject(error);
+      }
+    };
+
+    request.once("error", fail);
+    request.setTimeout(60_000, () => request.destroy(new Error("BHAI engine request timed out")));
+
+    const signal = options.signal;
+    if (signal) {
+      if (signal.aborted) {
+        request.destroy(new Error("BHAI engine request aborted"));
+        return;
+      }
+      signal.addEventListener("abort", () => request.destroy(new Error("BHAI engine request aborted")), { once: true });
+    }
+
+    if (options.body !== undefined && options.body !== null) request.write(options.body);
+    request.end();
+  });
+}
+
+function requestHttp(url, options = {}, fingerprint = "") {
+  if (String(url || "").startsWith("https://") && String(fingerprint || "").trim()) {
+    return pinnedHttpsRequest(url, options, fingerprint);
+  }
+  return fetch(url, options);
+}
+
 function isMobileTarget(url) {
   return String(url || "").startsWith("mobile://");
 }
@@ -47,7 +122,7 @@ async function requestTarget(target, path, options = {}) {
   }
 
   if (!isMobileTarget(target.url)) {
-    return fetch(path, options);
+    return requestHttp(path, options, target.tlsFingerprint);
   }
 
   const forwardedHeaders = { ...(options.headers || {}) };
@@ -67,7 +142,9 @@ export function engineTargets({
   model = "",
   fallbackUrl = "",
   fallbackKey = "",
-  fallbackModel = ""
+  fallbackModel = "",
+  tlsFingerprint = "",
+  fallbackTlsFingerprint = ""
 } = {}) {
   const targets = [];
   const push = (baseUrl, apiKey, targetModel, role) => {
@@ -77,6 +154,7 @@ export function engineTargets({
       url: cleanUrl,
       key: String(apiKey || ""),
       model: String(targetModel || model || "bhai-local"),
+      tlsFingerprint: String(role === "fallback" ? fallbackTlsFingerprint : tlsFingerprint || ""),
       role
     };
     if (!targets.some(existing =>
@@ -328,13 +406,21 @@ export async function bhaiEngineChatStream(config = {}) {
   throw error;
 }
 
-export function engineInfo({ url = "", model = "", fallbackUrl = "", fallbackModel = "" } = {}) {
-  const targets = engineTargets({ url, model, fallbackUrl, fallbackModel });
+export function engineInfo({
+  url = "",
+  model = "",
+  fallbackUrl = "",
+  fallbackModel = "",
+  tlsFingerprint = "",
+  fallbackTlsFingerprint = ""
+} = {}) {
+  const targets = engineTargets({ url, model, fallbackUrl, fallbackModel, tlsFingerprint, fallbackTlsFingerprint });
   return {
     configured: targets.length > 0,
     url_configured: Boolean(String(url).trim()),
     fallback_configured: Boolean(String(fallbackUrl).trim()),
     target_count: targets.length,
+    tls_pinned: targets.some(target => Boolean(target.tlsFingerprint)),
     model: String(model || fallbackModel || "")
   };
 }

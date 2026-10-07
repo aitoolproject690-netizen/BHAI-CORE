@@ -1,3 +1,9 @@
+import crypto from "node:crypto";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import https from "node:https";
+import { execFileSync } from "node:child_process";
 import test from "node:test";
 import assert from "node:assert/strict";
 
@@ -84,5 +90,61 @@ test("engine provider can remain configured with only a fallback target", async 
     if (previousFallbackModel === undefined) delete process.env.BHAI_ENGINE_FALLBACK_MODEL; else process.env.BHAI_ENGINE_FALLBACK_MODEL = previousFallbackModel;
     if (previousKey === undefined) delete process.env.BHAI_ENGINE_API_KEY; else process.env.BHAI_ENGINE_API_KEY = previousKey;
     if (previousFallbackKey === undefined) delete process.env.BHAI_ENGINE_FALLBACK_API_KEY; else process.env.BHAI_ENGINE_FALLBACK_API_KEY = previousFallbackKey;
+  }
+});
+
+
+test("engine can pin a self-signed HTTPS phone gateway by certificate fingerprint", async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "bhai-engine-tls-"));
+  const keyFile = path.join(tmp, "key.pem");
+  const certFile = path.join(tmp, "cert.pem");
+
+  execFileSync("openssl", [
+    "req", "-x509", "-new", "-newkey", "rsa:2048", "-nodes",
+    "-keyout", keyFile, "-out", certFile, "-days", "1",
+    "-subj", "/CN=bhai-test-gateway"
+  ], { stdio: "ignore" });
+
+  const cert = new crypto.X509Certificate(fs.readFileSync(certFile));
+  const fingerprint = cert.fingerprint256.replace(/:/g, "").toLowerCase();
+
+  const server = https.createServer({ key: fs.readFileSync(keyFile), cert: fs.readFileSync(certFile) }, (req, res) => {
+    if (req.url === "/v1/models") {
+      res.setHeader("content-type", "application/json");
+      return res.end(JSON.stringify({ data: [{ id: "smollm2.gguf" }] }));
+    }
+    res.statusCode = 404;
+    return res.end(JSON.stringify({ error: "not_found" }));
+  });
+
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+
+  const port = server.address().port;
+  try {
+    const { bhaiEngineProbe } = await import("../src/engine.js");
+    const ok = await bhaiEngineProbe({
+      url: `https://127.0.0.1:${port}`,
+      key: "ignored-by-test-server",
+      model: "smollm2.gguf",
+      tlsFingerprint: fingerprint
+    });
+    assert.equal(ok.ok, true);
+    assert.equal(ok.model_available, true);
+
+    await assert.rejects(
+      () => bhaiEngineProbe({
+        url: `https://127.0.0.1:${port}`,
+        key: "ignored-by-test-server",
+        model: "smollm2.gguf",
+        tlsFingerprint: "00".repeat(32)
+      }),
+      /fingerprint mismatch|All BHAI engine targets failed/
+    );
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+    fs.rmSync(tmp, { recursive: true, force: true });
   }
 });

@@ -406,7 +406,14 @@ export async function bhaiEngineChatStream(config = {}) {
   throw error;
 }
 
-export function engineInfo({ url = "", model = "", fallbackUrl = "", fallbackModel = "" } = {}) {
+export function engineInfo({
+  url = "",
+  model = "",
+  fallbackUrl = "",
+  fallbackModel = "",
+  tlsFingerprint = "",
+  fallbackTlsFingerprint = ""
+} = {}) {
   const targets = engineTargets({ url, model, fallbackUrl, fallbackModel, tlsFingerprint, fallbackTlsFingerprint });
   return {
     configured: targets.length > 0,

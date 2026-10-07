@@ -148,3 +148,19 @@ test("engine can pin a self-signed HTTPS phone gateway by certificate fingerprin
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+
+test("engine supports multiple comma-separated fallback targets", async () => {
+  const { engineTargets } = await import("../src/engine.js");
+  const targets = engineTargets({
+    url: "https://primary.test",
+    model: "smollm2.gguf",
+    fallbackUrl: "mobile://node, mobile://relay",
+    fallbackModel: "smollm2.gguf"
+  });
+  assert.deepEqual(targets.map(target => ({ url: target.url, role: target.role, model: target.model })), [
+    { url: "https://primary.test", role: "primary", model: "smollm2.gguf" },
+    { url: "mobile://node", role: "fallback", model: "smollm2.gguf" },
+    { url: "mobile://relay", role: "fallback", model: "smollm2.gguf" }
+  ]);
+});

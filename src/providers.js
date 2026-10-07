@@ -194,8 +194,8 @@ async function ollamaChatStream({ url, model, messages, temperature = 0.7, onTok
 }
 
 export const providerAdapters = {
-  async engine({ url, key, model, messages, temperature = 0.7 }) {
-    return bhaiEngineChat({ url, key, model, messages, temperature });
+  async engine({ url, key, model, messages, temperature = 0.7, fallbackUrl, fallbackKey, fallbackModel, tlsFingerprint, fallbackTlsFingerprint }) {
+    return bhaiEngineChat({ url, key, model, messages, temperature, fallbackUrl, fallbackKey, fallbackModel, tlsFingerprint, fallbackTlsFingerprint });
   },
   async ollama({ url, model, messages, temperature = 0.7 }) {
     return ollamaChat({ url, model, messages, temperature });
@@ -243,8 +243,8 @@ export const providerAdapters = {
     return {text,raw:data};
   },
 
-  async engineStream({ url, key, model, messages, temperature = 0.7, onToken }) {
-    return bhaiEngineChatStream({ url, key, model, messages, temperature, onToken });
+  async engineStream({ url, key, model, messages, temperature = 0.7, onToken, fallbackUrl, fallbackKey, fallbackModel, tlsFingerprint, fallbackTlsFingerprint }) {
+    return bhaiEngineChatStream({ url, key, model, messages, temperature, onToken, fallbackUrl, fallbackKey, fallbackModel, tlsFingerprint, fallbackTlsFingerprint });
   },
 
   async geminiStream({ key, model, messages, temperature = 0.7, onToken }) {

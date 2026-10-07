@@ -110,6 +110,9 @@ export function createMobileGateway(options = {}) {
   const certFile = String(options.certFile ?? process.env.BHAI_MOBILE_GATEWAY_TLS_CERT_FILE ?? "").trim();
   const keyFile = String(options.keyFile ?? process.env.BHAI_MOBILE_GATEWAY_TLS_KEY_FILE ?? "").trim();
   const maxConcurrent = Number(options.maxConcurrent ?? MAX_CONCURRENT);
+  const tlsFingerprint = tls
+    ? new crypto.X509Certificate(fs.readFileSync(certFile)).fingerprint256
+    : "";
   const requests = new Map();
   let active = 0;
 
@@ -129,7 +132,8 @@ export function createMobileGateway(options = {}) {
         configured: Boolean(token && engineKey),
         protocol,
         host,
-        port
+        port,
+        tls_fingerprint: tlsFingerprint || undefined
       });
     }
 

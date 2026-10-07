@@ -25,7 +25,15 @@ jobs:
             body="$(curl --fail --silent --show-error --max-time 25 "$url" || true)"
             echo "$body"
 
-            if echo "$body" | grep -F '"ok":true' >/dev/null               && echo "$body" | grep -F '"inference":true' >/dev/null               && echo "$body" | grep -F '"model":"smollm2.gguf"' >/dev/null               && echo "$body" | grep -F '"target_role":"primary"' >/dev/null               && echo "$body" | grep -F '"fallback_used":false' >/dev/null               && echo "$body" | grep -F '"text":"BHAI_LOCAL_INFERENCE_OK"' >/dev/null; then
+            if echo "$body" | jq -e '
+              .ok == true
+              and .inference == true
+              and .model == "smollm2.gguf"
+              and .target_role == "primary"
+              and .fallback_used == false
+              and (.text | type == "string")
+              and (.text | length > 0)
+            ' >/dev/null 2>&1; then
               echo "LIVE ENGINE PROOF: PASS"
               exit 0
             fi

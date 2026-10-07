@@ -167,7 +167,13 @@ export function engineTargets({
   };
 
   push(url, key, model, "primary");
-  push(fallbackUrl, fallbackKey, fallbackModel || model, "fallback");
+  const fallbackUrls = String(fallbackUrl || "")
+    .split(",")
+    .map(value => value.trim())
+    .filter(Boolean);
+  for (const fallback of fallbackUrls) {
+    push(fallback, fallbackKey, fallbackModel || model, "fallback");
+  }
   return targets;
 }
 

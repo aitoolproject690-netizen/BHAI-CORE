@@ -17,8 +17,7 @@ export const REQUEST_TIMEOUT_MS = 65_000;
 
 const ALLOWED = new Map([
   ["GET /v1/models", true],
-  ["POST /v1/chat/completions", true],
-  ["POST /v1/chat/completions/stream", true]
+  ["POST /v1/chat/completions", true]
 ]);
 
 function boolEnv(value) {

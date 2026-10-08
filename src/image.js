@@ -145,7 +145,9 @@ export async function submitMobileImage({ request }) {
     throw Object.assign(new Error(data?.error || data?.message || "Local Dream image engine failed"), { status: response.status });
   }
   const complete = parseLocalDreamSse(raw);
-  const channels = Number(complete.channels || 3);\n  if (channels !== 3) throw new Error("Local Dream returned unsupported pixel channels: " + channels);\n  const png = rawRgbToPng(complete.image, complete.width, complete.height);
+  const channels = Number(complete.channels || 3);
+  if (channels !== 3) throw new Error("Local Dream returned unsupported pixel channels: " + channels);
+  const png = rawRgbToPng(complete.image, complete.width, complete.height);
   const jobId = "ld-" + request.id.slice(4);
   return {
     provider: "mobile-local-dream",

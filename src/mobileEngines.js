@@ -5,7 +5,7 @@ const MAX_NAME = 128;
 
 const CAPABILITIES = new Set([
   "chat","vision","image-text-to-image","image-image-to-image",
-  "video-image-to-video","video-text-to-video","vfx","audio","tts","stt"
+  "video-image-to-video","video-text-to-video","vfx","audio","tts","stt","gpu"
 ]);
 
 function clean(value,max=MAX_NAME){return String(value||"").trim().slice(0,max);}

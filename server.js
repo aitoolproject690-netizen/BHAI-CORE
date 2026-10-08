@@ -19,8 +19,8 @@ import { searchRag, ragContext } from "./src/rag.js";
 import { embeddingInfo } from "./src/embeddings.js";
 import { getModelRegistry, modelCapabilities } from "./src/models.js";
 import { analyzeImage, getVisionCandidates } from "./src/vision.js";
-import { createImageRequest, submitComfyUI, getComfyUIHistory, imageProviderInfo, recordImageJobOwnership, getImageJobOwnership } from "./src/image.js";
-import { createVideoRequest, planVideo, submitVideoHttp, videoProviderInfo } from "./src/video.js";
+import { createImageRequest, submitComfyUI, submitMobileImage, getComfyUIHistory, getMobileImageJob, imageProviderInfo, recordImageJobOwnership, getImageJobOwnership } from "./src/image.js";
+import { createVideoRequest, planVideo, submitVideoHttp, submitMobileVideo, getMobileVideoJob, videoProviderInfo } from "./src/video.js";
 import { billingPlans, getBillingAccount, billingUsage, billingSnapshot, setBillingPlan, assertBillingQuota, consumeBillingQuota, releaseBillingQuota, recordBillingUsage } from "./src/billing.js";
 import { dashboardSnapshot } from "./src/dashboard.js";
 import { createSpeechRequest, transcribeWhisper, createTtsRequest, synthesizePiper, voiceProviderInfo } from "./src/voice.js";
@@ -505,17 +505,7 @@ const server = http.createServer(async (req, res) => {
       return res.end(html);
     }
 
-    if (url.pathname === "/v1/mobile/engines" && req.method === "GET") {
-    return send(res, 200, mobileEngineRegistryInfo(), rid);
-  }
-
-  if (url.pathname === "/v1/mobile/engine/select" && req.method === "POST") {
-    const body = await readJson(req, 64 * 1024);
-    const engine = chooseMobileEngine(body.capability, body.model || null);
-    return send(res, engine ? 200 : 404, engine ? { ok:true, engine } : { ok:false, error:"No ready local mobile engine matches request" }, rid);
-  }
-
-  if (url.pathname === "/v1/cloud/webhooks/github" && req.method === "POST") {
+    if (url.pathname === "/v1/cloud/webhooks/github" && req.method === "POST") {
       const secret = process.env.BHAI_GITHUB_WEBHOOK_SECRET;
       if (!secret) return send(res, 503, { ok:false, error:"GitHub webhook secret is not configured" }, rid);
       const signature = req.headers["x-hub-signature-256"] || "";
@@ -768,6 +758,20 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true, tool: body.tool, result }, rid);
     }
 
+    if (url.pathname === "/v1/mobile/engines" && req.method === "GET") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok:false, error:"BHAI key required" }, rid);
+      return send(res, 200, mobileEngineRegistryInfo(), rid);
+    }
+
+    if (url.pathname === "/v1/mobile/engine/select" && req.method === "POST") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok:false, error:"BHAI key required" }, rid);
+      const body = await readJson(req, 64 * 1024);
+      const engine = chooseMobileEngine(body.capability, body.model || null);
+      return send(res, engine ? 200 : 404, engine ? { ok:true, engine } : { ok:false, error:"No ready local mobile engine matches request" }, rid);
+    }
+
     if (url.pathname === "/v1/providers" && req.method === "GET")
       return send(res, 200, { ok: true, providers: getProviderStatus() }, rid);
 
@@ -831,7 +835,9 @@ const server = http.createServer(async (req, res) => {
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
       const ownership = await getImageJobOwnership(imageJobMatch[1], identity.id);
       if (!ownership) return send(res, 404, { ok: false, error: "Image job not found" }, rid);
-      const result = await getComfyUIHistory({ url: process.env.COMFYUI_URL, promptId: imageJobMatch[1] });
+      const result = ownership.provider === "mobile"
+        ? await getMobileImageJob({ jobId: imageJobMatch[1] })
+        : await getComfyUIHistory({ url: process.env.COMFYUI_URL, promptId: imageJobMatch[1] });
       return send(res, 200, { ok: true, ...result }, rid);
     }
 
@@ -840,21 +846,19 @@ const server = http.createServer(async (req, res) => {
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
       const body = await readJson(req);
       const request = createImageRequest(body);
-      if (request.provider !== "comfyui") return send(res, 400, { ok: false, error: "Unsupported image provider" }, rid);
+      if (!new Set(["comfyui","mobile"]).has(request.provider)) return send(res, 400, { ok: false, error: "Unsupported image provider" }, rid);
       const billingReservation = { requests: 1, imageJobs: 1 };
       await consumeBillingQuota(identity.id, billingReservation);
       let result;
       try {
-        result = await submitComfyUI({
-          url: process.env.COMFYUI_URL,
-          request,
-          workflow: body.workflow
-        });
+        result = request.provider === "mobile"
+          ? await submitMobileImage({ request })
+          : await submitComfyUI({ url: process.env.COMFYUI_URL, request, workflow: body.workflow });
       } catch (error) {
         await releaseBillingQuota(identity.id, billingReservation);
         throw error;
       }
-      await recordImageJobOwnership({ promptId: result.promptId, ownerId: identity.id, requestId: rid });
+      await recordImageJobOwnership({ promptId: result.promptId || result.jobId, ownerId: identity.id, requestId: rid, provider: request.provider });
       await recordBillingUsage(identity.id, {});
       await recordUsage({ key: identity.id, input: JSON.stringify(body).length });
       return send(res, 202, { ok: true, ...request, ...result, status: "submitted" }, rid);
@@ -907,12 +911,14 @@ const server = http.createServer(async (req, res) => {
       const identity = await authenticate(req.headers["x-bhai-key"]);
       if (!identity) return send(res, 401, { ok: false, error: "BHAI key required" }, rid);
       const request = createVideoRequest(await readJson(req));
-      if (request.provider !== "http") return send(res, 400, { ok: false, error: "Unsupported video provider" }, rid);
+      if (!new Set(["http","mobile"]).has(request.provider)) return send(res, 400, { ok: false, error: "Unsupported video provider" }, rid);
       const billingReservation = { requests: 1, videoSeconds: request.durationSeconds };
       await consumeBillingQuota(identity.id, billingReservation);
       let result;
       try {
-        result = await submitVideoHttp({ url: process.env.VIDEO_API_URL, apiKey: process.env.VIDEO_API_KEY, request });
+        result = request.provider === "mobile"
+          ? await submitMobileVideo({ request })
+          : await submitVideoHttp({ url: process.env.VIDEO_API_URL, apiKey: process.env.VIDEO_API_KEY, request });
       } catch (error) {
         await releaseBillingQuota(identity.id, billingReservation);
         throw error;

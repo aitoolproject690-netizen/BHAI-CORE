@@ -214,6 +214,7 @@ export function attachMobileNode(server) {
           activeConnectedAt = 0;
           activeLastSeenAt = 0;
           activeMeta = null;
+          updateMobileEngineRegistry([]);
           for (const [id, waiter] of pending) {
             clearTimeout(waiter.timer);
             waiter.reject(Object.assign(new Error("Mobile node disconnected"), { status: 503 }));

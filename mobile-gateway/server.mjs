@@ -17,7 +17,11 @@ export const REQUEST_TIMEOUT_MS = 65_000;
 
 const ALLOWED = new Map([
   ["GET /v1/models", true],
-  ["POST /v1/chat/completions", true]
+  ["POST /v1/chat/completions", true],
+  ["POST /v1/image/generate", true],
+  ["GET /v1/image/jobs/:id", true],
+  ["POST /v1/video/generate", true],
+  ["GET /v1/video/jobs/:id", true]
 ]);
 
 function boolEnv(value) {
@@ -62,7 +66,10 @@ function localEngineUrl(value) {
 }
 
 function requestAllowed(method, path) {
-  return Boolean(ALLOWED.get(String(method || "GET").toUpperCase() + " " + cleanPath(path)));
+  const normalized = String(method || "GET").toUpperCase() + " " + cleanPath(path);
+  if (ALLOWED.has(normalized)) return true;
+  return /^(GET|POST) \/v1\/(?:image|video)\/jobs\/[A-Za-z0-9._:-]{1,160}$/.test(normalized)
+    || /^POST \/v1\/(?:image|video)\/generate$/.test(normalized);
 }
 
 async function readBody(req) {

@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { requestMobileNode } from "./mobileNode.js";
+import { requestMobileNode, mobileNodeInfo } from "./mobileNode.js";
 import { getStore, updateStore } from "./store.js";
 
 const MAX_SCENES = 120;
@@ -102,7 +102,7 @@ export async function submitVideoHttp({ url, apiKey, request }) {
 
 export function videoProviderInfo() {
   return {
-    mobile: { configured: true, local: true, mode: "mobile-node", capabilities: ["video-image-to-video","video-text-to-video"] },
+    mobile: { configured: mobileNodeInfo().configured, connected: mobileNodeInfo().connected, local: true, mode: "mobile-node", capabilities: ["video-image-to-video","video-text-to-video"] },
     http: {
       configured: Boolean(process.env.VIDEO_API_URL),
       url: cleanUrl(process.env.VIDEO_API_URL || ""),

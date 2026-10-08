@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { getStore, updateStore } from "./store.js";
-import { requestMobileNode } from "./mobileNode.js";
+import { requestMobileNode, mobileNodeInfo } from "./mobileNode.js";
 
 const MAX_PROMPT_CHARS = Number(process.env.BHAI_MAX_IMAGE_PROMPT_CHARS || 4000);
 
@@ -84,7 +84,8 @@ export function imageProviderInfo() {
   return {
     mobile: {
       local: true,
-      configured: true,
+      configured: mobileNodeInfo().configured,
+      connected: mobileNodeInfo().connected,
       mode: "mobile-node",
       capabilities: ["image-text-to-image","image-image-to-image"]
     },

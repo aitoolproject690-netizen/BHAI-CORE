@@ -168,7 +168,7 @@ export function engineTargets({
 
   const configuredPrimary = String(url || "").trim();
   const configuredFallback = String(fallbackUrl || "").trim();
-  const mobileEngine = !configuredPrimary && !configuredFallback ? chooseMobileEngine("chat", model || null) : null;
+  const mobileEngine = !configuredPrimary && !configuredFallback ? chooseMobileEngine("chat") : null;
   if (mobileEngine) {
     push("mobile://" + mobileEngine.id, "", mobileEngine.model || mobileEngine.id, "mobile");
   }

@@ -1,4 +1,6 @@
 import crypto from "node:crypto";
+import { requestMobileNode, mobileNodeInfo } from "./mobileNode.js";
+import { getStore, updateStore } from "./store.js";
 
 const MAX_SCENES = 120;
 const MAX_TOTAL_SECONDS = 600;
@@ -60,6 +62,29 @@ export function planVideo(request) {
   };
 }
 
+export async function submitMobileVideo({ request }) {
+  const response = await requestMobileNode({
+    path: "/v1/video/generate",
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(planVideo(request))
+  });
+  const raw = await response.text();
+  let data; try { data = raw ? JSON.parse(raw) : {}; } catch { data = { raw }; }
+  if (!response.ok) throw Object.assign(new Error(data?.error || data?.message || "Mobile video engine failed"), { status: response.status });
+  const jobId = data.jobId || data.id;
+  if (!jobId) throw new Error("Mobile video engine returned no job id");
+  return { provider: "mobile", jobId: String(jobId), output: data.output || null, status: data.status || "submitted" };
+}
+
+export async function getMobileVideoJob({ jobId }) {
+  const response = await requestMobileNode({ path: "/v1/video/jobs/" + encodeURIComponent(String(jobId)), method: "GET", headers: {} });
+  const raw = await response.text();
+  let data; try { data = raw ? JSON.parse(raw) : {}; } catch { data = { raw }; }
+  if (!response.ok) throw Object.assign(new Error(data?.error || data?.message || "Mobile video job lookup failed"), { status: response.status });
+  return { provider: "mobile", jobId: String(jobId), job: data };
+}
+
 export async function submitVideoHttp({ url, apiKey, request }) {
   const endpoint = cleanUrl(url);
   if (!endpoint) throw Object.assign(new Error("Video API is not configured"), { code: "VIDEO_NOT_CONFIGURED", status: 503 });
@@ -77,10 +102,32 @@ export async function submitVideoHttp({ url, apiKey, request }) {
 
 export function videoProviderInfo() {
   return {
+    mobile: { configured: mobileNodeInfo().configured, connected: mobileNodeInfo().connected, local: true, mode: "mobile-node", capabilities: ["video-image-to-video","video-text-to-video"] },
     http: {
       configured: Boolean(process.env.VIDEO_API_URL),
       url: cleanUrl(process.env.VIDEO_API_URL || ""),
       mode: "external-adapter"
     }
   };
+}
+
+
+export async function recordVideoJobOwnership({ jobId, ownerId, requestId = null, provider = "mobile" }) {
+  const id = String(jobId || "").trim();
+  if (!id || !/^[A-Za-z0-9._:-]{1,160}$/.test(id)) throw new Error("Invalid video job id");
+  if (!ownerId) throw new Error("ownerId is required");
+  await updateStore(store => {
+    store.videoJobs ??= {};
+    store.videoJobs[id] = { jobId:id, ownerId:String(ownerId), requestId:requestId || null, provider:String(provider || "mobile").toLowerCase(), createdAt:new Date().toISOString() };
+    return store;
+  });
+  return { jobId:id, ownerId:String(ownerId) };
+}
+
+export async function getVideoJobOwnership(jobId, ownerId) {
+  const id=String(jobId || "").trim();
+  const store=await getStore();
+  const job=store.videoJobs?.[id];
+  if(!job || job.ownerId!==ownerId) return null;
+  return {...job};
 }

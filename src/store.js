@@ -6,7 +6,7 @@ import * as postgresStore from "./postgresStore.js";
 const file = process.env.BHAI_STORE_FILE || "./data/bhai-core-store.json";
 const maxBytes = Number(process.env.BHAI_STORE_MAX_BYTES || 10 * 1024 * 1024);
 const backupEnabled = process.env.BHAI_STORE_BACKUP !== "false";
-const emptyState = () => ({apiKeys:{},usage:{},providerUsage:{},billing:{},jobs:{},conversations:{},imageJobs:{},files:{},ragChunks:{},auditLog:[],approvals:{},services:{},deployments:{},servicePorts:{},routes:{},domains:{},autoDeploy:{},certificates:{},acmeAccounts:{},acmeOrders:{},dnsRecords:{}});
+const emptyState = () => ({apiKeys:{},usage:{},providerUsage:{},billing:{},jobs:{},conversations:{},imageJobs:{},videoJobs:{},files:{},ragChunks:{},auditLog:[],approvals:{},services:{},deployments:{},servicePorts:{},routes:{},domains:{},autoDeploy:{},certificates:{},acmeAccounts:{},acmeOrders:{},dnsRecords:{}});
 let state=emptyState(),loaded=false,writeChain=Promise.resolve();
 function backend(){return (process.env.BHAI_STORE_BACKEND||"json").trim().toLowerCase();}
 function assertBackend(){const value=backend();if(value!=="json"&&value!=="postgres")throw Object.assign(new Error("Unsupported BHAI_STORE_BACKEND: "+value),{code:"STORE_BACKEND_INVALID",status:500});return value;}
@@ -17,7 +17,7 @@ async function ensureJsonLoaded(){
   let parsed;
   try{parsed=JSON.parse(raw);}catch(error){throw Object.assign(new Error("Persistent store contains invalid JSON"),{code:"STORE_CORRUPT",status:500,cause:error});}
   if(!parsed||typeof parsed!=="object"||Array.isArray(parsed))throw Object.assign(new Error("Persistent store must contain a JSON object"),{code:"STORE_CORRUPT",status:500});
-  const names=["apiKeys","usage","providerUsage","billing","jobs","conversations","imageJobs","files","ragChunks","approvals","services","deployments","servicePorts","routes","domains","autoDeploy","certificates","acmeAccounts","acmeOrders","dnsRecords"];
+  const names=["apiKeys","usage","providerUsage","billing","jobs","conversations","imageJobs","videoJobs","files","ragChunks","approvals","services","deployments","servicePorts","routes","domains","autoDeploy","certificates","acmeAccounts","acmeOrders","dnsRecords"];
   for(const name of names)if(parsed[name]!=null&&(!parsed[name]||typeof parsed[name]!=="object"||Array.isArray(parsed[name])))throw Object.assign(new Error("Persistent store field "+name+" must be a JSON object"),{code:"STORE_CORRUPT",status:500});
   if(parsed.auditLog!=null&&!Array.isArray(parsed.auditLog))throw Object.assign(new Error("Persistent store field auditLog must be a JSON array"),{code:"STORE_CORRUPT",status:500});
   state={...emptyState(),...parsed,auditLog:parsed.auditLog??[]};loaded=true;

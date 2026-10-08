@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import http from "node:http";
 import WebSocket from "ws";
 import { attachMobileNode, mobileNodeInfo, requestMobileNode } from "../src/mobileNode.js";
+import { mobileEngineInfo, selectMobileEngine } from "../src/mobileEngines.js";
 
 test("mobile node relay authenticates and forwards requests", async () => {
   process.env.BHAI_MOBILE_NODE_TOKEN = "relay-test-token";
@@ -23,6 +24,10 @@ test("mobile node relay authenticates and forwards requests", async () => {
           nodeId: "oneplus-12r",
           model: "smollm2.gguf",
           capabilities: ["chat", "gpu", "vulkan"],
+          engines: [
+            { id:"smollm2", name:"SmolLM2", kind:"llm", model:"smollm2.gguf", backend:"llama.cpp-vulkan", capabilities:["chat"], ready:true, loaded:true, memory_mb:512 },
+            { id:"local-image", name:"BHAI Image", kind:"image", model:"local-image-v1", backend:"vulkan", capabilities:["image-text-to-image","image-image-to-image"], ready:true, memory_mb:2500 }
+          ],
           platform: "android-termux",
           version: "1.1.0"
         }));
@@ -42,6 +47,8 @@ test("mobile node relay authenticates and forwards requests", async () => {
     assert.equal(mobileNodeInfo().model, "smollm2.gguf");
     assert.deepEqual(mobileNodeInfo().capabilities, ["chat", "gpu", "vulkan"]);
     assert.equal(mobileNodeInfo().pairingMode, "token+node-id");
+    assert.equal(mobileEngineInfo().count, 2);
+    assert.equal(selectMobileEngine({capability:"image-text-to-image"}).id, "local-image");
 
     const responsePromise = requestMobileNode({
       path: "/v1/models",

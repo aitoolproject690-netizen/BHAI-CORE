@@ -5,8 +5,8 @@ const databaseUrl = process.env.DATABASE_URL;
 const table = process.env.BHAI_STORE_PG_TABLE || "bhai_core_store";
 const id = 1;
 const maxBytes = Number(process.env.BHAI_STORE_MAX_BYTES || 10 * 1024 * 1024);
-const collectionNames = ["apiKeys","usage","providerUsage","billing","jobs","conversations","imageJobs","files","ragChunks","approvals","services","deployments","servicePorts","routes","domains","autoDeploy","certificates","acmeAccounts","acmeOrders","dnsRecords"];
-const emptyState = () => ({apiKeys:{},usage:{},providerUsage:{},billing:{},jobs:{},conversations:{},imageJobs:{},files:{},ragChunks:{},auditLog:[],approvals:{},services:{},deployments:{},servicePorts:{},routes:{},domains:{},autoDeploy:{},certificates:{},acmeAccounts:{},acmeOrders:{},dnsRecords:{}});
+const collectionNames = ["apiKeys","usage","providerUsage","billing","jobs","conversations","imageJobs","videoJobs","files","ragChunks","approvals","services","deployments","servicePorts","routes","domains","autoDeploy","certificates","acmeAccounts","acmeOrders","dnsRecords"];
+const emptyState = () => ({apiKeys:{},usage:{},providerUsage:{},billing:{},jobs:{},conversations:{},imageJobs:{},videoJobs:{},files:{},ragChunks:{},auditLog:[],approvals:{},services:{},deployments:{},servicePorts:{},routes:{},domains:{},autoDeploy:{},certificates:{},acmeAccounts:{},acmeOrders:{},dnsRecords:{}});
 function validateConfig() {
   if (!databaseUrl) throw Object.assign(new Error("DATABASE_URL is required for the PostgreSQL store"),{code:"STORE_DATABASE_URL_MISSING",status:500});
   if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(table)) throw Object.assign(new Error("Invalid BHAI_STORE_PG_TABLE"),{code:"STORE_TABLE_INVALID",status:500});

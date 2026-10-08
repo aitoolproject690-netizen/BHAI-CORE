@@ -30,30 +30,32 @@ const LOCAL_ENGINE_RETRY_DELAYS_MS = [350, 900, 1600];
 const NODE_ID = String(process.env.BHAI_MOBILE_NODE_ID || "mobile-node").trim();
 const NODE_VERSION = String(process.env.BHAI_MOBILE_NODE_VERSION || "1.1.0").trim();
 
-const MOBILE_ENGINES = [
-  {
-    id: "smollm2",
-    name: "SmolLM2",
-    kind: "llm",
-    model: process.env.BHAI_LOCAL_MODEL || "smollm2.gguf",
-    backend: "llama.cpp-vulkan",
-    capabilities: ["chat", "gpu"],
-    ready: true,
-    loaded: true,
-    memory_mb: 512
-  },
-  {
-    id: "local-image",
-    name: "Local Dream SD1.5",
-    kind: "image",
-    model: process.env.BHAI_LOCAL_IMAGE_MODEL || "sd1.5",
-    backend: "local-dream",
-    capabilities: ["image-text-to-image", "gpu"],
-    ready: Boolean(LOCAL_IMAGE_ENGINE_READY && LOCAL_IMAGE_ENGINE),
-    loaded: Boolean(LOCAL_IMAGE_ENGINE_READY && LOCAL_IMAGE_ENGINE),
-    memory_mb: Number(process.env.BHAI_LOCAL_IMAGE_MEMORY_MB || 2048)
-  }
-];
+function buildMobileEngines(localImageReady = false) {
+  return [
+    {
+      id: "smollm2",
+      name: "SmolLM2",
+      kind: "llm",
+      model: process.env.BHAI_LOCAL_MODEL || "smollm2.gguf",
+      backend: "llama.cpp-vulkan",
+      capabilities: ["chat", "gpu"],
+      ready: true,
+      loaded: true,
+      memory_mb: 512
+    },
+    {
+      id: "local-image",
+      name: "Local Dream SD1.5",
+      kind: "image",
+      model: process.env.BHAI_LOCAL_IMAGE_MODEL || "sd1.5",
+      backend: "local-dream",
+      capabilities: ["image-text-to-image", "gpu"],
+      ready: localImageReady,
+      loaded: localImageReady,
+      memory_mb: Number(process.env.BHAI_LOCAL_IMAGE_MEMORY_MB || 2048)
+    }
+  ];
+}
 
 if (!CORE_URL) throw new Error("BHAI_CORE_URL is required");
 if (!NODE_TOKEN) throw new Error("BHAI_MOBILE_NODE_TOKEN or BHAI_ENGINE_API_KEY is required");
@@ -84,6 +86,26 @@ function localEngineHeaders(headers, imageEngine = false) {
     result.authorization = "Bearer " + LOCAL_ENGINE_API_KEY;
   }
   return result;
+}
+
+async function probeLocalImageEngine() {
+  if (!LOCAL_IMAGE_ENGINE) return false;
+  if (LOCAL_IMAGE_ENGINE_READY) return true;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 3000);
+  try {
+    const response = await fetch(LOCAL_IMAGE_ENGINE + "/tokenize", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ prompt: "bhai image probe" }),
+      signal: controller.signal
+    });
+    return response.status >= 200 && response.status < 300;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function sleep(ms) {
@@ -167,7 +189,10 @@ async function handleRequest(message) {
   };
 }
 
-function connect() {
+async function connect() {
+  const localImageReady = await probeLocalImageEngine();
+  const engines = buildMobileEngines(localImageReady);
+  console.log("BHAI mobile image engine", localImageReady ? "ready" : "not ready");
   socket = new WebSocket(wsUrl);
   socket.addEventListener("open", () => {
     console.log("BHAI mobile node connected");
@@ -177,7 +202,7 @@ function connect() {
       nodeId: NODE_ID,
       model: process.env.BHAI_LOCAL_MODEL || "smollm2.gguf",
       capabilities: ["chat", "streaming", "local", "gpu", "vulkan"],
-      engines: MOBILE_ENGINES,
+      engines,
       platform: "android-termux",
       version: NODE_VERSION
     }));

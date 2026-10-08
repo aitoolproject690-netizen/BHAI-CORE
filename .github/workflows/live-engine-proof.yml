@@ -5,6 +5,10 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/live-engine-proof.yml"
+      - "src/engine.js"
+      - "src/mobileNode.js"
+      - "engine/**"
+      - "docs/production-engine-verification-2026-10-08.md"
   workflow_dispatch:
 
 permissions:

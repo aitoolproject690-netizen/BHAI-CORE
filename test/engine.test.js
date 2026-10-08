@@ -22,10 +22,11 @@ test("BHAI engine is a first-class provider without requiring a vendor API key",
   process.env.BHAI_ENGINE_URL = "http://engine.test";
   process.env.BHAI_ENGINE_MODEL = "bhai-local";
   delete process.env.BHAI_ENGINE_API_KEY;
-  providerAdapters.engine = async ({ url, model, messages }) => ({
+  const mobileTargets = engineTargets({ model: "bhai-local" });
+  providerAdapters.engine = async ({ messages }) => ({
     text: messages[0].content,
-    model,
-    raw: { url, model }
+    model: mobileTargets[0]?.model,
+    raw: { url: mobileTargets[0]?.url, model: mobileTargets[0]?.model }
   });
 
   try {

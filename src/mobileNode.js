@@ -15,6 +15,7 @@ const ALLOWED_REQUEST_PREFIX = "/v1/";
 let active = null;
 let activeConnectedAt = 0;
 let activeLastSeenAt = 0;
+let activeMeta = null;
 let sequence = 0;
 const pending = new Map();
 const connectionWaiters = new Set();
@@ -37,6 +38,27 @@ function tokens() {
 
 function authenticatedToken(value) {
   return tokens().some(expected => safeEqual(value, expected));
+}
+
+function normalizedNodeId(value) {
+  const nodeId = String(value || "").trim();
+  if (!nodeId) return "";
+  if (!/^[A-Za-z0-9._:-]{1,128}$/.test(nodeId)) return "";
+  return nodeId;
+}
+
+function normalizedCapabilities(value) {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(
+    value.map(item => String(item || "").trim().toLowerCase())
+      .filter(item => /^[a-z0-9._:-]{1,64}$/.test(item))
+  )].slice(0, 32);
+}
+
+function mobileNodeConfig() {
+  return {
+    expectedNodeId: normalizedNodeId(process.env.BHAI_MOBILE_NODE_ID || "")
+  };
 }
 
 function reject(socket, status = 404) {
@@ -115,9 +137,12 @@ export function attachMobileNode(server) {
         }
 
         if (!authenticated) {
+          const configured = mobileNodeConfig();
+          const announcedNodeId = normalizedNodeId(message.nodeId);
           if (message?.type !== "auth" ||
               typeof message.token !== "string" ||
-              !authenticatedToken(message.token)) {
+              !authenticatedToken(message.token) ||
+              (configured.expectedNodeId && announcedNodeId !== configured.expectedNodeId)) {
             console.warn("BHAI mobile node auth rejected");
             return ws.close(1008, "authentication failed");
           }
@@ -130,8 +155,21 @@ export function attachMobileNode(server) {
           active = ws;
           activeConnectedAt = Date.now();
           activeLastSeenAt = activeConnectedAt;
+          activeMeta = {
+            nodeId: announcedNodeId || "mobile-node",
+            model: String(message.model || "").trim().slice(0, 160) || null,
+            capabilities: normalizedCapabilities(message.capabilities),
+            platform: String(message.platform || "").trim().slice(0, 64) || null,
+            version: String(message.version || "").trim().slice(0, 64) || null,
+            pairedBy: configured.expectedNodeId ? "token+node-id" : "token"
+          };
           startHeartbeat();
-          ws.send(JSON.stringify({ type: "auth_ok" }));
+          ws.send(JSON.stringify({
+            type: "auth_ok",
+            nodeId: activeMeta.nodeId,
+            pairedBy: activeMeta.pairedBy,
+            serverTime: new Date().toISOString()
+          }));
           for (const waiter of connectionWaiters) {
             clearTimeout(waiter.timer);
             waiter.resolve(ws);
@@ -172,6 +210,7 @@ export function attachMobileNode(server) {
           active = null;
           activeConnectedAt = 0;
           activeLastSeenAt = 0;
+          activeMeta = null;
           for (const [id, waiter] of pending) {
             clearTimeout(waiter.timer);
             waiter.reject(Object.assign(new Error("Mobile node disconnected"), { status: 503 }));
@@ -189,12 +228,20 @@ export function attachMobileNode(server) {
 }
 
 export function mobileNodeInfo() {
+  const configured = mobileNodeConfig();
   return {
     configured: tokens().length > 0,
+    paired: Boolean(active && active.readyState === WebSocket.OPEN),
     connected: Boolean(active && active.readyState === WebSocket.OPEN),
     pending: pending.size,
     connectedAt: activeConnectedAt || null,
-    lastSeenAt: activeLastSeenAt || null
+    lastSeenAt: activeLastSeenAt || null,
+    nodeId: activeMeta?.nodeId || configured.expectedNodeId || null,
+    model: activeMeta?.model || null,
+    capabilities: activeMeta?.capabilities || [],
+    platform: activeMeta?.platform || null,
+    version: activeMeta?.version || null,
+    pairingMode: configured.expectedNodeId ? "token+node-id" : "token"
   };
 }
 

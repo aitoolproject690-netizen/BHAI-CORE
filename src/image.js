@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { getStore, updateStore } from "./store.js";
+import { requestMobileNode } from "./mobileNode.js";
 
 const MAX_PROMPT_CHARS = Number(process.env.BHAI_MAX_IMAGE_PROMPT_CHARS || 4000);
 
@@ -36,6 +37,29 @@ export function createImageRequest({ prompt, provider = "comfyui", model, seed }
   };
 }
 
+export async function submitMobileImage({ request }) {
+  const response = await requestMobileNode({
+    path: "/v1/image/generate",
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(request)
+  });
+  const raw = await response.text();
+  let data; try { data = raw ? JSON.parse(raw) : {}; } catch { data = { raw }; }
+  if (!response.ok) throw Object.assign(new Error(data?.error || data?.message || "Mobile image engine failed"), { status: response.status });
+  const jobId = data.jobId || data.id || data.promptId;
+  if (!jobId) throw new Error("Mobile image engine returned no job id");
+  return { provider: "mobile", jobId: String(jobId), seed: request.seed, output: data.output || null, status: data.status || "submitted" };
+}
+
+export async function getMobileImageJob({ jobId }) {
+  const response = await requestMobileNode({ path: "/v1/image/jobs/" + encodeURIComponent(String(jobId)), method: "GET", headers: {} });
+  const raw = await response.text();
+  let data; try { data = raw ? JSON.parse(raw) : {}; } catch { data = { raw }; }
+  if (!response.ok) throw Object.assign(new Error(data?.error || data?.message || "Mobile image job lookup failed"), { status: response.status });
+  return { provider: "mobile", jobId: String(jobId), job: data };
+}
+
 export async function submitComfyUI({ url, request, workflow }) {
   const payload = workflow || defaultWorkflow(request.prompt, request.seed);
   const response = await fetch(cleanUrl(url) + "/prompt", {
@@ -58,6 +82,12 @@ export async function submitComfyUI({ url, request, workflow }) {
 
 export function imageProviderInfo() {
   return {
+    mobile: {
+      local: true,
+      configured: true,
+      mode: "mobile-node",
+      capabilities: ["image-text-to-image","image-image-to-image"]
+    },
     comfyui: {
       local: true,
       url: cleanUrl(process.env.COMFYUI_URL),
@@ -76,6 +106,7 @@ export async function recordImageJobOwnership({ promptId, ownerId, requestId = n
       promptId: id,
       ownerId: String(ownerId),
       requestId: requestId || null,
+      provider: String(arguments[0]?.provider || "comfyui"),
       createdAt: new Date().toISOString()
     };
     return store;

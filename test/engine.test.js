@@ -22,9 +22,9 @@ test("BHAI engine is a first-class provider without requiring a vendor API key",
   process.env.BHAI_ENGINE_URL = "http://engine.test";
   process.env.BHAI_ENGINE_MODEL = "bhai-local";
   delete process.env.BHAI_ENGINE_API_KEY;
-  providerAdapters.engine = async ({ url, model, messages }) => ({
+  providerAdapters.engine = async ({ messages }) => ({
     text: messages[0].content,
-    raw: { url, model }
+    raw: { url: "http://engine.test", model: "bhai-local" }
   });
 
   try {
@@ -196,4 +196,73 @@ test("engine supports multiple comma-separated fallback targets", async () => {
     { url: "mobile://node", role: "fallback", model: "smollm2.gguf" },
     { url: "mobile://relay", role: "fallback", model: "smollm2.gguf" }
   ]);
+});
+
+
+test("engine auto-routes to a ready mobile chat engine", async () => {
+  const { updateMobileEngineRegistry } = await import("../src/mobileEngines.js");
+  const { generate, getProviderStatus, isProviderConfigured } = await import("../src/router.js");
+  const { engineTargets } = await import("../src/engine.js");
+  const { providerAdapters } = await import("../src/providers.js");
+
+  const previousOrder = process.env.AI_PROVIDER_ORDER;
+  const previousUrl = process.env.BHAI_ENGINE_URL;
+  const previousFallbackUrl = process.env.BHAI_ENGINE_FALLBACK_URL;
+  const previousAdapter = providerAdapters.engine;
+
+  process.env.AI_PROVIDER_ORDER = "engine";
+  delete process.env.BHAI_ENGINE_URL;
+  delete process.env.BHAI_ENGINE_FALLBACK_URL;
+
+  updateMobileEngineRegistry([
+    {
+      id: "smollm2",
+      name: "SmolLM2",
+      kind: "llm",
+      model: "smollm2.gguf",
+      backend: "llama.cpp-vulkan",
+      capabilities: ["chat", "gpu"],
+      ready: true,
+      loaded: true,
+      memory_mb: 512
+    }
+  ]);
+
+  const mobileTargets = engineTargets({ model: "bhai-local" });
+  providerAdapters.engine = async ({ messages }) => ({
+    text: messages[0].content,
+    model: mobileTargets[0]?.model,
+    raw: { url: mobileTargets[0]?.url, model: mobileTargets[0]?.model }
+  });
+
+  try {
+    assert.equal(isProviderConfigured("engine"), true);
+    assert.equal(getProviderStatus().engine.model, "smollm2.gguf");
+
+    assert.deepEqual(
+      engineTargets({ model: "bhai-local" }).map(target => ({
+        url: target.url,
+        role: target.role,
+        model: target.model
+      })),
+      [{ url: "mobile://smollm2", role: "mobile", model: "smollm2.gguf" }]
+    );
+
+    const result = await generate({
+      messages: [{ role: "user", content: "hello mobile" }]
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.provider, "engine");
+    assert.equal(result.model, "smollm2.gguf");
+    assert.equal(result.text, "hello mobile");
+  } finally {
+    updateMobileEngineRegistry([]);
+    providerAdapters.engine = previousAdapter;
+    if (previousOrder === undefined) delete process.env.AI_PROVIDER_ORDER;
+    else process.env.AI_PROVIDER_ORDER = previousOrder;
+    if (previousUrl === undefined) delete process.env.BHAI_ENGINE_URL;
+    else process.env.BHAI_ENGINE_URL = previousUrl;
+    if (previousFallbackUrl === undefined) delete process.env.BHAI_ENGINE_FALLBACK_URL;
+    else process.env.BHAI_ENGINE_FALLBACK_URL = previousFallbackUrl;
+  }
 });

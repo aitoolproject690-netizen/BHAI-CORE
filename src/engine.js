@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import https from "node:https";
 import { Readable } from "node:stream";
 
-import { requestMobileNode } from "./mobileNode.js";
+import { requestMobileNode, chooseMobileEngine } from "./mobileNode.js";
 import { requestMobileRelay } from "./mobileRelay.js";
 function timeoutSignal(ms = 60000) {
   return AbortSignal.timeout ? AbortSignal.timeout(ms) : undefined;
@@ -165,6 +165,13 @@ export function engineTargets({
       targets.push(item);
     }
   };
+
+  const configuredPrimary = String(url || "").trim();
+  const configuredFallback = String(fallbackUrl || "").trim();
+  const mobileEngine = !configuredPrimary && !configuredFallback ? chooseMobileEngine("chat") : null;
+  if (mobileEngine) {
+    push("mobile://" + mobileEngine.id, "", mobileEngine.model || mobileEngine.id, "mobile");
+  }
 
   push(url, key, model, "primary");
   const fallbackUrls = String(fallbackUrl || "")

@@ -107,7 +107,7 @@ function isMobileRelayTarget(url) {
   return String(url || "").startsWith("mobile://relay");
 }
 
-function smollm2CompletionPrompt(messages) {
+export function smollm2CompletionPrompt(messages) {
   const latest = Array.isArray(messages)
     ? messages.filter(message => message?.role === "user").slice(-1)[0]
     : null;

@@ -182,17 +182,39 @@ async function readJson(response) {
   let data;
   try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
   if (!response.ok) {
-    const error = new Error(
-      data?.error?.message ||
-      data?.error ||
-      data?.message ||
-      data?.raw ||
-      "BHAI engine HTTP " + response.status
-    );
+    const contentType = String(response.headers?.get?.("content-type") || "").toLowerCase();
+    const raw = String(data?.raw || "").trim();
+    const safeMessage = contentType.includes("text/html") || /^<!doctype html/i.test(raw)
+      ? "BHAI engine HTTP " + response.status
+      : (data?.error?.message || data?.error || data?.message || raw || "BHAI engine HTTP " + response.status);
+    const error = new Error(String(safeMessage).slice(0, 600));
     error.status = response.status;
     throw error;
   }
   return data;
+}
+
+function extractEngineText(data) {
+  const messageContent = data?.choices?.[0]?.message?.content;
+  const messageText = data?.choices?.[0]?.message?.text;
+  const choiceText = data?.choices?.[0]?.text;
+  const deltaText = data?.choices?.[0]?.delta?.content;
+  const candidates = [
+    Array.isArray(messageContent) ? messageContent.map(part => part?.text || "").join("") : messageContent,
+    messageText,
+    choiceText,
+    deltaText,
+    data?.output_text,
+    data?.output?.text,
+    data?.text,
+    data?.response,
+    data?.content
+  ];
+  for (const candidate of candidates) {
+    const value = String(candidate ?? "").trim();
+    if (value) return value;
+  }
+  return "";
 }
 
 export async function bhaiEngineProbe(config = {}) {
@@ -281,7 +303,7 @@ export async function bhaiEngineChat(config = {}) {
         signal: timeoutSignal()
       });
       const data = await readJson(response);
-      const text = data?.choices?.[0]?.message?.content || data?.output?.text || data?.text || "";
+      const text = extractEngineText(data);
       if (!text) throw new Error("BHAI engine returned no text");
       return {
         text,

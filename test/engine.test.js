@@ -151,6 +151,14 @@ test("engine can pin a self-signed HTTPS phone gateway by certificate fingerprin
 });
 
 
+test("SmolLM2 mobile prompt uses its documented ChatML format", async () => {
+  const { smollm2CompletionPrompt } = await import("../src/engine.js");
+  assert.equal(
+    smollm2CompletionPrompt([{ role: "user", content: "hello mobile" }]),
+    "<|im_start|>system\\nYou are a helpful AI assistant named SmolLM, trained by Hugging Face<|im_end|>\\n<|im_start|>user\\nhello mobile<|im_end|>\\n<|im_start|>assistant\\n"
+  );
+});
+
 test("engine accepts compatible response text shapes", async () => {
   const { bhaiEngineChat } = await import("../src/engine.js");
   const cases = [

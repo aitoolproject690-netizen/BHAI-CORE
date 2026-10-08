@@ -107,6 +107,16 @@ function isMobileRelayTarget(url) {
   return String(url || "").startsWith("mobile://relay");
 }
 
+export function smollm2CompletionPrompt(messages) {
+  const latest = Array.isArray(messages)
+    ? messages.filter(message => message?.role === "user").slice(-1)[0]
+    : null;
+  const content = String(latest?.content ?? "").trim();
+  return "<|im_start|>system\\nYou are a helpful AI assistant named SmolLM, trained by Hugging Face<|im_end|>\\n" +
+    "<|im_start|>user\\n" + content + "<|im_end|>\\n" +
+    "<|im_start|>assistant\\n";
+}
+
 async function requestTarget(target, path, options = {}) {
   if (isMobileRelayTarget(target.url)) {
     const forwardedHeaders = { ...(options.headers || {}) };
@@ -297,17 +307,30 @@ export async function bhaiEngineChat(config = {}) {
       const messages = localModel
         ? sourceMessages.filter(m => m?.role === "user").slice(-1)
         : sourceMessages;
-      const response = await requestTarget(target, endpoint(target.url), {
+      const targetPath = localModel && isMobileTarget(target.url)
+        ? "/v1/completions"
+        : endpoint(target.url);
+      const requestBody = localModel && isMobileTarget(target.url)
+        ? {
+            model: target.model,
+            prompt: smollm2CompletionPrompt(messages),
+            temperature: 0.2,
+            top_k: 1,
+            max_tokens: Math.min(Number(config.max_tokens ?? 64), 64),
+            stream: false
+          }
+        : {
+            model: target.model,
+            messages,
+            temperature: localModel ? 0.2 : (config.temperature ?? 0.2),
+            top_k: localModel ? 1 : undefined,
+            max_tokens: localModel ? Math.min(Number(config.max_tokens ?? 64), 64) : (config.max_tokens ?? 256),
+            stream: false
+          };
+      const response = await requestTarget(target, targetPath, {
         method: "POST",
         headers: headers(target.key),
-        body: JSON.stringify({
-          model: target.model,
-          messages,
-          temperature: localModel ? 0.2 : (config.temperature ?? 0.2),
-          top_k: localModel ? 1 : undefined,
-          max_tokens: localModel ? Math.min(Number(config.max_tokens ?? 64), 64) : (config.max_tokens ?? 256),
-          stream: false
-        }),
+        body: JSON.stringify(requestBody),
         signal: timeoutSignal()
       });
       const data = await readJson(response);

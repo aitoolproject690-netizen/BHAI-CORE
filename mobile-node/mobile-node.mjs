@@ -23,6 +23,34 @@ const HEARTBEAT_INTERVAL_MS = 10000;
 const LOCAL_ENGINE_RETRIES = 3;
 const LOCAL_ENGINE_RETRY_DELAYS_MS = [350, 900, 1600];
 
+const NODE_ID = String(process.env.BHAI_MOBILE_NODE_ID || "mobile-node").trim();
+const NODE_VERSION = String(process.env.BHAI_MOBILE_NODE_VERSION || "1.1.0").trim();
+
+const MOBILE_ENGINES = [
+  {
+    id: "smollm2",
+    name: "SmolLM2",
+    kind: "llm",
+    model: process.env.BHAI_LOCAL_MODEL || "smollm2.gguf",
+    backend: "llama.cpp-vulkan",
+    capabilities: ["chat", "gpu"],
+    ready: true,
+    loaded: true,
+    memory_mb: 512
+  },
+  {
+    id: "local-image",
+    name: "BHAI Local Image",
+    kind: "image",
+    model: "local-image-v1",
+    backend: "vulkan",
+    capabilities: ["image-text-to-image", "image-image-to-image", "gpu"],
+    ready: false,
+    loaded: false,
+    memory_mb: 0
+  }
+];
+
 if (!CORE_URL) throw new Error("BHAI_CORE_URL is required");
 if (!NODE_TOKEN) throw new Error("BHAI_MOBILE_NODE_TOKEN or BHAI_ENGINE_API_KEY is required");
 if (!LOCAL_ENGINE_API_KEY) throw new Error("BHAI local engine API key is required");
@@ -129,6 +157,7 @@ function connect() {
       nodeId: NODE_ID,
       model: process.env.BHAI_LOCAL_MODEL || "smollm2.gguf",
       capabilities: ["chat", "streaming", "local", "gpu", "vulkan"],
+      engines: MOBILE_ENGINES,
       platform: "android-termux",
       version: NODE_VERSION
     }));

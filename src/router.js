@@ -3,6 +3,7 @@ import { providerAdapters } from "./providers.js";
 import { breakerState, canAttempt, recordFailure, recordSuccess } from "./circuitBreaker.js";
 import { withRetry, classifyError } from "./retry.js";
 import { recordProviderUsage } from "./usage.js";
+import { chooseMobileEngine } from "./mobileNode.js";
 
 function providerConfig(name, cfg) {
   return name === "engine" ? cfg.engine : cfg.providers[name];
@@ -11,7 +12,12 @@ function providerConfig(name, cfg) {
 export function isProviderConfigured(name, cfg = config()) {
   const entry = providerConfig(name, cfg);
   if (name === "engine") {
-    return Boolean((entry?.url || entry?.fallbackUrl) && (entry?.model || entry?.fallbackModel) && typeof providerAdapters[name] === "function");
+    const configuredTarget = Boolean(
+      (entry?.url || entry?.fallbackUrl) &&
+      (entry?.model || entry?.fallbackModel)
+    );
+    const mobileTarget = Boolean(chooseMobileEngine("chat"));
+    return (configuredTarget || mobileTarget) && typeof providerAdapters[name] === "function";
   }
   return Boolean(entry?.key && typeof providerAdapters[name] === "function");
 }
@@ -31,7 +37,11 @@ export function getProviderStatus() {
         name,
         {
           configured: isProviderConfigured(name, cfg),
-          model: String(providerConfig(name, cfg)?.model ?? ""),
+          model: String(
+            name === "engine"
+              ? (chooseMobileEngine("chat")?.model || providerConfig(name, cfg)?.model || "")
+              : (providerConfig(name, cfg)?.model ?? "")
+          ),
           enabled: cfg.providerOrder.includes(name),
           breaker: breakerState(name)
         }

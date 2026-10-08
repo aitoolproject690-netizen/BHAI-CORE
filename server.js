@@ -546,7 +546,8 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (url.pathname === "/v1/engine/health" && req.method === "GET") {
-      const configured = Boolean(String(cfg.engine.url || "").trim() && String(cfg.engine.model || "").trim());
+      const mobileEngine = chooseMobileEngine("chat");
+      const configured = Boolean((String(cfg.engine.url || "").trim() && String(cfg.engine.model || "").trim()) || mobileEngine);
       if (!configured) {
         return send(res, 503, {
           ok: false,
@@ -571,7 +572,7 @@ const server = http.createServer(async (req, res) => {
             configured: true,
             reachable: true,
             inference: true,
-            model: result.model || cfg.engine.model,
+            model: result.model || mobileEngine?.model || cfg.engine.model,
             text: String(result.text || "").slice(0, 200),
             target_role: result.target_role || "primary",
             fallback_used: result.fallback_used === true
@@ -590,7 +591,7 @@ const server = http.createServer(async (req, res) => {
           configured: true,
           reachable: false,
           inference: url.searchParams.get("inference") === "true",
-          model: cfg.engine.model,
+          model: mobileEngine?.model || cfg.engine.model,
           error: String(error?.message || "BHAI engine probe failed").slice(0, 500)
         }, rid);
       }

@@ -245,7 +245,7 @@ test("engine auto-routes to a ready mobile chat engine", async () => {
         role: target.role,
         model: target.model
       })),
-      [{ url: "mobile://smollm2", role: "mobile", model: "smollm2.gguf" }]
+      [{ url: "mobile://smollm2", role: "primary", model: "smollm2.gguf" }]
     );
 
     const result = await generate({

@@ -23,3 +23,39 @@ test("image job ownership is tenant isolated", async () => {
   assert.equal((await getImageJobOwnership("prompt-123", "owner-a")).ownerId, "owner-a");
   assert.equal(await getImageJobOwnership("prompt-123", "owner-b"), null);
 });
+
+
+import { rawRgbToPng, parseLocalDreamSse, localDreamRequestPayload } from "../src/image.js";
+
+test("Local Dream raw RGB is converted into a valid PNG", () => {
+  const raw = Buffer.from([255,0,0, 0,255,0]).toString("base64");
+  const png = rawRgbToPng(raw, 2, 1);
+  assert.deepEqual([...png.subarray(0,8)], [137,80,78,71,13,10,26,10]);
+  assert.ok(png.length > 32);
+});
+
+test("Local Dream SSE parser returns the completed frame", () => {
+  const rgb = Buffer.from([255,0,0]).toString("base64");
+  const progress = JSON.stringify({ type: "progress", step: 1 });
+  const complete = JSON.stringify({ type: "complete", image: rgb, seed: 42, width: 1, height: 1 });
+  const event = parseLocalDreamSse(
+    "event: progress\ndata: " + progress + "\n\n" +
+    "event: complete\ndata: " + complete + "\n"
+  );
+  assert.equal(event.type, "complete");
+  assert.equal(event.seed, 42);
+});
+
+test("Local Dream payload keeps bounded mobile generation settings", () => {
+  const payload = localDreamRequestPayload({
+    prompt: "cinematic hero",
+    aspectRatio: "9:16",
+    steps: 999,
+    cfg: 99,
+    seed: -1
+  });
+  assert.deepEqual(
+    { width: payload.width, height: payload.height, steps: payload.steps, cfg: payload.cfg, scheduler: payload.scheduler },
+    { width: 576, height: 1024, steps: 30, cfg: 15, scheduler: "dpm" }
+  );
+});

@@ -3,6 +3,10 @@ import fs from "node:fs";
 const CORE_URL = String(process.env.BHAI_CORE_URL || "").replace(/\/+$/, "");
 const NODE_TOKEN = String(process.env.BHAI_MOBILE_NODE_TOKEN || process.env.BHAI_ENGINE_API_KEY || "");
 const LOCAL_ENGINE = String(process.env.BHAI_LOCAL_ENGINE_URL || "http://127.0.0.1:18080").replace(/\/+$/, "");
+// Local Dream listens separately on 127.0.0.1:8081; keep llama-server on 18080.
+const LOCAL_IMAGE_ENGINE = String(process.env.BHAI_LOCAL_IMAGE_ENGINE_URL || "http://127.0.0.1:8081").replace(/\/+$/, "");
+const LOCAL_IMAGE_ENGINE_API_KEY = String(process.env.BHAI_LOCAL_IMAGE_ENGINE_API_KEY || "");
+const LOCAL_IMAGE_ENGINE_READY = String(process.env.BHAI_LOCAL_IMAGE_ENGINE_READY || "false").toLowerCase() === "true";
 
 function readSecretFile(file) {
   try {

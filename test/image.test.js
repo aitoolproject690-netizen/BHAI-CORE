@@ -55,7 +55,7 @@ test("Local Dream payload keeps bounded mobile generation settings", () => {
     seed: -1
   });
   assert.deepEqual(
-    { width: payload.width, height: payload.height, steps: payload.steps, cfg: payload.cfg, scheduler: payload.scheduler },
-    { width: 576, height: 1024, steps: 30, cfg: 15, scheduler: "dpm" }
+    { size: payload.size, steps: payload.steps, cfg: payload.cfg, scheduler: payload.scheduler, use_opencl: payload.use_opencl },
+    { size: 512, steps: 30, cfg: 15, scheduler: "dpm", use_opencl: false }
   );
 });

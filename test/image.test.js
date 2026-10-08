@@ -39,8 +39,8 @@ test("Local Dream SSE parser returns the completed frame", () => {
   const progress = JSON.stringify({ type: "progress", step: 1 });
   const complete = JSON.stringify({ type: "complete", image: rgb, seed: 42, width: 1, height: 1 });
   const event = parseLocalDreamSse(
-    "event: progress\\ndata: " + progress + "\\n\\n" +
-    "event: complete\\ndata: " + complete + "\\n"
+    "event: progress\ndata: " + progress + "\n\n" +
+    "event: complete\ndata: " + complete + "\n"
   );
   assert.equal(event.type, "complete");
   assert.equal(event.seed, 42);

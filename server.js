@@ -20,7 +20,7 @@ import { embeddingInfo } from "./src/embeddings.js";
 import { getModelRegistry, modelCapabilities } from "./src/models.js";
 import { analyzeImage, getVisionCandidates } from "./src/vision.js";
 import { createImageRequest, submitComfyUI, submitMobileImage, getComfyUIHistory, getMobileImageJob, imageProviderInfo, recordImageJobOwnership, getImageJobOwnership } from "./src/image.js";
-import { createVideoRequest, planVideo, submitVideoHttp, submitMobileVideo, getMobileVideoJob, videoProviderInfo } from "./src/video.js";
+import { createVideoRequest, planVideo, submitVideoHttp, submitMobileVideo, getMobileVideoJob, recordVideoJobOwnership, getVideoJobOwnership, videoProviderInfo } from "./src/video.js";
 import { billingPlans, getBillingAccount, billingUsage, billingSnapshot, setBillingPlan, assertBillingQuota, consumeBillingQuota, releaseBillingQuota, recordBillingUsage } from "./src/billing.js";
 import { dashboardSnapshot } from "./src/dashboard.js";
 import { createSpeechRequest, transcribeWhisper, createTtsRequest, synthesizePiper, voiceProviderInfo } from "./src/voice.js";
@@ -898,6 +898,18 @@ const server = http.createServer(async (req, res) => {
 
     if (url.pathname === "/v1/video/providers" && req.method === "GET")
       return send(res, 200, { ok: true, providers: videoProviderInfo() }, rid);
+
+    const mobileVideoJobMatch = url.pathname.match(/^\/v1\/video\/jobs\/([A-Za-z0-9._:-]{1,160})$/);
+    if (mobileVideoJobMatch && req.method === "GET") {
+      const identity = await authenticate(req.headers["x-bhai-key"]);
+      if (!identity) return send(res, 401, { ok:false, error:"BHAI key required" }, rid);
+      const ownership = await getVideoJobOwnership(mobileVideoJobMatch[1], identity.id);
+      if (!ownership) return send(res, 404, { ok:false, error:"Video job not found" }, rid);
+      const result = ownership.provider === "mobile"
+        ? await getMobileVideoJob({ jobId: mobileVideoJobMatch[1] })
+        : { provider: ownership.provider, jobId: ownership.jobId, status:"polling-not-supported" };
+      return send(res, 200, { ok:true, ...result }, rid);
+    }
 
     if (url.pathname === "/v1/video/plan" && req.method === "POST") {
       const identity = await authenticate(req.headers["x-bhai-key"]);

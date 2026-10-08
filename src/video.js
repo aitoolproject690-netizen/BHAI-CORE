@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { requestMobileNode } from "./mobileNode.js";
 
 const MAX_SCENES = 120;
 const MAX_TOTAL_SECONDS = 600;
@@ -60,6 +61,29 @@ export function planVideo(request) {
   };
 }
 
+export async function submitMobileVideo({ request }) {
+  const response = await requestMobileNode({
+    path: "/v1/video/generate",
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(planVideo(request))
+  });
+  const raw = await response.text();
+  let data; try { data = raw ? JSON.parse(raw) : {}; } catch { data = { raw }; }
+  if (!response.ok) throw Object.assign(new Error(data?.error || data?.message || "Mobile video engine failed"), { status: response.status });
+  const jobId = data.jobId || data.id;
+  if (!jobId) throw new Error("Mobile video engine returned no job id");
+  return { provider: "mobile", jobId: String(jobId), output: data.output || null, status: data.status || "submitted" };
+}
+
+export async function getMobileVideoJob({ jobId }) {
+  const response = await requestMobileNode({ path: "/v1/video/jobs/" + encodeURIComponent(String(jobId)), method: "GET", headers: {} });
+  const raw = await response.text();
+  let data; try { data = raw ? JSON.parse(raw) : {}; } catch { data = { raw }; }
+  if (!response.ok) throw Object.assign(new Error(data?.error || data?.message || "Mobile video job lookup failed"), { status: response.status });
+  return { provider: "mobile", jobId: String(jobId), job: data };
+}
+
 export async function submitVideoHttp({ url, apiKey, request }) {
   const endpoint = cleanUrl(url);
   if (!endpoint) throw Object.assign(new Error("Video API is not configured"), { code: "VIDEO_NOT_CONFIGURED", status: 503 });
@@ -77,6 +101,7 @@ export async function submitVideoHttp({ url, apiKey, request }) {
 
 export function videoProviderInfo() {
   return {
+    mobile: { configured: true, local: true, mode: "mobile-node", capabilities: ["video-image-to-video","video-text-to-video"] },
     http: {
       configured: Boolean(process.env.VIDEO_API_URL),
       url: cleanUrl(process.env.VIDEO_API_URL || ""),

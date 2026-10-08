@@ -36,9 +36,11 @@ test("Local Dream raw RGB is converted into a valid PNG", () => {
 
 test("Local Dream SSE parser returns the completed frame", () => {
   const rgb = Buffer.from([255,0,0]).toString("base64");
+  const progress = JSON.stringify({ type: "progress", step: 1 });
+  const complete = JSON.stringify({ type: "complete", image: rgb, seed: 42, width: 1, height: 1 });
   const event = parseLocalDreamSse(
-    "event: progress\ndata: {\\\"type\\\":\\\"progress\\\",\\\"step\\\":1}\\n\\n" +
-    "event: complete\ndata: {\\\"type\\\":\\\"complete\\\",\\\"image\\\":\\\"" + rgb + "\\",\\\"seed\\\":42,\\\"width\\\":1,\\\"height\\\":1}\\n"
+    "event: progress\\ndata: " + progress + "\\n\\n" +
+    "event: complete\\ndata: " + complete + "\\n"
   );
   assert.equal(event.type, "complete");
   assert.equal(event.seed, 42);

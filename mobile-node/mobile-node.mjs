@@ -3,6 +3,10 @@ import fs from "node:fs";
 const CORE_URL = String(process.env.BHAI_CORE_URL || "").replace(/\/+$/, "");
 const NODE_TOKEN = String(process.env.BHAI_MOBILE_NODE_TOKEN || process.env.BHAI_ENGINE_API_KEY || "");
 const LOCAL_ENGINE = String(process.env.BHAI_LOCAL_ENGINE_URL || "http://127.0.0.1:18080").replace(/\/+$/, "");
+// Local Dream listens separately on 127.0.0.1:8081; keep llama-server on 18080.
+const LOCAL_IMAGE_ENGINE = String(process.env.BHAI_LOCAL_IMAGE_ENGINE_URL || "http://127.0.0.1:8081").replace(/\/+$/, "");
+const LOCAL_IMAGE_ENGINE_API_KEY = String(process.env.BHAI_LOCAL_IMAGE_ENGINE_API_KEY || "");
+const LOCAL_IMAGE_ENGINE_READY = String(process.env.BHAI_LOCAL_IMAGE_ENGINE_READY || "false").toLowerCase() === "true";
 
 function readSecretFile(file) {
   try {
@@ -40,14 +44,14 @@ const MOBILE_ENGINES = [
   },
   {
     id: "local-image",
-    name: "BHAI Local Image",
+    name: "Local Dream SD1.5",
     kind: "image",
-    model: "local-image-v1",
-    backend: "vulkan",
-    capabilities: ["image-text-to-image", "image-image-to-image", "gpu"],
-    ready: false,
-    loaded: false,
-    memory_mb: 0
+    model: process.env.BHAI_LOCAL_IMAGE_MODEL || "sd1.5",
+    backend: "local-dream",
+    capabilities: ["image-text-to-image", "gpu"],
+    ready: Boolean(LOCAL_IMAGE_ENGINE_READY && LOCAL_IMAGE_ENGINE),
+    loaded: Boolean(LOCAL_IMAGE_ENGINE_READY && LOCAL_IMAGE_ENGINE),
+    memory_mb: Number(process.env.BHAI_LOCAL_IMAGE_MEMORY_MB || 2048)
   }
 ];
 
@@ -70,10 +74,15 @@ function scheduleReconnect() {
   }, 3000);
 }
 
-function localEngineHeaders(headers) {
+function localEngineHeaders(headers, imageEngine = false) {
   const result = headers && typeof headers === "object" ? { ...headers } : {};
-  // Never trust/forward a remote Authorization header to the local engine.
-  result.authorization = "Bearer " + LOCAL_ENGINE_API_KEY;
+  // Never trust/forward a remote Authorization header to a local engine.
+  delete result.authorization;
+  if (imageEngine) {
+    if (LOCAL_IMAGE_ENGINE_API_KEY) result.authorization = "Bearer " + LOCAL_IMAGE_ENGINE_API_KEY;
+  } else {
+    result.authorization = "Bearer " + LOCAL_ENGINE_API_KEY;
+  }
   return result;
 }
 
@@ -90,7 +99,8 @@ function isRetryableLocalEngineError(error) {
 async function handleRequest(message) {
   const path = String(message.path || "/");
   const method = String(message.method || "GET").toUpperCase();
-  if (!path.startsWith("/v1/")) {
+  const imageEngine = path === "/generate";
+  if (!path.startsWith("/v1/") && !imageEngine) {
     return {
       type: "response",
       id: String(message.id || ""),
@@ -98,18 +108,28 @@ async function handleRequest(message) {
       body: JSON.stringify({ error: "path not allowed" })
     };
   }
+  if (imageEngine && !LOCAL_IMAGE_ENGINE_READY) {
+    return {
+      type: "response",
+      id: String(message.id || ""),
+      status: 503,
+      body: JSON.stringify({ error: "Local image engine is not marked ready on this mobile node" })
+    };
+  }
 
-  console.log("BHAI mobile node request", String(message.id || ""), method, path);
+  const engineBase = imageEngine ? LOCAL_IMAGE_ENGINE : LOCAL_ENGINE;
+  const timeoutMs = imageEngine ? 240000 : 65000;
+  console.log("BHAI mobile node request", String(message.id || ""), method, path, imageEngine ? "image-engine" : "llm-engine");
   let lastError = null;
 
   for (let attempt = 1; attempt <= LOCAL_ENGINE_RETRIES; attempt++) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 65000);
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      const response = await fetch(LOCAL_ENGINE + path, {
+      const response = await fetch(engineBase + path, {
         method,
-        headers: localEngineHeaders(message.headers),
+        headers: localEngineHeaders(message.headers, imageEngine),
         body: message.body == null ? undefined : String(message.body),
         signal: controller.signal
       });

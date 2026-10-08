@@ -827,6 +827,18 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true, ...request, ...result }, rid);
     }
 
+    if (url.pathname === "/v1/internal/image/generate" && req.method === "POST") {
+      const expected = process.env.BHAI_CORE_INTERNAL_IMAGE_KEY;
+      const provided = req.headers["x-bhai-internal-key"];
+      if (!secretsEqual(String(provided || ""), String(expected || ""))) {
+        return send(res, 401, { ok: false, error: "Internal image route authentication failed" }, rid);
+      }
+      const body = await readJson(req, 120_000);
+      const request = createImageRequest({ ...body, provider: "mobile" });
+      const result = await submitMobileImage({ request });
+      return send(res, 200, { ok: true, ...result, status: "completed" }, rid);
+    }
+
     if (url.pathname === "/v1/image/providers" && req.method === "GET")
       return send(res, 200, { ok: true, providers: imageProviderInfo() }, rid);
 

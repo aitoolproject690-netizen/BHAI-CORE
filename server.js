@@ -53,7 +53,7 @@ import { clientAddress } from "./src/requestIdentity.js";
 import { authenticateMaster } from "./src/masterAuth.js";
 import { sessionCookie, clearSessionCookie, authenticateSession } from "./src/dashboardAuth.js";
 import { hasApiAccess } from "./src/access.js";
-import { attachMobileNode, mobileNodeInfo } from "./src/mobileNode.js";
+import { attachMobileNode, mobileNodeInfo, mobileEngineRegistryInfo, chooseMobileEngine } from "./src/mobileNode.js";
 import { moduleCatalog, moduleForRequest, modulePermissions } from "./src/modules.js";
 
 const cfg = config();
@@ -505,7 +505,17 @@ const server = http.createServer(async (req, res) => {
       return res.end(html);
     }
 
-    if (url.pathname === "/v1/cloud/webhooks/github" && req.method === "POST") {
+    if (url.pathname === "/v1/mobile/engines" && req.method === "GET") {
+    return send(res, 200, mobileEngineRegistryInfo(), rid);
+  }
+
+  if (url.pathname === "/v1/mobile/engine/select" && req.method === "POST") {
+    const body = await readJson(req, 64 * 1024);
+    const engine = chooseMobileEngine(body.capability, body.model || null);
+    return send(res, engine ? 200 : 404, engine ? { ok:true, engine } : { ok:false, error:"No ready local mobile engine matches request" }, rid);
+  }
+
+  if (url.pathname === "/v1/cloud/webhooks/github" && req.method === "POST") {
       const secret = process.env.BHAI_GITHUB_WEBHOOK_SECRET;
       if (!secret) return send(res, 503, { ok:false, error:"GitHub webhook secret is not configured" }, rid);
       const signature = req.headers["x-hub-signature-256"] || "";

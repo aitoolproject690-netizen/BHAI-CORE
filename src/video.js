@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { requestMobileNode } from "./mobileNode.js";
+import { getStore, updateStore } from "./store.js";
 
 const MAX_SCENES = 120;
 const MAX_TOTAL_SECONDS = 600;
@@ -108,4 +109,25 @@ export function videoProviderInfo() {
       mode: "external-adapter"
     }
   };
+}
+
+
+export async function recordVideoJobOwnership({ jobId, ownerId, requestId = null, provider = "mobile" }) {
+  const id = String(jobId || "").trim();
+  if (!id || !/^[A-Za-z0-9._:-]{1,160}$/.test(id)) throw new Error("Invalid video job id");
+  if (!ownerId) throw new Error("ownerId is required");
+  await updateStore(store => {
+    store.videoJobs ??= {};
+    store.videoJobs[id] = { jobId:id, ownerId:String(ownerId), requestId:requestId || null, provider:String(provider || "mobile").toLowerCase(), createdAt:new Date().toISOString() };
+    return store;
+  });
+  return { jobId:id, ownerId:String(ownerId) };
+}
+
+export async function getVideoJobOwnership(jobId, ownerId) {
+  const id=String(jobId || "").trim();
+  const store=await getStore();
+  const job=store.videoJobs?.[id];
+  if(!job || job.ownerId!==ownerId) return null;
+  return {...job};
 }

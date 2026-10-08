@@ -136,6 +136,7 @@ async function requestTarget(target, path, options = {}) {
   });
 }
 
+// Live Mobile Engine Proof trigger: keep engine path covered by push-triggered proof.
 export function engineTargets({
   url = "",
   key = "",

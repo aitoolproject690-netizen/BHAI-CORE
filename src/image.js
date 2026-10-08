@@ -7,18 +7,13 @@ const MAX_PROMPT_CHARS = Number(process.env.BHAI_MAX_IMAGE_PROMPT_CHARS || 4000)
 
 const LOCAL_DREAM_PATH = "/generate";
 const LOCAL_DREAM_DEFAULTS = Object.freeze({
-  steps: Number(process.env.BHAI_LOCAL_IMAGE_STEPS || 10),
+  steps: Number(process.env.BHAI_LOCAL_IMAGE_STEPS || 20),
   cfg: Number(process.env.BHAI_LOCAL_IMAGE_CFG || 7.5),
   scheduler: String(process.env.BHAI_LOCAL_IMAGE_SCHEDULER || "dpm")
 });
 
-function imageDimensions(aspectRatio) {
-  switch (String(aspectRatio || "16:9")) {
-    case "9:16": return { width: 576, height: 1024 };
-    case "1:1": return { width: 768, height: 768 };
-    case "4:5": return { width: 640, height: 800 };
-    default: return { width: 768, height: 432 };
-  }
+function imageDimensions() {
+  return { width: 512, height: 512, size: 512 };
 }
 
 function crc32(buffer) {
@@ -88,16 +83,16 @@ export function parseLocalDreamSse(raw) {
 }
 
 export function localDreamRequestPayload(request = {}) {
-  const dims = imageDimensions(request.aspectRatio);
+  const dims = imageDimensions();
   return {
     prompt: String(request.prompt || "").trim().slice(0, 1200),
-    negative_prompt: String(request.negativePrompt || "").trim().slice(0, 800),
+    negative_prompt: String(request.negativePrompt || "low quality, blurry, bad anatomy").trim().slice(0, 800),
+    size: dims.size,
     steps: Number.isInteger(Number(request.steps)) ? Math.max(1, Math.min(30, Number(request.steps))) : LOCAL_DREAM_DEFAULTS.steps,
     cfg: Number.isFinite(Number(request.cfg)) ? Math.max(1, Math.min(15, Number(request.cfg))) : LOCAL_DREAM_DEFAULTS.cfg,
     scheduler: String(request.scheduler || LOCAL_DREAM_DEFAULTS.scheduler),
     seed: Number.isInteger(Number(request.seed)) ? request.seed >>> 0 : Math.floor(Math.random() * 2 ** 31),
-    width: dims.width,
-    height: dims.height
+    use_opencl: false
   };
 }
 
@@ -150,6 +145,8 @@ export async function submitMobileImage({ request }) {
     throw Object.assign(new Error(data?.error || data?.message || "Local Dream image engine failed"), { status: response.status });
   }
   const complete = parseLocalDreamSse(raw);
+  const channels = Number(complete.channels || 3);
+  if (channels !== 3) throw new Error("Local Dream returned unsupported pixel channels: " + channels);
   const png = rawRgbToPng(complete.image, complete.width, complete.height);
   const jobId = "ld-" + request.id.slice(4);
   return {

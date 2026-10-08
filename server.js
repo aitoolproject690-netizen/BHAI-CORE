@@ -935,6 +935,9 @@ const server = http.createServer(async (req, res) => {
         await releaseBillingQuota(identity.id, billingReservation);
         throw error;
       }
+      if (request.provider === "mobile") {
+        await recordVideoJobOwnership({ jobId: result.jobId, ownerId: identity.id, requestId: rid, provider: "mobile" });
+      }
       await recordBillingUsage(identity.id, {});
       await recordUsage({ key: identity.id, input: JSON.stringify(request).length });
       return send(res, 202, { ok: true, ...request, ...result }, rid);

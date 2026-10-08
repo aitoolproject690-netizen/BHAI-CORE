@@ -53,7 +53,7 @@ import { clientAddress } from "./src/requestIdentity.js";
 import { authenticateMaster } from "./src/masterAuth.js";
 import { sessionCookie, clearSessionCookie, authenticateSession } from "./src/dashboardAuth.js";
 import { hasApiAccess } from "./src/access.js";
-import { attachMobileNode } from "./src/mobileNode.js";
+import { attachMobileNode, mobileNodeInfo } from "./src/mobileNode.js";
 import { moduleCatalog, moduleForRequest, modulePermissions } from "./src/modules.js";
 
 const cfg = config();
@@ -210,7 +210,8 @@ const server = http.createServer(async (req, res) => {
           agentTools: "/v1/agent/tools",
           jobs: "/v1/jobs",
           modules: "/v1/modules",
-          keys: "/v1/keys"
+          keys: "/v1/keys",
+          mobileNodeStatus: "/v1/mobile-node/status"
         }
       }, rid);
     }
@@ -759,6 +760,9 @@ const server = http.createServer(async (req, res) => {
 
     if (url.pathname === "/v1/providers" && req.method === "GET")
       return send(res, 200, { ok: true, providers: getProviderStatus() }, rid);
+
+    if (url.pathname === "/v1/mobile-node/status" && req.method === "GET")
+      return send(res, 200, { ok: true, mobileNode: mobileNodeInfo() }, rid);
 
     if (url.pathname === "/v1/models" && req.method === "GET") {
       const probe = url.searchParams.get("probe") === "true";

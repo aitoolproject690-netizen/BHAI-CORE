@@ -123,7 +123,15 @@ function connect() {
   socket = new WebSocket(wsUrl);
   socket.addEventListener("open", () => {
     console.log("BHAI mobile node connected");
-    socket.send(JSON.stringify({ type: "auth", token: NODE_TOKEN }));
+    socket.send(JSON.stringify({
+      type: "auth",
+      token: NODE_TOKEN,
+      nodeId: NODE_ID,
+      model: process.env.BHAI_LOCAL_MODEL || "smollm2.gguf",
+      capabilities: ["chat", "streaming", "local", "gpu", "vulkan"],
+      platform: "android-termux",
+      version: NODE_VERSION
+    }));
     if (heartbeatTimer) clearInterval(heartbeatTimer);
     heartbeatTimer = setInterval(() => {
       if (socket?.readyState !== WebSocket.OPEN) return;
@@ -136,7 +144,10 @@ function connect() {
     try { message = JSON.parse(String(event.data)); } catch { return; }
 
     if (message?.type === "auth_ok") {
-      console.log("BHAI mobile node auth ok");
+      console.log("BHAI mobile node auth ok", JSON.stringify({
+        nodeId: message.nodeId || NODE_ID,
+        pairedBy: message.pairedBy || "token"
+      }));
       return;
     }
     if (message?.type === "heartbeat_ack") {

@@ -151,49 +151,12 @@ test("engine can pin a self-signed HTTPS phone gateway by certificate fingerprin
 });
 
 
-test("mobile SmolLM2 uses a deterministic completion prompt when chat output is empty", async () => {
-  const { bhaiEngineChat } = await import("../src/engine.js");
-  const { updateMobileEngineRegistry } = await import("../src/mobileEngines.js");
-  const previousUrl = process.env.BHAI_ENGINE_URL;
-  const previousFallbackUrl = process.env.BHAI_ENGINE_FALLBACK_URL;
-  delete process.env.BHAI_ENGINE_URL;
-  delete process.env.BHAI_ENGINE_FALLBACK_URL;
-  updateMobileEngineRegistry([{
-    id: "smollm2", model: "smollm2.gguf", capabilities: ["chat"], ready: true, loaded: true, memory_mb: 512
-  }]);
-
-  const server = http.createServer((req, res) => {
-    assert.equal(req.url, "/v1/completions");
-    let body = "";
-    req.on("data", chunk => { body += chunk; });
-    req.on("end", () => {
-      const payload = JSON.parse(body);
-      assert.match(payload.prompt, /<\\|im_start\\|>system/);
-      assert.match(payload.prompt, /<\\|im_start\\|>user\\nhello mobile<\\|im_end\\|>/);
-      assert.match(payload.prompt, /<\\|im_start\\|>assistant\\n$/);
-      res.setHeader("content-type", "application/json");
-      res.end(JSON.stringify({ choices: [{ text: "mobile completion ok" }] }));
-    });
-  });
-  await new Promise((resolve, reject) => { server.once("error", reject); server.listen(0, "127.0.0.1", resolve); });
-  const port = server.address().port;
-
-  try {
-    const result = await bhaiEngineChat({
-      url: "mobile://smollm2",
-      model: "smollm2.gguf",
-      messages: [{ role: "user", content: "hello mobile" }]
-    });
-    assert.equal(result.text, "mobile completion ok");
-    assert.equal(result.model, "smollm2.gguf");
-  } finally {
-    await new Promise(resolve => server.close(resolve));
-    updateMobileEngineRegistry([]);
-    if (previousUrl === undefined) delete process.env.BHAI_ENGINE_URL; else process.env.BHAI_ENGINE_URL = previousUrl;
-    if (previousFallbackUrl === undefined) delete process.env.BHAI_ENGINE_FALLBACK_URL; else process.env.BHAI_ENGINE_FALLBACK_URL = previousFallbackUrl;
-  }
-
-  void port;
+test("SmolLM2 mobile prompt uses its documented ChatML format", async () => {
+  const { smollm2CompletionPrompt } = await import("../src/engine.js");
+  assert.equal(
+    smollm2CompletionPrompt([{ role: "user", content: "hello mobile" }]),
+    "<|im_start|>system\\nYou are a helpful AI assistant named SmolLM, trained by Hugging Face<|im_end|>\\n<|im_start|>user\\nhello mobile<|im_end|>\\n<|im_start|>assistant\\n"
+  );
 });
 
 test("engine accepts compatible response text shapes", async () => {

@@ -6,6 +6,7 @@ import https from "node:https";
 import { execFileSync } from "node:child_process";
 import test from "node:test";
 import assert from "node:assert/strict";
+import http from "node:http";
 
 import { generate, getProviderStatus, isProviderConfigured } from "../src/router.js";
 import { providerAdapters } from "../src/providers.js";
@@ -149,6 +150,38 @@ test("engine can pin a self-signed HTTPS phone gateway by certificate fingerprin
   }
 });
 
+
+test("engine accepts compatible response text shapes", async () => {
+  const { bhaiEngineChat } = await import("../src/engine.js");
+  const cases = [
+    [{ choices: [{ message: { content: "message-content" } }] }, "message-content"],
+    [{ choices: [{ message: { text: "message-text" } }] }, "message-text"],
+    [{ choices: [{ text: "choice-text" }] }, "choice-text"],
+    [{ output_text: "output-text" }, "output-text"],
+    [{ response: "response-text" }, "response-text"]
+  ];
+  for (const [body, expected] of cases) {
+    const server = http.createServer((req, res) => {
+      res.setHeader("content-type", "application/json");
+      res.end(JSON.stringify(body));
+    });
+    await new Promise((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(0, "127.0.0.1", resolve);
+    });
+    try {
+      const port = server.address().port;
+      const result = await bhaiEngineChat({
+        url: "http://127.0.0.1:" + port,
+        model: "test-model",
+        messages: [{ role: "user", content: "hello" }]
+      });
+      assert.equal(result.text, expected);
+    } finally {
+      await new Promise(resolve => server.close(resolve));
+    }
+  }
+});
 
 test("engine supports multiple comma-separated fallback targets", async () => {
   const { engineTargets } = await import("../src/engine.js");

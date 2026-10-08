@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { WebSocketServer, WebSocket } from "ws";
+import { updateMobileEngineRegistry, mobileEngineInfo, selectMobileEngine } from "./mobileEngines.js";
 
 const PATH = "/v1/mobile-node";
 const AUTH_TIMEOUT_MS = 5000;
@@ -159,10 +160,12 @@ export function attachMobileNode(server) {
             nodeId: announcedNodeId || "mobile-node",
             model: String(message.model || "").trim().slice(0, 160) || null,
             capabilities: normalizedCapabilities(message.capabilities),
+            engines: Array.isArray(message.engines) ? message.engines.slice(0,64) : [],
             platform: String(message.platform || "").trim().slice(0, 64) || null,
             version: String(message.version || "").trim().slice(0, 64) || null,
             pairedBy: configured.expectedNodeId ? "token+node-id" : "token"
           };
+          updateMobileEngineRegistry(activeMeta.engines);
           startHeartbeat();
           ws.send(JSON.stringify({
             type: "auth_ok",
@@ -241,8 +244,19 @@ export function mobileNodeInfo() {
     capabilities: activeMeta?.capabilities || [],
     platform: activeMeta?.platform || null,
     version: activeMeta?.version || null,
+    engines: mobileEngineInfo().engines,
     pairingMode: configured.expectedNodeId ? "token+node-id" : "token"
   };
+}
+
+
+
+export function mobileEngineRegistryInfo(){
+  return mobileEngineInfo();
+}
+
+export function chooseMobileEngine(capability, model=null){
+  return selectMobileEngine({capability,model});
 }
 
 async function waitForActive(timeoutMs = CONNECT_WAIT_TIMEOUT_MS) {

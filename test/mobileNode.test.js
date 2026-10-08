@@ -86,3 +86,43 @@ test("mobile node relay authenticates and forwards requests", async () => {
     delete process.env.BHAI_MOBILE_NODE_ID;
   }
 });
+
+
+test("mobile node accepts the exact Local Dream generation path", async () => {
+  process.env.BHAI_MOBILE_NODE_TOKEN = "path-test-token";
+  try {
+    const server = http.createServer();
+    attachMobileNode(server);
+    await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+    const port = server.address().port;
+    const client = new WebSocket("ws://127.0.0.1:" + port + "/v1/mobile-node");
+    try {
+      await new Promise((resolve, reject) => {
+        client.once("error", reject);
+        client.once("open", () => client.send(JSON.stringify({ type:"auth", token:"path-test-token" })));
+        client.once("message", raw => JSON.parse(String(raw)).type === "auth_ok" ? resolve() : null);
+      });
+      const relay = requestMobileNode({ path:"/generate", method:"POST", headers:{"content-type":"application/json"}, body:"{}" });
+      const request = await new Promise((resolve, reject) => {
+        const onMessage = raw => {
+          const message = JSON.parse(String(raw));
+          if (message.type === "request") {
+            client.off("message", onMessage);
+            resolve(message);
+          }
+        };
+        client.on("message", onMessage);
+        client.once("error", reject);
+      });
+      assert.equal(request.path, "/generate");
+      client.send(JSON.stringify({ type:"response", id:request.id, status:503, body:"{}" }));
+      const response = await relay;
+      assert.equal(response.status, 503);
+    } finally {
+      client.close();
+      await new Promise(resolve => server.close(resolve));
+    }
+  } finally {
+    delete process.env.BHAI_MOBILE_NODE_TOKEN;
+  }
+});

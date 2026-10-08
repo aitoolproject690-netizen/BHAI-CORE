@@ -96,7 +96,7 @@ export function imageProviderInfo() {
   };
 }
 
-export async function recordImageJobOwnership({ promptId, ownerId, requestId = null }) {
+export async function recordImageJobOwnership({ promptId, ownerId, requestId = null, provider = "comfyui" }) {
   const id = String(promptId || "").trim();
   if (!id || !/^[A-Za-z0-9_-]+$/.test(id)) throw new Error("Invalid image job id");
   if (!ownerId) throw new Error("ownerId is required");
@@ -106,7 +106,7 @@ export async function recordImageJobOwnership({ promptId, ownerId, requestId = n
       promptId: id,
       ownerId: String(ownerId),
       requestId: requestId || null,
-      provider: String(arguments[0]?.provider || "comfyui"),
+      provider: String(provider || "comfyui").toLowerCase(),
       createdAt: new Date().toISOString()
     };
     return store;

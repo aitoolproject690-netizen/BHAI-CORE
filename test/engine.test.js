@@ -24,6 +24,7 @@ test("BHAI engine is a first-class provider without requiring a vendor API key",
   delete process.env.BHAI_ENGINE_API_KEY;
   providerAdapters.engine = async ({ url, model, messages }) => ({
     text: messages[0].content,
+    model,
     raw: { url, model }
   });
 
@@ -202,6 +203,7 @@ test("engine supports multiple comma-separated fallback targets", async () => {
 test("engine auto-routes to a ready mobile chat engine", async () => {
   const { updateMobileEngineRegistry } = await import("../src/mobileEngines.js");
   const { generate, getProviderStatus, isProviderConfigured } = await import("../src/router.js");
+  const { engineTargets } = await import("../src/engine.js");
   const { providerAdapters } = await import("../src/providers.js");
 
   const previousOrder = process.env.AI_PROVIDER_ORDER;
@@ -235,6 +237,15 @@ test("engine auto-routes to a ready mobile chat engine", async () => {
   try {
     assert.equal(isProviderConfigured("engine"), true);
     assert.equal(getProviderStatus().engine.model, "smollm2.gguf");
+
+    assert.deepEqual(
+      engineTargets({ model: "bhai-local" }).map(target => ({
+        url: target.url,
+        role: target.role,
+        model: target.model
+      })),
+      [{ url: "mobile://smollm2", role: "mobile", model: "smollm2.gguf" }]
+    );
 
     const result = await generate({
       messages: [{ role: "user", content: "hello mobile" }]

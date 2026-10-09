@@ -54,6 +54,7 @@ import { authenticateMaster } from "./src/masterAuth.js";
 import { sessionCookie, clearSessionCookie, authenticateSession } from "./src/dashboardAuth.js";
 import { hasApiAccess } from "./src/access.js";
 import { attachMobileNode, mobileNodeInfo, mobileEngineRegistryInfo, chooseMobileEngine } from "./src/mobileNode.js";
+import { selfHostedImageWorkerStatus } from "./src/imageWorker.js";
 import { moduleCatalog, moduleForRequest, modulePermissions } from "./src/modules.js";
 
 const cfg = config();
@@ -825,6 +826,34 @@ const server = http.createServer(async (req, res) => {
       await recordBillingUsage(identity.id, {});
       await recordUsage({ key: identity.id, input: request.text.length });
       return send(res, 200, { ok: true, ...request, ...result }, rid);
+    }
+
+    if (url.pathname === "/v1/internal/image/worker" && (req.method === "GET" || req.method === "POST")) {
+      const expected = String(process.env.BHAI_IMAGE_WORKER_KEY || "");
+      if (!expected) return send(res, 503, { ok:false, configured:false, ready:false, error:"Self-hosted image worker key is not configured" }, rid);
+      if (!secretsEqual(String(req.headers.authorization || ""), "Bearer " + expected))
+        return send(res, 401, { ok:false, configured:true, ready:false, error:"Image worker authentication required" }, rid);
+      const worker = selfHostedImageWorkerStatus();
+      if (req.method === "GET") return send(res, worker.ready ? 200 : 503, worker, rid);
+      if (!worker.ready) return send(res, 503, { ...worker, error:"Self-hosted Local Dream image engine is not ready" }, rid);
+      const body = await readJson(req, 120_000);
+      let result;
+      try {
+        const request = createImageRequest({ prompt:body.prompt, provider:"mobile",
+          model:body.model || worker.engine?.model || "sd1.5",
+          seed:Number.isInteger(body.seed) ? body.seed : undefined });
+        result = await submitMobileImage({ request });
+      } catch (error) {
+        const status = Number(error?.status) >= 400 && Number(error.status) < 600 ? Number(error.status) : 502;
+        return send(res, status, { ok:false, provider:"mobile-local-dream", error:String(error?.message || error).slice(0,500) }, rid);
+      }
+      const output = result?.output || {};
+      if (String(output.mimeType || "").toLowerCase() !== "image/png" || !output.data)
+        return send(res, 502, { ok:false, provider:"mobile-local-dream", error:"Local Dream returned no valid PNG image" }, rid);
+      return send(res, 200, { schemaVersion:"1.0", mimeType:"image/png", data:output.data,
+        width:Number(output.width)||null, height:Number(output.height)||null,
+        seed:Number.isInteger(result.seed)?result.seed:null, provider:"mobile-local-dream",
+        verification:{ok:true,mode:"mobile-local-dream-png",containerValid:true} }, rid);
     }
 
     if (url.pathname === "/v1/internal/image/generate" && req.method === "POST") {

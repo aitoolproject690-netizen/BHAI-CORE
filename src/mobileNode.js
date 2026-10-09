@@ -179,7 +179,16 @@ export function attachMobileNode(server) {
             waiter.resolve(ws);
           }
           connectionWaiters.clear();
-          console.log("BHAI mobile node authenticated");
+          console.log("BHAI mobile node authenticated", JSON.stringify({
+            nodeId: activeMeta.nodeId,
+            engines: activeMeta.engines.map(engine => ({
+              id: String(engine?.id || "").slice(0, 80),
+              model: String(engine?.model || "").slice(0, 120),
+              ready: engine?.ready === true,
+              loaded: engine?.loaded === true,
+              capabilities: normalizedCapabilities(engine?.capabilities)
+            }))
+          }));
           return;
         }
 

@@ -4,7 +4,7 @@ export async function probeLocalImageEngine({
   fetchImpl = globalThis.fetch,
   timeoutMs = 3000
 } = {}) {
-  const endpoint = String(url || "").trim().replace(/\\/+$/, "");
+  const endpoint = String(url || "").trim().replace(/\/+$/, "");
   if (!endpoint || typeof fetchImpl !== "function") return false;
 
   const controller = new AbortController();

@@ -192,7 +192,7 @@ async function handleRequest(message) {
 async function connect() {
   localImageEngineReady = await probeLocalImageEngine();
   const engines = buildMobileEngines(localImageEngineReady);
-  console.log("BHAI mobile image engine", localImageReady ? "ready" : "not ready");
+  console.log("BHAI mobile image engine", localImageEngineReady ? "ready" : "not ready");
   socket = new WebSocket(wsUrl);
   socket.addEventListener("open", () => {
     console.log("BHAI mobile node connected");

@@ -70,19 +70,31 @@ export function rawRgbToPng(rawBase64, width, height) {
 
 export function parseLocalDreamSse(raw) {
   const events = [];
-  const blocks = String(raw || "").split(/\r?\n\r?\n/);
-  for (const block of blocks) {
-    const dataLine = block.split(/\r?\n/).find(line => line.startsWith("data:"));
-    if (!dataLine) continue;
-    const payload = dataLine.slice(5).trim();
-    if (!payload) continue;
+  let dataLines = [];
+  const flush = () => {
+    if (!dataLines.length) return;
+    const payload = dataLines.join("\n").trim();
+    dataLines = [];
+    if (!payload) return;
     try { events.push(JSON.parse(payload)); } catch {
       throw new Error("Local Dream returned malformed SSE data.");
     }
+  };
+  for (const line of String(raw || "").split(/\r?\n/)) {
+    if (!line.trim()) {
+      flush();
+      continue;
+    }
+    if (line.startsWith("data:")) dataLines.push(line.slice(5).replace(/^ /, ""));
   }
-  const errorEvent = [...events].reverse().find(e => e?.type === "error" || e?.message && /error/i.test(String(e?.type || "")));
+  flush();
+  const errorEvent = [...events].reverse().find(e =>
+    e?.type === "error" || (e?.message && /error/i.test(String(e?.type || "")))
+  );
   if (errorEvent) throw new Error(String(errorEvent.message || "Local Dream generation failed."));
-  const complete = [...events].reverse().find(e => e?.type === "complete" && e?.image);
+  const complete = [...events].reverse().find(e =>
+    (e?.type === "complete" || e?.type === "completed" || e?.event === "complete") && e?.image
+  );
   if (!complete) throw new Error("Local Dream returned no completed image.");
   return complete;
 }

@@ -7,6 +7,7 @@ const LOCAL_ENGINE = String(process.env.BHAI_LOCAL_ENGINE_URL || "http://127.0.0
 const LOCAL_IMAGE_ENGINE = String(process.env.BHAI_LOCAL_IMAGE_ENGINE_URL || "http://127.0.0.1:8081").replace(/\/+$/, "");
 const LOCAL_IMAGE_ENGINE_API_KEY = String(process.env.BHAI_LOCAL_IMAGE_ENGINE_API_KEY || "");
 let localImageEngineReady = String(process.env.BHAI_LOCAL_IMAGE_ENGINE_READY || "false").toLowerCase() === "true";
+let localTextEngineReady = false;
 
 function readSecretFile(file) {
   try {
@@ -30,7 +31,7 @@ const LOCAL_ENGINE_RETRY_DELAYS_MS = [350, 900, 1600];
 const NODE_ID = String(process.env.BHAI_MOBILE_NODE_ID || "mobile-node").trim();
 const NODE_VERSION = String(process.env.BHAI_MOBILE_NODE_VERSION || "1.1.0").trim();
 
-function buildMobileEngines(localImageReady = false) {
+function buildMobileEngines(localImageReady = false, localTextReady = false) {
   return [
     {
       id: "smollm2",
@@ -39,7 +40,7 @@ function buildMobileEngines(localImageReady = false) {
       model: process.env.BHAI_LOCAL_MODEL || "smollm2.gguf",
       backend: "llama.cpp-vulkan",
       capabilities: ["chat", "gpu"],
-      ready: true,
+      ready: localTextReady,
       loaded: true,
       memory_mb: 512
     },
@@ -88,6 +89,28 @@ function localEngineHeaders(headers, imageEngine = false) {
   return result;
 }
 
+async function probeLocalTextEngine() {
+  if (!LOCAL_ENGINE || !LOCAL_ENGINE_API_KEY) return false;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12000);
+  try {
+    const response = await fetch(LOCAL_ENGINE + "/completion", {
+      method: "POST",
+      headers: localEngineHeaders({ "content-type": "application/json" }),
+      body: JSON.stringify({ prompt: "2 + 2 = ", n_predict: 8, temperature: 0, cache_prompt: false }),
+      signal: controller.signal
+    });
+    if (!response.ok) return false;
+    const result = await response.json().catch(() => ({}));
+    const answer = String(result?.content || "").trim();
+    // A reachable endpoint is not enough: do not advertise gibberish inference as ready.
+    return /^4(?:\s|[.!?]|$)/.test(answer);
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 async function probeLocalImageEngine() {
   if (!LOCAL_IMAGE_ENGINE) return false;
   if (localImageEngineReady) return true;
@@ -128,6 +151,14 @@ async function handleRequest(message) {
       id: String(message.id || ""),
       status: 400,
       body: JSON.stringify({ error: "path not allowed" })
+    };
+  }
+  if (!imageEngine && !localTextEngineReady) {
+    return {
+      type: "response",
+      id: String(message.id || ""),
+      status: 503,
+      body: JSON.stringify({ error: "Local text engine failed its inference readiness check" })
     };
   }
   if (imageEngine && !localImageEngineReady) {
@@ -190,8 +221,10 @@ async function handleRequest(message) {
 }
 
 async function connect() {
+  localTextEngineReady = await probeLocalTextEngine();
   localImageEngineReady = await probeLocalImageEngine();
-  const engines = buildMobileEngines(localImageEngineReady);
+  const engines = buildMobileEngines(localImageEngineReady, localTextEngineReady);
+  console.log("BHAI mobile text engine", localTextEngineReady ? "ready" : "not ready (inference probe failed)");
   console.log("BHAI mobile image engine", localImageEngineReady ? "ready" : "not ready");
   socket = new WebSocket(wsUrl);
   socket.addEventListener("open", () => {

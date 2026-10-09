@@ -7,7 +7,8 @@ const AUTH_TIMEOUT_MS = 5000;
 const REQUEST_TIMEOUT_MS = 65000;
 const HEARTBEAT_INTERVAL_MS = 10000;
 const CONNECT_WAIT_TIMEOUT_MS = 12000;
-const MAX_WS_PAYLOAD = 256 * 1024;
+// Image-generation replies include base64 PNG data; allow bounded multi-megabyte payloads.
+const MAX_WS_PAYLOAD = 8 * 1024 * 1024;
 const MAX_BODY = 192 * 1024;
 const MAX_PATH = 2048;
 const ALLOWED_METHODS = new Set(["GET", "POST", "PUT", "PATCH", "DELETE"]);

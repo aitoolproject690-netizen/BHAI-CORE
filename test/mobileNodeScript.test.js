@@ -19,5 +19,6 @@ test("mobile node script splits Local Dream image traffic from llama-server", ()
   assert.match(source, /LOCAL_IMAGE_ENGINE.*127\.0\.0\.1:8081/);
   assert.match(source, /path === "\/generate"/);
   assert.match(source, /image-engine/);
-  assert.match(source, /async function probeLocalImageEngine/);
+  assert.match(source, /import \{ probeLocalImageEngine \} from "\.\/localEngineProbe\.mjs"/);
+  assert.match(source, /probeLocalImageEngine\(\{ url: LOCAL_IMAGE_ENGINE, apiKey: LOCAL_IMAGE_ENGINE_API_KEY \}\)/);
 });

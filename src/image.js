@@ -65,19 +65,52 @@ export function rawRgbToPng(rawBase64, width, height) {
 
 export function parseLocalDreamSse(raw) {
   const events = [];
-  const blocks = String(raw || "").split(/\r?\n\r?\n/);
-  for (const block of blocks) {
-    const dataLine = block.split(/\r?\n/).find(line => line.startsWith("data:"));
-    if (!dataLine) continue;
-    const payload = dataLine.slice(5).trim();
-    if (!payload) continue;
-    try { events.push(JSON.parse(payload)); } catch {
+  let dataLines = [];
+  let eventName = "";
+  const flush = () => {
+    if (!dataLines.length) {
+      eventName = "";
+      return;
+    }
+    const payload = dataLines.join("\n").trim();
+    dataLines = [];
+    const name = eventName;
+    eventName = "";
+    if (!payload) return;
+    try {
+      const parsed = JSON.parse(payload);
+      if (parsed && typeof parsed === "object" && !parsed.type && name) {
+        parsed.type = name;
+      }
+      events.push(parsed);
+    } catch {
       throw new Error("Local Dream returned malformed SSE data.");
     }
+  };
+  for (const line of String(raw || "").split(/\r?\n/)) {
+    if (!line) {
+      flush();
+      continue;
+    }
+    if (line.startsWith(":")) continue;
+    if (line.startsWith("event:")) {
+      eventName = line.slice(6).trim();
+      continue;
+    }
+    if (line.startsWith("data:")) {
+      dataLines.push(line.slice(5).replace(/^ /, ""));
+    }
   }
-  const errorEvent = [...events].reverse().find(e => e?.type === "error" || e?.message && /error/i.test(String(e?.type || "")));
+  // SSE streams may end immediately after the final data line without a blank delimiter.
+  flush();
+
+  const errorEvent = [...events].reverse().find(e =>
+    e?.type === "error" || (e?.message && /error/i.test(String(e?.type || "")))
+  );
   if (errorEvent) throw new Error(String(errorEvent.message || "Local Dream generation failed."));
-  const complete = [...events].reverse().find(e => e?.type === "complete" && e?.image);
+  const complete = [...events].reverse().find(e =>
+    (e?.type === "complete" || e?.type === "completed" || e?.event === "complete") && e?.image
+  );
   if (!complete) throw new Error("Local Dream returned no completed image.");
   return complete;
 }

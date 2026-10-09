@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { probeLocalImageEngine } from "./localEngineProbe.mjs";
 
 const CORE_URL = String(process.env.BHAI_CORE_URL || "").replace(/\/+$/, "");
 const NODE_TOKEN = String(process.env.BHAI_MOBILE_NODE_TOKEN || process.env.BHAI_ENGINE_API_KEY || "");
@@ -6,7 +7,7 @@ const LOCAL_ENGINE = String(process.env.BHAI_LOCAL_ENGINE_URL || "http://127.0.0
 // Local Dream listens separately on 127.0.0.1:8081; keep llama-server on 18080.
 const LOCAL_IMAGE_ENGINE = String(process.env.BHAI_LOCAL_IMAGE_ENGINE_URL || "http://127.0.0.1:8081").replace(/\/+$/, "");
 const LOCAL_IMAGE_ENGINE_API_KEY = String(process.env.BHAI_LOCAL_IMAGE_ENGINE_API_KEY || "");
-let localImageEngineReady = String(process.env.BHAI_LOCAL_IMAGE_ENGINE_READY || "false").toLowerCase() === "true";
+let localImageEngineReady = false;
 let localTextEngineReady = false;
 
 function readSecretFile(file) {
@@ -111,26 +112,6 @@ async function probeLocalTextEngine() {
     clearTimeout(timeout);
   }
 }
-async function probeLocalImageEngine() {
-  if (!LOCAL_IMAGE_ENGINE) return false;
-  if (localImageEngineReady) return true;
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 3000);
-  try {
-    const response = await fetch(LOCAL_IMAGE_ENGINE + "/tokenize", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ prompt: "bhai image probe" }),
-      signal: controller.signal
-    });
-    return response.status >= 200 && response.status < 300;
-  } catch {
-    return false;
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
 async function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -222,7 +203,7 @@ async function handleRequest(message) {
 
 async function connect() {
   localTextEngineReady = await probeLocalTextEngine();
-  localImageEngineReady = await probeLocalImageEngine();
+  localImageEngineReady = await probeLocalImageEngine({ url: LOCAL_IMAGE_ENGINE, apiKey: LOCAL_IMAGE_ENGINE_API_KEY });
   const engines = buildMobileEngines(localImageEngineReady, localTextEngineReady);
   console.log("BHAI mobile text engine", localTextEngineReady ? "ready" : "not ready (inference probe failed)");
   console.log("BHAI mobile image engine", localImageEngineReady ? "ready" : "not ready");

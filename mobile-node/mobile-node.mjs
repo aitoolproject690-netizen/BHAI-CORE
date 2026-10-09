@@ -6,7 +6,7 @@ const LOCAL_ENGINE = String(process.env.BHAI_LOCAL_ENGINE_URL || "http://127.0.0
 // Local Dream listens separately on 127.0.0.1:8081; keep llama-server on 18080.
 const LOCAL_IMAGE_ENGINE = String(process.env.BHAI_LOCAL_IMAGE_ENGINE_URL || "http://127.0.0.1:8081").replace(/\/+$/, "");
 const LOCAL_IMAGE_ENGINE_API_KEY = String(process.env.BHAI_LOCAL_IMAGE_ENGINE_API_KEY || "");
-const LOCAL_IMAGE_ENGINE_READY = String(process.env.BHAI_LOCAL_IMAGE_ENGINE_READY || "false").toLowerCase() === "true";
+let localImageEngineReady = String(process.env.BHAI_LOCAL_IMAGE_ENGINE_READY || "false").toLowerCase() === "true";
 
 function readSecretFile(file) {
   try {
@@ -90,7 +90,7 @@ function localEngineHeaders(headers, imageEngine = false) {
 
 async function probeLocalImageEngine() {
   if (!LOCAL_IMAGE_ENGINE) return false;
-  if (LOCAL_IMAGE_ENGINE_READY) return true;
+  if (localImageEngineReady) return true;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 3000);
   try {
@@ -130,7 +130,7 @@ async function handleRequest(message) {
       body: JSON.stringify({ error: "path not allowed" })
     };
   }
-  if (imageEngine && !LOCAL_IMAGE_ENGINE_READY) {
+  if (imageEngine && !localImageEngineReady) {
     return {
       type: "response",
       id: String(message.id || ""),
@@ -190,8 +190,8 @@ async function handleRequest(message) {
 }
 
 async function connect() {
-  const localImageReady = await probeLocalImageEngine();
-  const engines = buildMobileEngines(localImageReady);
+  localImageEngineReady = await probeLocalImageEngine();
+  const engines = buildMobileEngines(localImageEngineReady);
   console.log("BHAI mobile image engine", localImageReady ? "ready" : "not ready");
   socket = new WebSocket(wsUrl);
   socket.addEventListener("open", () => {

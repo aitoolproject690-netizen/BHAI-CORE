@@ -15,11 +15,11 @@ const LOCAL_DREAM_DEFAULTS = Object.freeze({
 function imageDimensions(request = {}) {
   const presets = {
     "1:1": [1024, 1024],
-    "16:9": [1344, 768],
-    "9:16": [768, 1344],
-    "4:3": [1152, 896],
-    "3:2": [1216, 832],
-    "2:3": [832, 1216]
+    "16:9": [1280, 720],
+    "9:16": [720, 1280],
+    "4:3": [1152, 864],
+    "3:2": [1152, 768],
+    "2:3": [768, 1152]
   };
   const ratio = String(request.aspectRatio || "").trim();
   const [presetWidth, presetHeight] = presets[ratio] || [1024, 1024];
@@ -27,8 +27,8 @@ function imageDimensions(request = {}) {
   const height = request.height == null ? presetHeight : Number(request.height);
   if (!Number.isInteger(width) || !Number.isInteger(height) ||
       width < 512 || height < 512 || width > 1536 || height > 1536 ||
-      width % 64 !== 0 || height % 64 !== 0 || width * height > 1_572_864) {
-    throw new Error("Image width and height must be multiples of 64 between 512 and 1536, with at most 1.57 megapixels.");
+      width % 8 !== 0 || height % 8 !== 0 || width * height > 1_572_864) {
+    throw new Error("Image width and height must be multiples of 8 between 512 and 1536, with at most 1.57 megapixels.");
   }
   return { width, height };
 }

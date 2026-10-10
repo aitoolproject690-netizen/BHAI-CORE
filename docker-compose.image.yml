@@ -1,0 +1,29 @@
+services:
+  image-engine:
+    build:
+      context: .
+      dockerfile: ops/image-engine/Dockerfile
+    image: bhai-image-engine:local
+    restart: unless-stopped
+    gpus: all
+    expose:
+      - "8188"
+    volumes:
+      - bhai-image-models:/opt/ComfyUI/models
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://127.0.0.1:8188/system_stats >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+    networks:
+      - bhai-public
+
+volumes:
+  bhai-image-models:
+    name: bhai-image-models
+
+networks:
+  bhai-public:
+    external: true
+    name: bhai-public

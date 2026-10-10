@@ -133,7 +133,8 @@ export function parseLocalDreamSse(raw) {
 }
 
 export function localDreamRequestPayload(request = {}) {
-  const dims = imageDimensions();
+  // Keep the optional legacy mobile adapter bounded to 512px; it is not the GPU image backend.
+  const dims = { width: 512, height: 512, size: 512 };
   return {
     prompt: String(request.prompt || "").trim().slice(0, 1200),
     negative_prompt: String(request.negativePrompt || "low quality, blurry, bad anatomy").trim().slice(0, 800),

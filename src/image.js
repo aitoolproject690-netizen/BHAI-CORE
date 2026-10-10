@@ -264,12 +264,13 @@ export async function getMobileImageJob({ jobId }) {
   return { provider: "mobile", jobId: String(jobId), job: data };
 }
 
-export async function submitComfyUI({ url, request }) {
+export async function submitComfyUI({ url, request, fetchImpl = globalThis.fetch }) {
   const endpoint = cleanUrl(url);
   if (!endpoint) throw Object.assign(new Error("Self-hosted image engine is not configured. Set COMFYUI_URL to your own ComfyUI server."), { status: 503 });
+  if (typeof fetchImpl !== "function") throw new Error("Fetch is unavailable for the self-hosted image engine.");
   // Never accept raw ComfyUI graphs from public API callers: graphs may access local files or custom nodes.
   const payload = buildComfyUIWorkflow(request);
-  const response = await fetch(endpoint + "/prompt", {
+  const response = await fetchImpl(endpoint + "/prompt", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ prompt: payload, client_id: "bhai-core" }),
@@ -285,6 +286,93 @@ export async function submitComfyUI({ url, request }) {
   }
   if (!data.prompt_id) throw new Error("ComfyUI returned no prompt_id");
   return { provider: "comfyui", promptId: data.prompt_id, seed: request.seed };
+}
+
+function pause(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+export async function generateComfyUIImage({
+  url,
+  request,
+  timeoutMs = 240000,
+  pollIntervalMs = 1000,
+  fetchImpl = globalThis.fetch
+} = {}) {
+  const endpoint = cleanUrl(url);
+  if (!endpoint) throw Object.assign(new Error("Self-hosted image engine is not configured. Set COMFYUI_URL to your own ComfyUI server."), { status: 503 });
+  const startedAt = Date.now();
+  const submitted = await submitComfyUI({ url: endpoint, request, fetchImpl });
+  const budgetMs = Number(timeoutMs) > 0 ? Math.min(Number(timeoutMs), 360000) : 240000;
+  const deadline = Date.now() + budgetMs;
+
+  while (Date.now() < deadline) {
+    const response = await fetchImpl(endpoint + "/history/" + encodeURIComponent(submitted.promptId), {
+      signal: AbortSignal.timeout(15000)
+    });
+    const text = await response.text();
+    let data;
+    try { data = text ? JSON.parse(text) : {}; } catch { data = {}; }
+    if (!response.ok) throw Object.assign(new Error("ComfyUI history failed with HTTP " + response.status), { status: 502 });
+
+    const job = data?.[submitted.promptId];
+    const statusText = String(job?.status?.status_str || "").toLowerCase();
+    if (statusText === "error") {
+      throw Object.assign(new Error("ComfyUI reported an image-generation error."), { status: 502 });
+    }
+
+    const images = Object.values(job?.outputs || {}).flatMap(output =>
+      Array.isArray(output?.images) ? output.images : []
+    );
+    const descriptor = images.find(item => String(item?.type || "output") === "output");
+    if (descriptor) {
+      const filename = String(descriptor.filename || "");
+      const subfolder = String(descriptor.subfolder || "");
+      if (!filename || filename.length > 255 || /[\\/]|\.\./.test(filename) ||
+          subfolder.length > 160 || subfolder.startsWith("/") || subfolder.includes("..") ||
+          /[^A-Za-z0-9_./ -]/.test(subfolder) || subfolder.includes("\\")) {
+        throw Object.assign(new Error("ComfyUI returned an invalid image output path."), { status: 502 });
+      }
+      const query = new URLSearchParams({ filename, subfolder, type: "output" });
+      const imageResponse = await fetchImpl(endpoint + "/view?" + query.toString(), {
+        signal: AbortSignal.timeout(30000)
+      });
+      if (!imageResponse.ok) throw Object.assign(new Error("ComfyUI image output download failed with HTTP " + imageResponse.status), { status: 502 });
+      const bytes = Buffer.from(await imageResponse.arrayBuffer());
+      if (!bytes.length || bytes.length > 12 * 1024 * 1024) {
+        throw Object.assign(new Error("ComfyUI image output is empty or exceeds the 12 MB limit."), { status: 502 });
+      }
+      const mimeType = String(imageResponse.headers?.get?.("content-type") || "image/png").split(";")[0].toLowerCase();
+      const png = bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10]));
+      const jpeg = bytes.length >= 4 && bytes[0] === 0xff && bytes[1] === 0xd8 &&
+        bytes[bytes.length - 2] === 0xff && bytes[bytes.length - 1] === 0xd9;
+      const webp = bytes.length >= 12 && bytes.subarray(0, 4).toString("ascii") === "RIFF" &&
+        bytes.subarray(8, 12).toString("ascii") === "WEBP";
+      if (!((mimeType === "image/png" && png) || (mimeType === "image/jpeg" && jpeg) ||
+          (mimeType === "image/webp" && webp))) {
+        throw Object.assign(new Error("ComfyUI image output failed media signature verification."), { status: 502 });
+      }
+      return {
+        provider: "comfyui",
+        promptId: submitted.promptId,
+        seed: submitted.seed,
+        status: "completed",
+        output: {
+          mimeType,
+          data: bytes.toString("base64"),
+          width: Number(request.width) || null,
+          height: Number(request.height) || null,
+          generationTimeMs: Date.now() - startedAt
+        }
+      };
+    }
+
+    if (job?.status?.completed === true && images.length === 0) {
+      throw Object.assign(new Error("ComfyUI completed the job without producing an image."), { status: 502 });
+    }
+    await pause(Math.max(250, Math.min(5000, Number(pollIntervalMs) || 1000)));
+  }
+  throw Object.assign(new Error("Timed out waiting for the self-hosted image engine."), { status: 504 });
 }
 
 export function imageProviderInfo() {

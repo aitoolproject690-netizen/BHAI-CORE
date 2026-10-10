@@ -141,11 +141,17 @@ export function attachMobileNode(server) {
         if (!authenticated) {
           const configured = mobileNodeConfig();
           const announcedNodeId = normalizedNodeId(message.nodeId);
-          if (message?.type !== "auth" ||
-              typeof message.token !== "string" ||
-              !authenticatedToken(message.token) ||
-              (configured.expectedNodeId && announcedNodeId !== configured.expectedNodeId)) {
-            console.warn("BHAI mobile node auth rejected");
+          const tokenValid = typeof message?.token === "string" && authenticatedToken(message.token);
+          const nodeIdMatch = !configured.expectedNodeId || announcedNodeId === configured.expectedNodeId;
+          if (message?.type !== "auth" || !tokenValid || !nodeIdMatch) {
+            // Safe auth diagnostics: never log credentials or their fingerprints.
+            console.warn("BHAI mobile node auth rejected", JSON.stringify({
+              messageType: String(message?.type || "").slice(0, 32) || null,
+              tokenValid,
+              nodeIdConfigured: Boolean(configured.expectedNodeId),
+              nodeIdPresent: Boolean(announcedNodeId),
+              nodeIdMatch
+            }));
             return ws.close(1008, "authentication failed");
           }
 

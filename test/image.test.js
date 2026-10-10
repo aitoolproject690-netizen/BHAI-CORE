@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createImageRequest } from "../src/image.js";
+import { createImageRequest, probeComfyUI } from "../src/image.js";
 
 test("image request validates prompt and normalizes provider", () => {
   const result = createImageRequest({ prompt: "A cinematic mountain", provider: "ComfyUI", seed: 42 });
@@ -138,4 +138,68 @@ test("image generation fails clearly when the self-hosted engine is not configur
     () => submitComfyUI({ url: "", request: { prompt: "test", seed: 1 } }),
     error => error.status === 503 && /COMFYUI_URL/.test(error.message)
   );
+});
+
+
+function fakeComfyProbeFetch({ devices = [{ name:"NVIDIA GeForce RTX 4090", type:"cuda", vram_total:25769803776, vram_free:24000000000 }], checkpoints = ["flux1-schnell-fp8.safetensors"] } = {}) {
+  return async url => {
+    if (String(url).endsWith("/system_stats")) {
+      return { ok:true, json:async()=>({ devices }) };
+    }
+    if (String(url).endsWith("/object_info/CheckpointLoaderSimple")) {
+      return { ok:true, json:async()=>({ CheckpointLoaderSimple:{ input:{ required:{ ckpt_name:[checkpoints,{}] } } } }) };
+    }
+    throw new Error("Unexpected probe URL");
+  };
+}
+
+test("ComfyUI readiness is false when the image server is not configured", async () => {
+  let calls=0;
+  const status=await probeComfyUI({url:"",fetchImpl:async()=>{calls++;throw new Error("must not call");}});
+  assert.equal(status.ready,false);
+  assert.equal(status.configured,false);
+  assert.equal(status.reason,"image_engine_not_configured");
+  assert.equal(calls,0);
+});
+
+test("ComfyUI readiness requires the configured checkpoint and an NVIDIA CUDA device", async () => {
+  const modelMissing=await probeComfyUI({
+    url:"http://image-engine:8188",
+    env:{BHAI_IMAGE_WORKFLOW:"flux-schnell"},
+    fetchImpl:fakeComfyProbeFetch({checkpoints:["other.safetensors"]})
+  });
+  assert.equal(modelMissing.reachable,true);
+  assert.equal(modelMissing.modelAvailable,false);
+  assert.equal(modelMissing.ready,false);
+  assert.equal(modelMissing.reason,"checkpoint_not_found");
+
+  const gpuMissing=await probeComfyUI({
+    url:"http://image-engine:8188",
+    env:{BHAI_IMAGE_WORKFLOW:"flux-schnell"},
+    fetchImpl:fakeComfyProbeFetch({devices:[{name:"CPU",type:"cpu"}]})
+  });
+  assert.equal(gpuMissing.modelAvailable,true);
+  assert.equal(gpuMissing.gpuAvailable,false);
+  assert.equal(gpuMissing.ready,false);
+  assert.equal(gpuMissing.reason,"nvidia_gpu_not_detected");
+});
+
+test("ComfyUI readiness is green only when the correct model and CUDA GPU are visible", async () => {
+  const status=await probeComfyUI({
+    url:"http://image-engine:8188",
+    env:{BHAI_IMAGE_WORKFLOW:"flux-schnell"},
+    fetchImpl:fakeComfyProbeFetch()
+  });
+  assert.equal(status.ready,true);
+  assert.equal(status.gpuAvailable,true);
+  assert.equal(status.modelAvailable,true);
+  assert.equal(status.model,"flux1-schnell-fp8.safetensors");
+  assert.equal(status.gpu.name,"NVIDIA GeForce RTX 4090");
+});
+
+test("ComfyUI readiness reports an unreachable image server truthfully", async () => {
+  const status=await probeComfyUI({url:"http://image-engine:8188",fetchImpl:async()=>{throw new Error("offline");}});
+  assert.equal(status.reachable,false);
+  assert.equal(status.ready,false);
+  assert.equal(status.reason,"image_engine_unreachable");
 });

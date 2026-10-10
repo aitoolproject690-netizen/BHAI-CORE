@@ -19,7 +19,7 @@ import { searchRag, ragContext } from "./src/rag.js";
 import { embeddingInfo } from "./src/embeddings.js";
 import { getModelRegistry, modelCapabilities } from "./src/models.js";
 import { analyzeImage, getVisionCandidates } from "./src/vision.js";
-import { createImageRequest, submitComfyUI, submitMobileImage, generateComfyUIImage, getComfyUIHistory, getMobileImageJob, imageProviderInfo, recordImageJobOwnership, getImageJobOwnership } from "./src/image.js";
+import { createImageRequest, submitComfyUI, submitMobileImage, generateComfyUIImage, probeComfyUI, getComfyUIHistory, getMobileImageJob, imageProviderInfo, recordImageJobOwnership, getImageJobOwnership } from "./src/image.js";
 import { createVideoRequest, planVideo, submitVideoHttp, submitMobileVideo, getMobileVideoJob, recordVideoJobOwnership, getVideoJobOwnership, videoProviderInfo } from "./src/video.js";
 import { billingPlans, getBillingAccount, billingUsage, billingSnapshot, setBillingPlan, assertBillingQuota, consumeBillingQuota, releaseBillingQuota, recordBillingUsage } from "./src/billing.js";
 import { dashboardSnapshot } from "./src/dashboard.js";
@@ -883,6 +883,11 @@ const server = http.createServer(async (req, res) => {
 
     if (url.pathname === "/v1/image/providers" && req.method === "GET")
       return send(res, 200, { ok: true, providers: imageProviderInfo() }, rid);
+
+    if (url.pathname === "/v1/image/health" && req.method === "GET") {
+      const status = await probeComfyUI({ url: process.env.COMFYUI_URL });
+      return send(res, status.ready ? 200 : 503, { ok: status.ready, ...status }, rid);
+    }
 
     const imageJobMatch = url.pathname.match(/^\/v1\/image\/jobs\/([^/]+)$/);
     if (imageJobMatch && req.method === "GET") {

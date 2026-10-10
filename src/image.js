@@ -264,12 +264,12 @@ export async function getMobileImageJob({ jobId }) {
   return { provider: "mobile", jobId: String(jobId), job: data };
 }
 
-export async function submitComfyUI({ url, request, fetchImpl = globalThis.fetch }) {
+export async function submitComfyUI({ url, request, fetchImpl = globalThis.fetch, env = process.env }) {
   const endpoint = cleanUrl(url);
   if (!endpoint) throw Object.assign(new Error("Self-hosted image engine is not configured. Set COMFYUI_URL to your own ComfyUI server."), { status: 503 });
   if (typeof fetchImpl !== "function") throw new Error("Fetch is unavailable for the self-hosted image engine.");
   // Never accept raw ComfyUI graphs from public API callers: graphs may access local files or custom nodes.
-  const payload = buildComfyUIWorkflow(request);
+  const payload = buildComfyUIWorkflow(request, env);
   const response = await fetchImpl(endpoint + "/prompt", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -297,12 +297,13 @@ export async function generateComfyUIImage({
   request,
   timeoutMs = 240000,
   pollIntervalMs = 1000,
-  fetchImpl = globalThis.fetch
+  fetchImpl = globalThis.fetch,
+  env = process.env
 } = {}) {
   const endpoint = cleanUrl(url);
   if (!endpoint) throw Object.assign(new Error("Self-hosted image engine is not configured. Set COMFYUI_URL to your own ComfyUI server."), { status: 503 });
   const startedAt = Date.now();
-  const submitted = await submitComfyUI({ url: endpoint, request, fetchImpl });
+  const submitted = await submitComfyUI({ url: endpoint, request, fetchImpl, env });
   const budgetMs = Number(timeoutMs) > 0 ? Math.min(Number(timeoutMs), 360000) : 240000;
   const deadline = Date.now() + budgetMs;
 

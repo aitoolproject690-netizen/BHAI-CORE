@@ -376,8 +376,93 @@ export async function generateComfyUIImage({
   throw Object.assign(new Error("Timed out waiting for the self-hosted image engine."), { status: 504 });
 }
 
+function configuredComfyUIImage(env = process.env) {
+  const workflow = String(env.BHAI_IMAGE_WORKFLOW || "checkpoint").trim().toLowerCase();
+  return {
+    workflow,
+    model: String(env.COMFYUI_CHECKPOINT || (workflow === "flux-schnell" ? "flux1-schnell-fp8.safetensors" : "model.safetensors"))
+  };
+}
+
+/** Verify that ComfyUI is reachable, has the requested checkpoint, and sees an NVIDIA CUDA device. */
+export async function probeComfyUI({
+  url = process.env.COMFYUI_URL,
+  env = process.env,
+  fetchImpl = globalThis.fetch,
+  timeoutMs = 8000
+} = {}) {
+  const config = configuredComfyUIImage(env);
+  const configured = Boolean(String(url || "").trim());
+  if (!configured) {
+    return { provider: "comfyui", configured: false, reachable: false, gpuAvailable: false,
+      modelAvailable: false, ready: false, workflow: config.workflow, model: config.model,
+      reason: "image_engine_not_configured" };
+  }
+
+  let endpoint;
+  try {
+    endpoint = cleanUrl(url);
+  } catch {
+    return { provider: "comfyui", configured: true, reachable: false, gpuAvailable: false,
+      modelAvailable: false, ready: false, workflow: config.workflow, model: config.model,
+      reason: "image_engine_url_invalid" };
+  }
+  if (!endpoint || typeof fetchImpl !== "function") {
+    return { provider: "comfyui", configured: true, reachable: false, gpuAvailable: false,
+      modelAvailable: false, ready: false, workflow: config.workflow, model: config.model,
+      reason: "image_engine_unreachable" };
+  }
+
+  let statsResponse, modelResponse;
+  try {
+    [statsResponse, modelResponse] = await Promise.all([
+      fetchImpl(endpoint + "/system_stats", { signal: AbortSignal.timeout(timeoutMs) }),
+      fetchImpl(endpoint + "/object_info/CheckpointLoaderSimple", { signal: AbortSignal.timeout(timeoutMs) })
+    ]);
+  } catch {
+    return { provider: "comfyui", configured: true, reachable: false, gpuAvailable: false,
+      modelAvailable: false, ready: false, workflow: config.workflow, model: config.model,
+      reason: "image_engine_unreachable" };
+  }
+  if (!statsResponse.ok || !modelResponse.ok) {
+    return { provider: "comfyui", configured: true, reachable: false, gpuAvailable: false,
+      modelAvailable: false, ready: false, workflow: config.workflow, model: config.model,
+      reason: "image_engine_probe_http_error" };
+  }
+
+  let stats, objectInfo;
+  try {
+    [stats, objectInfo] = await Promise.all([statsResponse.json(), modelResponse.json()]);
+  } catch {
+    return { provider: "comfyui", configured: true, reachable: false, gpuAvailable: false,
+      modelAvailable: false, ready: false, workflow: config.workflow, model: config.model,
+      reason: "image_engine_probe_invalid_json" };
+  }
+
+  const devices = Array.isArray(stats?.devices) ? stats.devices : [];
+  const gpu = devices.find(device =>
+    /cuda|nvidia/i.test(String(device?.type || "") + " " + String(device?.name || ""))
+  ) || null;
+  const names = objectInfo?.CheckpointLoaderSimple?.input?.required?.ckpt_name?.[0];
+  const checkpoints = Array.isArray(names) ? names.map(String) : [];
+  const modelAvailable = checkpoints.includes(config.model);
+  const gpuAvailable = Boolean(gpu);
+  const ready = gpuAvailable && modelAvailable;
+  return {
+    provider: "comfyui", configured: true, reachable: true, gpuAvailable,
+    gpu: gpu ? {
+      name: String(gpu.name || "NVIDIA CUDA device").slice(0, 160),
+      type: String(gpu.type || "cuda").slice(0, 40),
+      vramTotalBytes: Number.isFinite(Number(gpu.vram_total)) ? Number(gpu.vram_total) : null,
+      vramFreeBytes: Number.isFinite(Number(gpu.vram_free)) ? Number(gpu.vram_free) : null
+    } : null,
+    modelAvailable, ready, workflow: config.workflow, model: config.model,
+    reason: ready ? null : !gpuAvailable ? "nvidia_gpu_not_detected" : "checkpoint_not_found"
+  };
+}
+
 export function imageProviderInfo() {
-  const workflow = String(process.env.BHAI_IMAGE_WORKFLOW || "checkpoint").trim().toLowerCase();
+  const { workflow, model } = configuredComfyUIImage(process.env);
   return {
     mobile: {
       local: true,
@@ -391,7 +476,7 @@ export function imageProviderInfo() {
       local: true,
       configured: Boolean(String(process.env.COMFYUI_URL || "").trim()),
       workflow,
-      model: String(process.env.COMFYUI_CHECKPOINT || (workflow === "flux-schnell" ? "flux1-schnell-fp8.safetensors" : "model.safetensors")),
+      model,
       qualityPreset: workflow === "flux-schnell" ? "FLUX.1-schnell FP8 (4-step distilled model)" : "ComfyUI checkpoint workflow"
     }
   };

@@ -895,7 +895,7 @@ const server = http.createServer(async (req, res) => {
       try {
         result = request.provider === "mobile"
           ? await submitMobileImage({ request })
-          : await submitComfyUI({ url: process.env.COMFYUI_URL, request, workflow: body.workflow });
+          : await submitComfyUI({ url: process.env.COMFYUI_URL, request });
       } catch (error) {
         await releaseBillingQuota(identity.id, billingReservation);
         throw error;

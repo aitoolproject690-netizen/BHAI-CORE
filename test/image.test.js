@@ -67,8 +67,8 @@ test("FLUX Schnell preset uses its distilled low-guidance workflow and model", (
     { BHAI_IMAGE_WORKFLOW: "flux-schnell" }
   );
   assert.equal(workflow["1"].inputs.ckpt_name, "flux1-schnell-fp8.safetensors");
-  assert.equal(workflow["3"].inputs.width, 1344);
-  assert.equal(workflow["3"].inputs.height, 768);
+  assert.equal(workflow["3"].inputs.width, 1280);
+  assert.equal(workflow["3"].inputs.height, 720);
   assert.equal(workflow["4"].inputs.steps, 4);
   assert.equal(workflow["4"].inputs.cfg, 1);
   assert.equal(workflow["4"].inputs.seed, 17);
@@ -91,7 +91,7 @@ test("ComfyUI dimensions reject excessive or unaligned workloads", () => {
     /Image width and height/
   );
   assert.throws(
-    () => buildComfyUIWorkflow({ prompt: "test", width: 1000, height: 768 }, { BHAI_IMAGE_WORKFLOW: "flux-schnell" }),
+    () => buildComfyUIWorkflow({ prompt: "test", width: 1004, height: 768 }, { BHAI_IMAGE_WORKFLOW: "flux-schnell" }),
     /Image width and height/
   );
 });

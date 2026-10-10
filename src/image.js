@@ -12,8 +12,25 @@ const LOCAL_DREAM_DEFAULTS = Object.freeze({
   scheduler: String(process.env.BHAI_LOCAL_IMAGE_SCHEDULER || "dpm")
 });
 
-function imageDimensions() {
-  return { width: 512, height: 512, size: 512 };
+function imageDimensions(request = {}) {
+  const presets = {
+    "1:1": [1024, 1024],
+    "16:9": [1344, 768],
+    "9:16": [768, 1344],
+    "4:3": [1152, 896],
+    "3:2": [1216, 832],
+    "2:3": [832, 1216]
+  };
+  const ratio = String(request.aspectRatio || "").trim();
+  const [presetWidth, presetHeight] = presets[ratio] || [1024, 1024];
+  const width = request.width == null ? presetWidth : Number(request.width);
+  const height = request.height == null ? presetHeight : Number(request.height);
+  if (!Number.isInteger(width) || !Number.isInteger(height) ||
+      width < 512 || height < 512 || width > 1536 || height > 1536 ||
+      width % 64 !== 0 || height % 64 !== 0 || width * height > 1_572_864) {
+    throw new Error("Image width and height must be multiples of 64 between 512 and 1536, with at most 1.57 megapixels.");
+  }
+  return { width, height };
 }
 
 function crc32(buffer) {
@@ -131,7 +148,18 @@ export function localDreamRequestPayload(request = {}) {
 
 
 function cleanUrl(url) {
-  return String(url || "http://127.0.0.1:8188").replace(/\/$/, "");
+  const value = String(url || "").trim().replace(/\/+$/, "");
+  if (!value) return "";
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw Object.assign(new Error("COMFYUI_URL must be a valid HTTP(S) URL."), { status: 503 });
+  }
+  if (!["http:", "https:"].includes(parsed.protocol) || parsed.username || parsed.password) {
+    throw Object.assign(new Error("COMFYUI_URL must use HTTP(S) without embedded credentials."), { status: 503 });
+  }
+  return parsed.toString().replace(/\/+$/, "");
 }
 
 function normalizePrompt(prompt) {
@@ -141,24 +169,54 @@ function normalizePrompt(prompt) {
   return value;
 }
 
-function defaultWorkflow(prompt, seed) {
+export function buildComfyUIWorkflow(request = {}, env = process.env) {
+  const prompt = normalizePrompt(request.prompt);
+  const seed = Number.isInteger(request.seed) ? request.seed : Math.floor(Math.random() * 2 ** 31);
+  const { width, height } = imageDimensions(request);
+  const preset = String(env.BHAI_IMAGE_WORKFLOW || "checkpoint").trim().toLowerCase();
+
+  if (preset === "flux-schnell") {
+    const rawSteps = Number(env.BHAI_IMAGE_STEPS || 4);
+    const steps = Number.isInteger(rawSteps) ? Math.max(1, Math.min(8, rawSteps)) : 4;
+    return {
+      "1": { class_type: "CheckpointLoaderSimple", inputs: { ckpt_name: String(env.COMFYUI_CHECKPOINT || "flux1-schnell-fp8.safetensors") } },
+      "2": { class_type: "CLIPTextEncode", inputs: { text: prompt, clip: ["1", 1] } },
+      "3": { class_type: "EmptyLatentImage", inputs: { width, height, batch_size: 1 } },
+      "4": { class_type: "KSampler", inputs: { seed, steps, cfg: 1, sampler_name: "euler", scheduler: "simple", denoise: 1, model: ["1", 0], positive: ["2", 0], negative: ["5", 0], latent_image: ["3", 0] } },
+      "5": { class_type: "CLIPTextEncode", inputs: { text: "", clip: ["1", 1] } },
+      "6": { class_type: "VAEDecode", inputs: { samples: ["4", 0], vae: ["1", 2] } },
+      "7": { class_type: "SaveImage", inputs: { filename_prefix: "bhai", images: ["6", 0] } }
+    };
+  }
+
+  if (preset !== "checkpoint") {
+    throw Object.assign(new Error("Unsupported BHAI_IMAGE_WORKFLOW. Use checkpoint or flux-schnell."), { status: 503 });
+  }
+  const rawSteps = Number(env.BHAI_IMAGE_STEPS || 20);
+  const steps = Number.isInteger(rawSteps) ? Math.max(1, Math.min(50, rawSteps)) : 20;
+  const rawCfg = Number(env.BHAI_IMAGE_CFG || 7);
+  const cfg = Number.isFinite(rawCfg) ? Math.max(1, Math.min(15, rawCfg)) : 7;
   return {
-    "1": { class_type: "CheckpointLoaderSimple", inputs: { ckpt_name: process.env.COMFYUI_CHECKPOINT || "model.safetensors" } },
+    "1": { class_type: "CheckpointLoaderSimple", inputs: { ckpt_name: String(env.COMFYUI_CHECKPOINT || "model.safetensors") } },
     "2": { class_type: "CLIPTextEncode", inputs: { text: prompt, clip: ["1", 1] } },
-    "3": { class_type: "EmptyLatentImage", inputs: { width: 1024, height: 1024, batch_size: 1 } },
-    "4": { class_type: "KSampler", inputs: { seed, steps: 20, cfg: 7, sampler_name: "euler", scheduler: "normal", denoise: 1, model: ["1", 0], positive: ["2", 0], negative: ["5", 0], latent_image: ["3", 0] } },
-    "5": { class_type: "CLIPTextEncode", inputs: { text: "", clip: ["1", 1] } },
+    "3": { class_type: "EmptyLatentImage", inputs: { width, height, batch_size: 1 } },
+    "4": { class_type: "KSampler", inputs: { seed, steps, cfg, sampler_name: "euler", scheduler: "normal", denoise: 1, model: ["1", 0], positive: ["2", 0], negative: ["5", 0], latent_image: ["3", 0] } },
+    "5": { class_type: "CLIPTextEncode", inputs: { text: String(request.negativePrompt || "low quality, blurry, bad anatomy").slice(0, 800), clip: ["1", 1] } },
     "6": { class_type: "VAEDecode", inputs: { samples: ["4", 0], vae: ["1", 2] } },
     "7": { class_type: "SaveImage", inputs: { filename_prefix: "bhai", images: ["6", 0] } }
   };
 }
 
-export function createImageRequest({ prompt, provider = "comfyui", model, seed }) {
+export function createImageRequest({ prompt, provider = "comfyui", model, seed, width, height, aspectRatio, negativePrompt }) {
+  const dimensions = imageDimensions({ width, height, aspectRatio });
   return {
     id: "img_" + crypto.randomUUID(),
     provider: String(provider).toLowerCase(),
     model: model || null,
     prompt: normalizePrompt(prompt),
+    negativePrompt: String(negativePrompt || "").trim().slice(0, 800),
+    ...dimensions,
+    aspectRatio: aspectRatio || "1:1",
     seed: Number.isInteger(seed) ? seed : Math.floor(Math.random() * 2 ** 31)
   };
 }
@@ -205,9 +263,12 @@ export async function getMobileImageJob({ jobId }) {
   return { provider: "mobile", jobId: String(jobId), job: data };
 }
 
-export async function submitComfyUI({ url, request, workflow }) {
-  const payload = workflow || defaultWorkflow(request.prompt, request.seed);
-  const response = await fetch(cleanUrl(url) + "/prompt", {
+export async function submitComfyUI({ url, request }) {
+  const endpoint = cleanUrl(url);
+  if (!endpoint) throw Object.assign(new Error("Self-hosted image engine is not configured. Set COMFYUI_URL to your own ComfyUI server."), { status: 503 });
+  // Never accept raw ComfyUI graphs from public API callers: graphs may access local files or custom nodes.
+  const payload = buildComfyUIWorkflow(request);
+  const response = await fetch(endpoint + "/prompt", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ prompt: payload, client_id: "bhai-core" }),
@@ -226,18 +287,22 @@ export async function submitComfyUI({ url, request, workflow }) {
 }
 
 export function imageProviderInfo() {
+  const workflow = String(process.env.BHAI_IMAGE_WORKFLOW || "checkpoint").trim().toLowerCase();
   return {
     mobile: {
       local: true,
       configured: mobileNodeInfo().configured,
       connected: mobileNodeInfo().connected,
       mode: "mobile-node",
-      capabilities: ["image-text-to-image","image-image-to-image"]
+      capabilities: ["image-text-to-image", "image-image-to-image"],
+      note: "Mobile image generation is a separate optional backend; it is not required by the self-hosted GPU engine."
     },
     comfyui: {
       local: true,
-      url: cleanUrl(process.env.COMFYUI_URL),
-      configured: Boolean(process.env.COMFYUI_URL || process.env.COMFYUI_ENABLED === "true")
+      configured: Boolean(String(process.env.COMFYUI_URL || "").trim()),
+      workflow,
+      model: String(process.env.COMFYUI_CHECKPOINT || (workflow === "flux-schnell" ? "flux1-schnell-fp8.safetensors" : "model.safetensors")),
+      qualityPreset: workflow === "flux-schnell" ? "FLUX.1-schnell FP8 (4-step distilled model)" : "ComfyUI checkpoint workflow"
     }
   };
 }

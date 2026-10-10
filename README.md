@@ -242,3 +242,14 @@ and `BHAI_ENGINE_TLS_FINGERPRINT=<gateway certificate SHA-256 fingerprint>`. Thi
 
 BHAI-CORE can target the gateway with an IPv6 literal such as `http://[YOUR_IPV6]:19180` for testing or the equivalent pinned HTTPS URL for production. The current Render relay remains independent until the direct IPv6 path is proven end-to-end.
 
+
+
+## Self-hosted GPU image generation (FLUX Schnell)
+
+BHAI-CORE includes an optional GPU image backend that runs **on your own NVIDIA GPU VPS**. It uses ComfyUI plus the open-weight FLUX.1-schnell FP8 checkpoint and does not call a hosted image-generation API. It is separate from the phone's working llama.cpp / SmolLM2 text service.
+
+See [the complete setup guide](ops/image-engine/README.md). In short: create the Core Docker network, start `docker-compose.image.yml`, download the 17.2 GB checkpoint with the checksum-verified installer, then set `COMFYUI_URL=http://image-engine:8188`, `BHAI_IMAGE_WORKFLOW=flux-schnell`, and `COMFYUI_CHECKPOINT=flux1-schnell-fp8.safetensors` in the host's `.env` and recreate only the Core container. The image service does not publish a public host port.
+
+The server-controlled `flux-schnell` preset uses 4 steps and CFG 1, supports bounded square, landscape and portrait dimensions, and rejects arbitrary client-provided ComfyUI graphs. The model weights are downloaded only when the operator runs the explicit installer command; CI never downloads or stores the model.
+
+**Hardware:** plan for a dedicated NVIDIA GPU host with around 24 GB VRAM as a practical starting point; 48 GB gives additional headroom. This is a planning guideline, not a guaranteed minimum for every configuration. The checkpoint is about 17.2 GB and the engine requires persistent model storage. The FLUX.1-schnell weights are published under Apache-2.0; see the [official model card](https://huggingface.co/Comfy-Org/flux1-schnell). GPU output quality, latency and peak VRAM remain to be smoke-tested on the actual host.

@@ -19,7 +19,7 @@ import { searchRag, ragContext } from "./src/rag.js";
 import { embeddingInfo } from "./src/embeddings.js";
 import { getModelRegistry, modelCapabilities } from "./src/models.js";
 import { analyzeImage, getVisionCandidates } from "./src/vision.js";
-import { createImageRequest, submitComfyUI, submitMobileImage, getComfyUIHistory, getMobileImageJob, imageProviderInfo, recordImageJobOwnership, getImageJobOwnership } from "./src/image.js";
+import { createImageRequest, submitComfyUI, submitMobileImage, generateComfyUIImage, getComfyUIHistory, getMobileImageJob, imageProviderInfo, recordImageJobOwnership, getImageJobOwnership } from "./src/image.js";
 import { createVideoRequest, planVideo, submitVideoHttp, submitMobileVideo, getMobileVideoJob, recordVideoJobOwnership, getVideoJobOwnership, videoProviderInfo } from "./src/video.js";
 import { billingPlans, getBillingAccount, billingUsage, billingSnapshot, setBillingPlan, assertBillingQuota, consumeBillingQuota, releaseBillingQuota, recordBillingUsage } from "./src/billing.js";
 import { dashboardSnapshot } from "./src/dashboard.js";
@@ -598,6 +598,31 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // Private BHAI-X-to-Core media bridge: this scoped secret authorizes only this route.
+    // Keep it ahead of general Core API auth so BHAI-X does not need a master/admin credential.
+    if (url.pathname === "/v1/internal/image/generate" && req.method === "POST") {
+      const expected = process.env.BHAI_CORE_INTERNAL_IMAGE_KEY;
+      const provided = req.headers["x-bhai-internal-key"];
+      if (!expected || !secretsEqual(String(provided || ""), String(expected))) {
+        return send(res, 401, { ok: false, error: "Internal image route authentication failed" }, rid);
+      }
+      const body = await readJson(req, 120_000);
+      const request = createImageRequest({ ...body, provider: "comfyui" });
+      const result = await generateComfyUIImage({ url: process.env.COMFYUI_URL, request });
+      return send(res, 200, {
+        ok: true,
+        schemaVersion: "1.0",
+        mimeType: result.output.mimeType,
+        data: result.output.data,
+        width: result.output.width,
+        height: result.output.height,
+        seed: result.seed,
+        provider: "bhai-core-comfyui",
+        verification: { ok: true, mode: "self-hosted-comfyui-image", containerValid: true },
+        generationTimeMs: result.output.generationTimeMs
+      }, rid);
+    }
+
     const apiIdentity = req.headers["x-bhai-key"]
       ? await authenticate(req.headers["x-bhai-key"])
       : null;
@@ -856,18 +881,6 @@ const server = http.createServer(async (req, res) => {
         verification:{ok:true,mode:"mobile-local-dream-png",containerValid:true} }, rid);
     }
 
-    if (url.pathname === "/v1/internal/image/generate" && req.method === "POST") {
-      const expected = process.env.BHAI_CORE_INTERNAL_IMAGE_KEY;
-      const provided = req.headers["x-bhai-internal-key"];
-      if (!secretsEqual(String(provided || ""), String(expected || ""))) {
-        return send(res, 401, { ok: false, error: "Internal image route authentication failed" }, rid);
-      }
-      const body = await readJson(req, 120_000);
-      const request = createImageRequest({ ...body, provider: "mobile" });
-      const result = await submitMobileImage({ request });
-      return send(res, 200, { ok: true, ...result, status: "completed" }, rid);
-    }
-
     if (url.pathname === "/v1/image/providers" && req.method === "GET")
       return send(res, 200, { ok: true, providers: imageProviderInfo() }, rid);
 
@@ -895,7 +908,7 @@ const server = http.createServer(async (req, res) => {
       try {
         result = request.provider === "mobile"
           ? await submitMobileImage({ request })
-          : await submitComfyUI({ url: process.env.COMFYUI_URL, request, workflow: body.workflow });
+          : await submitComfyUI({ url: process.env.COMFYUI_URL, request });
       } catch (error) {
         await releaseBillingQuota(identity.id, billingReservation);
         throw error;

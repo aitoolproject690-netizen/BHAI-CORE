@@ -96,6 +96,42 @@ test("ComfyUI dimensions reject excessive or unaligned workloads", () => {
   );
 });
 
+test("self-hosted ComfyUI polling returns only validated image bytes", async () => {
+  const { generateComfyUIImage } = await import("../src/image.js");
+  const png = Buffer.alloc(32);
+  Buffer.from([137,80,78,71,13,10,26,10]).copy(png, 0);
+  let calls = [];
+  const fetchImpl = async (url, options = {}) => {
+    calls.push({ url: String(url), method: options.method || "GET" });
+    if (String(url).endsWith("/prompt")) {
+      const payload = JSON.parse(options.body);
+      assert.equal(payload.prompt["1"].inputs.ckpt_name, "flux1-schnell-fp8.safetensors");
+      return { ok:true, status:200, text:async()=>JSON.stringify({prompt_id:"prompt-1"}) };
+    }
+    if (String(url).includes("/history/prompt-1")) {
+      return { ok:true, status:200, text:async()=>JSON.stringify({
+        "prompt-1": {status:{status_str:"success",completed:true},outputs:{"7":{images:[{filename:"bhai_00001_.png",subfolder:"",type:"output"}]}}}
+      }) };
+    }
+    if (String(url).includes("/view?")) {
+      return {ok:true,status:200,headers:{get:()=> "image/png"},arrayBuffer:async()=>png.buffer.slice(png.byteOffset,png.byteOffset+png.byteLength)};
+    }
+    throw new Error("Unexpected URL");
+  };
+  const result = await generateComfyUIImage({
+    url:"http://image-engine:8188",
+    request:{prompt:"A cinematic village",seed:123,aspectRatio:"16:9"},
+    timeoutMs:1500,
+    fetchImpl
+  });
+  assert.equal(result.provider,"comfyui");
+  assert.equal(result.promptId,"prompt-1");
+  assert.equal(result.status,"completed");
+  assert.equal(result.output.mimeType,"image/png");
+  assert.equal(Buffer.from(result.output.data,"base64").subarray(0,8).toString("hex"),"89504e470d0a1a0a");
+  assert.deepEqual(calls.map(c=>c.method),["POST","GET","GET"]);
+});
+
 test("image generation fails clearly when the self-hosted engine is not configured", async () => {
   await assert.rejects(
     () => submitComfyUI({ url: "", request: { prompt: "test", seed: 1 } }),

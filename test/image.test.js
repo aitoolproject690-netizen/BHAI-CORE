@@ -122,7 +122,8 @@ test("self-hosted ComfyUI polling returns only validated image bytes", async () 
     url:"http://image-engine:8188",
     request:{prompt:"A cinematic village",seed:123,aspectRatio:"16:9"},
     timeoutMs:1500,
-    fetchImpl
+    fetchImpl,
+    env:{BHAI_IMAGE_WORKFLOW:"flux-schnell"}
   });
   assert.equal(result.provider,"comfyui");
   assert.equal(result.promptId,"prompt-1");

@@ -25,7 +25,7 @@ test("image job ownership is tenant isolated", async () => {
 });
 
 
-import { rawRgbToPng, parseLocalDreamSse, localDreamRequestPayload } from "../src/image.js";
+import { rawRgbToPng, parseLocalDreamSse, localDreamRequestPayload, buildComfyUIWorkflow, submitComfyUI } from "../src/image.js";
 
 test("Local Dream raw RGB is converted into a valid PNG", () => {
   const raw = Buffer.from([255,0,0, 0,255,0]).toString("base64");
@@ -57,5 +57,48 @@ test("Local Dream payload keeps bounded mobile generation settings", () => {
   assert.deepEqual(
     { size: payload.size, steps: payload.steps, cfg: payload.cfg, scheduler: payload.scheduler, use_opencl: payload.use_opencl },
     { size: 512, steps: 30, cfg: 15, scheduler: "dpm", use_opencl: false }
+  );
+});
+
+
+test("FLUX Schnell preset uses its distilled low-guidance workflow and model", () => {
+  const workflow = buildComfyUIWorkflow(
+    { prompt: "cinematic Indian village at golden hour", seed: 17, aspectRatio: "16:9" },
+    { BHAI_IMAGE_WORKFLOW: "flux-schnell" }
+  );
+  assert.equal(workflow["1"].inputs.ckpt_name, "flux1-schnell-fp8.safetensors");
+  assert.equal(workflow["3"].inputs.width, 1344);
+  assert.equal(workflow["3"].inputs.height, 768);
+  assert.equal(workflow["4"].inputs.steps, 4);
+  assert.equal(workflow["4"].inputs.cfg, 1);
+  assert.equal(workflow["4"].inputs.seed, 17);
+  assert.equal(workflow["2"].inputs.text, "cinematic Indian village at golden hour");
+});
+
+test("ComfyUI workflow uses only server-controlled graph, never caller-provided nodes", () => {
+  const workflow = buildComfyUIWorkflow(
+    { prompt: "portrait", seed: 9 },
+    { BHAI_IMAGE_WORKFLOW: "flux-schnell", COMFYUI_CHECKPOINT: "owned-model.safetensors" }
+  );
+  assert.equal(workflow["1"].inputs.ckpt_name, "owned-model.safetensors");
+  assert.ok(workflow["7"]);
+  assert.equal(Object.values(workflow).some(node => node.class_type === "ExecutePython"), false);
+});
+
+test("ComfyUI dimensions reject excessive or unaligned workloads", () => {
+  assert.throws(
+    () => buildComfyUIWorkflow({ prompt: "test", width: 2048, height: 2048 }, { BHAI_IMAGE_WORKFLOW: "flux-schnell" }),
+    /Image width and height/
+  );
+  assert.throws(
+    () => buildComfyUIWorkflow({ prompt: "test", width: 1000, height: 768 }, { BHAI_IMAGE_WORKFLOW: "flux-schnell" }),
+    /Image width and height/
+  );
+});
+
+test("image generation fails clearly when the self-hosted engine is not configured", async () => {
+  await assert.rejects(
+    () => submitComfyUI({ url: "", request: { prompt: "test", seed: 1 } }),
+    error => error.status === 503 && /COMFYUI_URL/.test(error.message)
   );
 });

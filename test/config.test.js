@@ -22,6 +22,16 @@ test("config accepts the default provider order", () => {
   }
 });
 
+test("config honors SERVER_PORT when PORT is not provided", () => {
+  try {
+    delete process.env.PORT;
+    process.env.SERVER_PORT = "18766";
+    assert.equal(config().port, 18766);
+  } finally {
+    restoreEnv();
+  }
+});
+
 test("config rejects an unknown provider", () => {
   try {
     process.env.AI_PROVIDER_ORDER = "gemini,unknown-provider";

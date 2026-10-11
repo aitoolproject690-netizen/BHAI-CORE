@@ -15,7 +15,7 @@ function masterAuthConfig(username, password) {
 }
 
 export function config() {
-  const port = Number(env("PORT", "8080"));
+  const port = Number(env("PORT", env("SERVER_PORT", "8080")));
   const host = env("HOST", "0.0.0.0");
   if (!host.trim()) {
     throw Object.assign(new Error("Invalid HOST configuration"), { code: "CONFIG_HOST_INVALID", status: 500 });

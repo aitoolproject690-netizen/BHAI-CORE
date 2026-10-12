@@ -222,38 +222,13 @@ export function createImageRequest({ prompt, provider = "comfyui", model, seed, 
   };
 }
 
-export async function submitMobileImage({ request }) {
-  const payload = localDreamRequestPayload(request);
-  const response = await requestMobileNode({
-    path: LOCAL_DREAM_PATH,
-    method: "POST",
-    headers: { "content-type": "application/json", accept: "text/event-stream" },
-    body: JSON.stringify(payload)
-  });
-  const raw = await response.text();
-  if (!response.ok) {
-    let data = {};
-    try { data = raw ? JSON.parse(raw) : {}; } catch {}
-    throw Object.assign(new Error(data?.error || data?.message || "Local Dream image engine failed"), { status: response.status });
-  }
-  const complete = parseLocalDreamSse(raw);
-  const channels = Number(complete.channels || 3);
-  if (channels !== 3) throw new Error("Local Dream returned unsupported pixel channels: " + channels);
-  const png = rawRgbToPng(complete.image, complete.width, complete.height);
-  const jobId = "ld-" + request.id.slice(4);
-  return {
-    provider: "mobile-local-dream",
-    jobId,
-    seed: Number.isInteger(complete.seed) ? complete.seed : payload.seed,
-    status: "completed",
-    output: {
-      mimeType: "image/png",
-      data: png.toString("base64"),
-      width: Number(complete.width),
-      height: Number(complete.height),
-      generationTimeMs: Number(complete.generation_time_ms || 0)
-    }
-  };
+export async function submitMobileImage() {
+  // Local Dream quality was explicitly rejected for BHAI-X media production.
+  // Fail closed so a caller cannot accidentally route generation through it.
+  throw Object.assign(
+    new Error("Mobile Local Dream image generation is disabled by quality policy. Use the self-hosted ComfyUI GPU image engine."),
+    { status: 503, code: "IMAGE_PROVIDER_DISABLED" }
+  );
 }
 
 export async function getMobileImageJob({ jobId }) {
@@ -466,11 +441,13 @@ export function imageProviderInfo() {
   return {
     mobile: {
       local: true,
-      configured: mobileNodeInfo().configured,
-      connected: mobileNodeInfo().connected,
-      mode: "mobile-node",
-      capabilities: ["image-text-to-image", "image-image-to-image"],
-      note: "Mobile image generation is a separate optional backend; it is not required by the self-hosted GPU engine."
+      enabled: false,
+      configured: false,
+      connected: false,
+      mode: "disabled",
+      capabilities: [],
+      reason: "quality_policy_disabled",
+      note: "Mobile Local Dream is disabled by quality policy. Use the self-hosted ComfyUI GPU image engine."
     },
     comfyui: {
       local: true,

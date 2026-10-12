@@ -25,7 +25,7 @@ test("image job ownership is tenant isolated", async () => {
 });
 
 
-import { rawRgbToPng, parseLocalDreamSse, localDreamRequestPayload, buildComfyUIWorkflow, submitComfyUI } from "../src/image.js";
+import { rawRgbToPng, parseLocalDreamSse, localDreamRequestPayload, buildComfyUIWorkflow, submitComfyUI, submitMobileImage } from "../src/image.js";
 
 test("Local Dream raw RGB is converted into a valid PNG", () => {
   const raw = Buffer.from([255,0,0, 0,255,0]).toString("base64");
@@ -202,4 +202,12 @@ test("ComfyUI readiness reports an unreachable image server truthfully", async (
   assert.equal(status.reachable,false);
   assert.equal(status.ready,false);
   assert.equal(status.reason,"image_engine_unreachable");
+});
+
+
+test("mobile Local Dream generation is disabled by quality policy", async () => {
+  await assert.rejects(
+    () => submitMobileImage({ request: { prompt: "cinematic character" } }),
+    error => error.status === 503 && error.code === "IMAGE_PROVIDER_DISABLED" && /quality policy/i.test(error.message)
+  );
 });

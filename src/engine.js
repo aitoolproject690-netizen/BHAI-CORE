@@ -310,15 +310,15 @@ export async function bhaiEngineChat(config = {}) {
         ? sourceMessages.filter(m => m?.role === "user").slice(-1)
         : sourceMessages;
       const targetPath = localModel && isMobileTarget(target.url)
-        ? "/v1/completions"
+        ? "/completion"
         : endpoint(target.url);
       const requestBody = localModel && isMobileTarget(target.url)
         ? {
-            model: target.model,
             prompt: smollm2CompletionPrompt(messages),
             temperature: 0.2,
             top_k: 1,
-            max_tokens: Math.min(Number(config.max_tokens ?? 64), 64),
+            n_predict: Math.min(Number(config.max_tokens ?? 64), 64),
+            cache_prompt: false,
             stream: false
           }
         : {
@@ -384,19 +384,33 @@ export async function bhaiEngineChatStream(config = {}) {
       const messages = localModel
         ? sourceMessages.filter(m => m?.role === "user").slice(-1)
         : sourceMessages;
-      const response = await requestTarget(target, endpoint(target.url), {
-        method: "POST",
-        headers: headers(target.key),
-        body: JSON.stringify({
-          model: target.model,
-          messages,
-          temperature: localModel ? 0.2 : (config.temperature ?? 0.2),
-          top_k: localModel ? 1 : undefined,
-          max_tokens: localModel ? Math.min(Number(config.max_tokens ?? 64), 64) : (config.max_tokens ?? 256),
-          stream: true
-        }),
-        signal: timeoutSignal()
-      });
+      const mobileCompletion = localModel && isMobileTarget(target.url);
+      const response = await requestTarget(
+        target,
+        mobileCompletion ? "/completion" : endpoint(target.url),
+        {
+          method: "POST",
+          headers: headers(target.key),
+          body: JSON.stringify(mobileCompletion
+            ? {
+                prompt: smollm2CompletionPrompt(messages),
+                temperature: 0.2,
+                top_k: 1,
+                n_predict: Math.min(Number(config.max_tokens ?? 64), 64),
+                cache_prompt: false,
+                stream: true
+              }
+            : {
+                model: target.model,
+                messages,
+                temperature: localModel ? 0.2 : (config.temperature ?? 0.2),
+                top_k: localModel ? 1 : undefined,
+                max_tokens: localModel ? Math.min(Number(config.max_tokens ?? 64), 64) : (config.max_tokens ?? 256),
+                stream: true
+              }),
+          signal: timeoutSignal()
+        }
+      );
 
       if (!response.ok) await readJson(response);
 
@@ -410,7 +424,7 @@ export async function bhaiEngineChatStream(config = {}) {
           if (!payload || payload === "[DONE]") continue;
           try {
             const data = JSON.parse(payload);
-            const token = data?.choices?.[0]?.delta?.content || data?.output?.delta || "";
+            const token = data?.choices?.[0]?.delta?.content || data?.output?.delta || (mobileCompletion ? data?.content : "") || "";
             if (token) {
               emitted = true;
               fullText += token;

@@ -7,6 +7,7 @@ import { execFileSync } from "node:child_process";
 import test from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
+import WebSocket from "ws";
 
 import { generate, getProviderStatus, isProviderConfigured } from "../src/router.js";
 import { providerAdapters } from "../src/providers.js";
@@ -162,6 +163,110 @@ hello mobile<|im_end|>
 <|im_start|>assistant
 `
   );
+});
+
+test("mobile SmolLM2 chat uses llama.cpp native completion response", async () => {
+  const { attachMobileNode } = await import("../src/mobileNode.js");
+  const { updateMobileEngineRegistry } = await import("../src/mobileEngines.js");
+  const { bhaiEngineChat } = await import("../src/engine.js");
+
+  const previousToken = process.env.BHAI_MOBILE_NODE_TOKEN;
+  const previousNodeId = process.env.BHAI_MOBILE_NODE_ID;
+  const previousUrl = process.env.BHAI_ENGINE_URL;
+  const previousFallback = process.env.BHAI_ENGINE_FALLBACK_URL;
+  process.env.BHAI_MOBILE_NODE_TOKEN = "mobile-native-completion-test-token";
+  delete process.env.BHAI_MOBILE_NODE_ID;
+  delete process.env.BHAI_ENGINE_URL;
+  delete process.env.BHAI_ENGINE_FALLBACK_URL;
+
+  updateMobileEngineRegistry([{
+    id: "smollm2",
+    name: "SmolLM2",
+    kind: "llm",
+    model: "smollm2.gguf",
+    backend: "llama.cpp-vulkan",
+    capabilities: ["chat"],
+    ready: true,
+    loaded: true,
+    memory_mb: 512
+  }]);
+
+  const server = http.createServer();
+  attachMobileNode(server);
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const client = new WebSocket("ws://127.0.0.1:" + server.address().port + "/v1/mobile-node");
+  let resolveRequest;
+  let rejectRequest;
+  const requestPromise = new Promise((resolve, reject) => {
+    resolveRequest = resolve;
+    rejectRequest = reject;
+  });
+
+  try {
+    await new Promise((resolve, reject) => {
+      client.once("error", reject);
+      client.on("message", raw => {
+        const message = JSON.parse(String(raw));
+        if (message.type === "auth_ok") {
+          resolve();
+          return;
+        }
+        if (message.type === "request") {
+          resolveRequest(message);
+          client.send(JSON.stringify({
+            type: "response",
+            id: message.id,
+            status: 200,
+            body: JSON.stringify({ content: "4" })
+          }));
+        }
+      });
+      client.once("open", () => client.send(JSON.stringify({
+        type: "auth",
+        token: "mobile-native-completion-test-token",
+        nodeId: "mobile-node-test",
+        model: "smollm2.gguf",
+        capabilities: ["chat", "gpu"],
+        engines: [{
+          id: "smollm2",
+          name: "SmolLM2",
+          kind: "llm",
+          model: "smollm2.gguf",
+          capabilities: ["chat"],
+          ready: true,
+          loaded: true,
+          memory_mb: 512
+        }],
+        platform: "test",
+        version: "test"
+      })));
+    });
+
+    const result = await bhaiEngineChat({
+      messages: [{ role: "user", content: "What is 2 + 2? Answer with only one digit." }],
+      max_tokens: 8
+    });
+    const request = await requestPromise;
+    const body = JSON.parse(request.body);
+    assert.equal(request.path, "/completion");
+    assert.equal(body.n_predict, 8);
+    assert.equal(body.stream, false);
+    assert.equal(body.cache_prompt, false);
+    assert.match(body.prompt, /<\|im_start\|>user\nWhat is 2 \+ 2\? Answer with only one digit\.<\|im_end\|>/);
+    assert.equal(result.text, "4");
+    assert.equal(result.model, "smollm2.gguf");
+  } finally {
+    client.close();
+    await new Promise(resolve => server.close(resolve));
+    updateMobileEngineRegistry([]);
+    if (previousToken === undefined) delete process.env.BHAI_MOBILE_NODE_TOKEN; else process.env.BHAI_MOBILE_NODE_TOKEN = previousToken;
+    if (previousNodeId === undefined) delete process.env.BHAI_MOBILE_NODE_ID; else process.env.BHAI_MOBILE_NODE_ID = previousNodeId;
+    if (previousUrl === undefined) delete process.env.BHAI_ENGINE_URL; else process.env.BHAI_ENGINE_URL = previousUrl;
+    if (previousFallback === undefined) delete process.env.BHAI_ENGINE_FALLBACK_URL; else process.env.BHAI_ENGINE_FALLBACK_URL = previousFallback;
+  }
 });
 
 test("engine accepts compatible response text shapes", async () => {

@@ -151,11 +151,16 @@ test("engine can pin a self-signed HTTPS phone gateway by certificate fingerprin
 });
 
 
-test("SmolLM2 mobile prompt uses its documented ChatML format", async () => {
+test("SmolLM2 mobile prompt uses actual ChatML line breaks", async () => {
   const { smollm2CompletionPrompt } = await import("../src/engine.js");
   assert.equal(
     smollm2CompletionPrompt([{ role: "user", content: "hello mobile" }]),
-    "<|im_start|>system\\nYou are a helpful AI assistant named SmolLM, trained by Hugging Face<|im_end|>\\n<|im_start|>user\\nhello mobile<|im_end|>\\n<|im_start|>assistant\\n"
+    `<|im_start|>system
+You are a helpful AI assistant named SmolLM, trained by Hugging Face<|im_end|>
+<|im_start|>user
+hello mobile<|im_end|>
+<|im_start|>assistant
+`
   );
 });
 

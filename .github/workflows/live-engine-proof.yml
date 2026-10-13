@@ -36,7 +36,7 @@ jobs:
               and .target_role == "primary"
               and .fallback_used == false
               and (.text | type == "string")
-              and (.text | length > 0)
+              and (.text | test("^\\s*4([[:space:].!?]|$)"))
             ' >/dev/null 2>&1; then
               echo "LIVE ENGINE PROOF: PASS"
               exit 0

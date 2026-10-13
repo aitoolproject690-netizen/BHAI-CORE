@@ -563,7 +563,7 @@ const server = http.createServer(async (req, res) => {
         if (url.searchParams.get("inference") === "true") {
           const result = await bhaiEngineChat({
             ...cfg.engine,
-            messages: [{ role: "user", content: "Reply with exactly BHAI_LOCAL_INFERENCE_OK" }],
+            messages: [{ role: "user", content: "What is 2 + 2? Answer with only one digit." }],
             temperature: 0,
             max_tokens: 16
           });

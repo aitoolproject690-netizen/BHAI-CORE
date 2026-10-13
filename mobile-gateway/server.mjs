@@ -232,7 +232,7 @@ export function createMobileGateway(options = {}) {
         };
         server.once("error", onError);
         server.once("listening", onListening);
-        server.listen({ host, port, ipv6Only: host === "::" });
+        server.listen({ host, port, ipv6Only: false });
       });
     },
     stop() {

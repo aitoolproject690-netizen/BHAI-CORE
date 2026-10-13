@@ -72,7 +72,7 @@ function validRequestPath(path) {
   return typeof path === "string" &&
     path.length > 0 &&
     path.length <= MAX_PATH &&
-    (path.startsWith(ALLOWED_REQUEST_PREFIX) || path === "/generate");
+    (path.startsWith(ALLOWED_REQUEST_PREFIX) || path === "/generate" || path === "/completion");
 }
 
 function validHeaders(headers) {

@@ -112,11 +112,13 @@ export function smollm2CompletionPrompt(messages) {
     ? messages.filter(message => message?.role === "user").slice(-1)[0]
     : null;
   const content = String(latest?.content ?? "").trim();
-  return "<|im_start|>system\\nYou are a helpful AI assistant named SmolLM, trained by Hugging Face<|im_end|>\\n" +
-    "<|im_start|>user\\n" + content + "<|im_end|>\\n" +
-    "<|im_start|>assistant\\n";
+  return `<|im_start|>system
+You are a helpful AI assistant named SmolLM, trained by Hugging Face<|im_end|>
+<|im_start|>user
+${content}<|im_end|>
+<|im_start|>assistant
+`;
 }
-
 async function requestTarget(target, path, options = {}) {
   if (isMobileRelayTarget(target.url)) {
     const forwardedHeaders = { ...(options.headers || {}) };

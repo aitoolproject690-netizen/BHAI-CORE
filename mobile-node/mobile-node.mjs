@@ -126,7 +126,8 @@ async function handleRequest(message) {
   const path = String(message.path || "/");
   const method = String(message.method || "GET").toUpperCase();
   const imageEngine = path === "/generate";
-  if (!path.startsWith("/v1/") && !imageEngine) {
+  const textCompletion = path === "/completion";
+  if (!path.startsWith("/v1/") && !imageEngine && !textCompletion) {
     return {
       type: "response",
       id: String(message.id || ""),

@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import { probeLocalImageEngine } from "./localEngineProbe.mjs";
+import { prepareLocalTextRequestBody } from "./requestBody.mjs";
 
 const CORE_URL = String(process.env.BHAI_CORE_URL || "").replace(/\/+$/, "");
 const NODE_TOKEN = String(process.env.BHAI_MOBILE_NODE_TOKEN || process.env.BHAI_ENGINE_API_KEY || "");
@@ -174,7 +175,7 @@ async function handleRequest(message) {
       const response = await fetch(engineBase + path, {
         method,
         headers: localEngineHeaders(message.headers, imageEngine),
-        body: message.body == null ? undefined : String(message.body),
+        body: message.body == null ? undefined : prepareLocalTextRequestBody(path, method, String(message.body)),
         signal: controller.signal
       });
       const body = await response.text();

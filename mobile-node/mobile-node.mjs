@@ -95,17 +95,26 @@ async function probeLocalTextEngine() {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 12000);
   try {
-    const response = await fetch(LOCAL_ENGINE + "/completion", {
+    // Use llama.cpp's OpenAI-compatible endpoint so Qwen chat templates are applied.
+    // cache_prompt:false avoids the broken cached-prompt path observed on the phone.
+    const response = await fetch(LOCAL_ENGINE + "/v1/chat/completions", {
       method: "POST",
       headers: localEngineHeaders({ "content-type": "application/json" }),
-      body: JSON.stringify({ prompt: "<|im_start|>system\nYou are a helpful AI assistant named SmolLM, trained by Hugging Face<|im_end|>\n<|im_start|>user\n2 + 2 = <|im_end|>\n<|im_start|>assistant\n", n_predict: 12, temperature: 0, cache_prompt: false }),
+      body: JSON.stringify({
+        messages: [
+          { role: "system", content: "You are a helpful assistant. Follow instructions exactly." },
+          { role: "user", content: "Reply with exactly this text: FOUR" }
+        ],
+        temperature: 0,
+        max_tokens: 8,
+        cache_prompt: false
+      }),
       signal: controller.signal
     });
     if (!response.ok) return false;
     const result = await response.json().catch(() => ({}));
-    const answer = String(result?.content || "").trim();
-    // A reachable endpoint is not enough: do not advertise gibberish inference as ready.
-    return /^4(?:\s|[.!?]|$)/.test(answer);
+    const answer = String(result?.choices?.[0]?.message?.content || "").trim();
+    return answer === "FOUR";
   } catch {
     return false;
   } finally {

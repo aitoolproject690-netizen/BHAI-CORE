@@ -98,7 +98,7 @@ async function probeLocalTextEngine() {
     const response = await fetch(LOCAL_ENGINE + "/completion", {
       method: "POST",
       headers: localEngineHeaders({ "content-type": "application/json" }),
-      body: JSON.stringify({ prompt: "2 + 2 = ", n_predict: 8, temperature: 0, cache_prompt: false }),
+      body: JSON.stringify({ prompt: "<|im_start|>system\nYou are a helpful AI assistant named SmolLM, trained by Hugging Face<|im_end|>\n<|im_start|>user\n2 + 2 = <|im_end|>\n<|im_start|>assistant\n", n_predict: 12, temperature: 0, cache_prompt: false }),
       signal: controller.signal
     });
     if (!response.ok) return false;
